@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Profivix automaticky najde chyby vašeho e-shopu a vyčíslí ztráty v Kč. Bezplatný report do 24 hodin.">
-  <title>Profivix — Audit e-shopu s finančním dopadem</title>
+  <meta name="description" content="Profivix — AI automatizace pro e-shopy. Sken chyb, finanční dopad v Kč, návod na opravu. Pilotní provoz zdarma pro prvních 5 e-shopů.">
+  <title>Profivix — AI, která zefektivní váš e-shop</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -16,11 +16,14 @@
       --navy-light: #243044;
       --navy-card: #2a3548;
       --white: #ffffff;
-      --green: #4ade80;
-      --green-dark: #22c55e;
-      --text-muted: #94a3b8;
       --text-light: #cbd5e1;
+      --text-muted: #94a3b8;
+      --green: #16a34a;
+      --green-light: #22c55e;
+      --green-bg: rgba(22, 163, 74, 0.12);
+      --red-soft: #f87171;
       --border: rgba(255, 255, 255, 0.08);
+      --max: 1080px;
     }
 
     html { scroll-behavior: smooth; }
@@ -36,124 +39,140 @@
     a { color: inherit; text-decoration: none; }
 
     .container {
-      width: min(1120px, 92vw);
+      width: min(var(--max), 92vw);
       margin: 0 auto;
     }
 
-    /* ── HEADER ── */
     header {
-      padding: 1.25rem 0;
+      padding: 1.15rem 0;
       border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: rgba(26, 35, 50, 0.92);
+      backdrop-filter: blur(8px);
+      z-index: 10;
     }
 
     .logo {
-      font-size: 1.35rem;
+      font-size: 1.3rem;
       font-weight: 800;
       letter-spacing: -0.02em;
     }
 
     .logo span { color: var(--green); }
 
-    /* ── BUTTONS ── */
     .btn {
       display: inline-block;
-      padding: 0.9rem 1.75rem;
+      padding: 0.95rem 1.85rem;
       background: var(--green);
-      color: var(--navy);
+      color: var(--white);
       font-weight: 700;
       font-size: 1rem;
       border-radius: 8px;
+      border: none;
+      cursor: pointer;
       transition: background 0.2s, transform 0.15s;
     }
 
     .btn:hover {
-      background: var(--green-dark);
+      background: var(--green-light);
       transform: translateY(-1px);
     }
 
-    .btn-outline {
-      background: transparent;
-      color: var(--green);
-      border: 2px solid var(--green);
-    }
-
-    .btn-outline:hover {
-      background: rgba(74, 222, 128, 0.1);
-      color: var(--green);
-    }
+    .btn-block { width: 100%; text-align: center; }
 
     /* ── HERO ── */
     .hero {
-      padding: 5rem 0 6rem;
+      padding: 4.5rem 0 3.5rem;
       text-align: center;
     }
 
-    .hero-badge {
+    .hero-tag {
       display: inline-block;
-      padding: 0.35rem 1rem;
-      background: rgba(74, 222, 128, 0.12);
-      color: var(--green);
-      font-size: 0.85rem;
-      font-weight: 600;
+      margin-bottom: 1.25rem;
+      padding: 0.35rem 0.9rem;
       border-radius: 999px;
-      margin-bottom: 1.5rem;
-      border: 1px solid rgba(74, 222, 128, 0.25);
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--green);
+      background: var(--green-bg);
+      border: 1px solid rgba(22, 163, 74, 0.35);
     }
 
     .hero h1 {
-      font-size: clamp(2.2rem, 5vw, 3.5rem);
+      font-size: clamp(2rem, 5.5vw, 3.25rem);
       font-weight: 800;
-      line-height: 1.15;
+      line-height: 1.12;
       letter-spacing: -0.03em;
-      max-width: 18ch;
+      max-width: 22ch;
       margin: 0 auto 1.25rem;
     }
 
-    .hero p {
-      font-size: clamp(1.05rem, 2.5vw, 1.25rem);
+    .hero-sub {
+      font-size: clamp(1.05rem, 2.4vw, 1.22rem);
       color: var(--text-light);
-      max-width: 42ch;
-      margin: 0 auto 2.5rem;
+      max-width: 48ch;
+      margin: 0 auto 2rem;
     }
 
-    .hero-stats {
+    .hero-sub strong { color: var(--white); font-weight: 600; }
+
+    /* ── TRUST ── */
+    .trust {
+      padding: 0 0 3.5rem;
+    }
+
+    .trust-grid {
       display: flex;
-      justify-content: center;
-      gap: 2.5rem;
-      margin-top: 3.5rem;
       flex-wrap: wrap;
+      justify-content: center;
+      gap: 1rem;
     }
 
-    .hero-stat strong {
+    .trust-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.85rem 1.15rem;
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.88rem;
+      color: var(--text-light);
+      max-width: 340px;
+    }
+
+    .trust-icon {
+      font-size: 1.35rem;
+      flex-shrink: 0;
+    }
+
+    .trust-badge strong {
       display: block;
-      font-size: 1.75rem;
-      font-weight: 800;
-      color: var(--green);
-    }
-
-    .hero-stat span {
-      font-size: 0.85rem;
-      color: var(--text-muted);
+      color: var(--white);
+      font-size: 0.92rem;
     }
 
     /* ── SECTIONS ── */
-    section { padding: 5rem 0; }
+    section.block {
+      padding: 4.5rem 0;
+    }
 
-    section:nth-child(even) {
+    section.block.alt {
       background: var(--navy-light);
     }
 
     .section-label {
       color: var(--green);
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.12em;
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.65rem;
     }
 
     .section-title {
-      font-size: clamp(1.75rem, 3.5vw, 2.25rem);
+      font-size: clamp(1.65rem, 3.2vw, 2.15rem);
       font-weight: 800;
       letter-spacing: -0.02em;
       margin-bottom: 0.75rem;
@@ -161,179 +180,65 @@
 
     .section-sub {
       color: var(--text-muted);
-      max-width: 52ch;
-      margin-bottom: 3rem;
+      max-width: 56ch;
+      margin-bottom: 2.5rem;
     }
 
-    /* ── STEPS ── */
-    .steps {
+    /* ── PAIN / SOLUTION ── */
+    .compare {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 2rem;
-    }
-
-    .step {
-      text-align: center;
-      padding: 2rem 1.5rem;
-    }
-
-    .step-num {
-      width: 3rem;
-      height: 3rem;
-      background: var(--green);
-      color: var(--navy);
-      font-weight: 800;
-      font-size: 1.25rem;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 1.25rem;
-    }
-
-    .step h3 {
-      font-size: 1.1rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
-    }
-
-    .step p { color: var(--text-muted); font-size: 0.95rem; }
-
-    /* ── FEATURE CARDS ── */
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      grid-template-columns: 1fr 1fr;
       gap: 1.25rem;
     }
 
-    .card {
+    .compare-col {
       background: var(--navy-card);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.75rem;
-      transition: border-color 0.2s;
+      border-radius: 14px;
+      padding: 1.75rem 1.5rem;
     }
 
-    .card:hover { border-color: rgba(74, 222, 128, 0.3); }
-
-    .card-icon {
-      font-size: 1.75rem;
+    .compare-col h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
       margin-bottom: 1rem;
     }
 
-    .card h3 {
-      font-size: 1.05rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
+    .compare-col.pain {
+      border-color: rgba(248, 113, 113, 0.25);
     }
 
-    .card p {
-      color: var(--text-muted);
-      font-size: 0.9rem;
+    .compare-col.pain h3 { color: var(--red-soft); }
+
+    .compare-col.solve {
+      border-color: rgba(22, 163, 74, 0.35);
     }
 
-    /* ── SAMPLE REPORT ── */
-    .sample {
-      background: var(--navy-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 3rem 2rem;
-      text-align: center;
-      max-width: 640px;
-      margin: 0 auto;
-    }
+    .compare-col.solve h3 { color: var(--green); }
 
-    .sample-loss {
-      font-size: clamp(2.5rem, 6vw, 3.5rem);
-      font-weight: 800;
-      color: #f87171;
-      margin: 1rem 0;
-      letter-spacing: -0.02em;
-    }
-
-    .sample-detail {
-      color: var(--text-muted);
-      margin-bottom: 2rem;
-      font-size: 1.05rem;
-    }
-
-    .sample-shop {
-      font-weight: 600;
-      color: var(--white);
-    }
-
-    /* ── PRICING ── */
-    .pricing {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 1.5rem;
-      align-items: start;
-    }
-
-    .price-card {
-      background: var(--navy-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 2rem 1.75rem;
-    }
-
-    .price-card.featured {
-      border-color: var(--green);
-      box-shadow: 0 0 0 1px var(--green), 0 8px 32px rgba(74, 222, 128, 0.12);
-      position: relative;
-    }
-
-    .price-badge {
-      position: absolute;
-      top: -0.75rem;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--green);
-      color: var(--navy);
-      font-size: 0.75rem;
-      font-weight: 700;
-      padding: 0.25rem 0.85rem;
-      border-radius: 999px;
-      white-space: nowrap;
-    }
-
-    .price-name {
-      font-size: 0.8rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-muted);
-      margin-bottom: 0.5rem;
-    }
-
-    .price-amount {
-      font-size: 2rem;
-      font-weight: 800;
-      margin-bottom: 1.5rem;
-      letter-spacing: -0.02em;
-    }
-
-    .price-amount small {
-      font-size: 0.9rem;
-      font-weight: 500;
-      color: var(--text-muted);
-    }
-
-    .price-features {
+    .compare-col ul {
       list-style: none;
-      margin-bottom: 2rem;
     }
 
-    .price-features li {
-      padding: 0.45rem 0;
+    .compare-col li {
+      position: relative;
+      padding: 0.45rem 0 0.45rem 1.35rem;
       font-size: 0.92rem;
       color: var(--text-light);
       border-bottom: 1px solid var(--border);
-      padding-left: 1.5rem;
-      position: relative;
     }
 
-    .price-features li::before {
+    .compare-col li:last-child { border-bottom: none; }
+
+    .compare-col.pain li::before {
+      content: "✕";
+      position: absolute;
+      left: 0;
+      color: var(--red-soft);
+      font-weight: 700;
+    }
+
+    .compare-col.solve li::before {
       content: "✓";
       position: absolute;
       left: 0;
@@ -341,14 +246,152 @@
       font-weight: 700;
     }
 
-    .price-card .btn {
+    /* ── EARLY ADOPTERS ── */
+    .offer {
+      background: linear-gradient(135deg, rgba(22, 163, 74, 0.18), rgba(26, 35, 50, 0.9));
+      border: 1px solid rgba(22, 163, 74, 0.45);
+      border-radius: 16px;
+      padding: 2.5rem 2rem;
+      text-align: center;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    .offer-badge {
+      display: inline-block;
+      background: var(--green);
+      color: var(--white);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 0.3rem 0.75rem;
+      border-radius: 999px;
+      margin-bottom: 1rem;
+    }
+
+    .offer h2 {
+      font-size: clamp(1.5rem, 3vw, 1.95rem);
+      font-weight: 800;
+      margin-bottom: 1rem;
+    }
+
+    .offer-price {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--green);
+      margin: 0.75rem 0;
+    }
+
+    .offer-price s {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      font-weight: 500;
+      margin-right: 0.5rem;
+    }
+
+    .offer-list {
+      list-style: none;
+      text-align: left;
+      max-width: 420px;
+      margin: 1.5rem auto 2rem;
+    }
+
+    .offer-list li {
+      padding: 0.4rem 0 0.4rem 1.4rem;
+      position: relative;
+      color: var(--text-light);
+      font-size: 0.95rem;
+    }
+
+    .offer-list li::before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    /* ── FORM ── */
+    .form-wrap {
+      max-width: 520px;
+      margin: 0 auto;
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem 1.75rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.15rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+      color: var(--text-light);
+    }
+
+    .form-group input {
       width: 100%;
+      padding: 0.75rem 0.9rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--navy);
+      color: var(--white);
+      font-family: inherit;
+      font-size: 1rem;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+    }
+
+    .form-group input.invalid {
+      border-color: var(--red-soft);
+    }
+
+    .form-error {
+      color: var(--red-soft);
+      font-size: 0.8rem;
+      margin-top: 0.35rem;
+      display: none;
+    }
+
+    .form-group.has-error .form-error { display: block; }
+
+    .form-success {
+      display: none;
+      text-align: center;
+      padding: 2rem 1rem;
+    }
+
+    .form-success.visible { display: block; }
+
+    .form-success h3 {
+      color: var(--green);
+      font-size: 1.35rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .form-success p { color: var(--text-light); }
+
+    #registration-form.hidden { display: none; }
+
+    .form-note {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 0.85rem;
       text-align: center;
     }
 
     /* ── FOOTER ── */
     footer {
-      padding: 2.5rem 0;
+      padding: 2.25rem 0;
       border-top: 1px solid var(--border);
       text-align: center;
       color: var(--text-muted);
@@ -362,185 +405,232 @@
 
     footer a:hover { text-decoration: underline; }
 
+    .footer-links {
+      margin-top: 0.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem 1rem;
+    }
+
     /* ── RESPONSIVE ── */
-    @media (max-width: 600px) {
-      .hero { padding: 3rem 0 4rem; }
-      section { padding: 3.5rem 0; }
-      .hero-stats { gap: 1.5rem; }
+    @media (max-width: 768px) {
+      .hero { padding: 3rem 0 2.5rem; }
+      section.block { padding: 3rem 0; }
+      .compare { grid-template-columns: 1fr; }
+      .trust-grid { flex-direction: column; align-items: stretch; }
+      .trust-badge { max-width: none; }
+      .offer { padding: 2rem 1.25rem; }
+      .form-wrap { padding: 1.5rem 1.15rem; }
     }
   </style>
 </head>
 <body>
 
-  <!-- HEADER -->
   <header>
     <div class="container">
       <div class="logo">Profi<span>vix</span></div>
     </div>
   </header>
 
-  <!-- HERO -->
-  <section class="hero">
-    <div class="container">
-      <div class="hero-badge">Audit e-shopu · CZ / SK</div>
-      <h1>Váš e-shop ztrácí peníze. Víme kde.</h1>
-      <p>Profivix automaticky najde chyby vašeho e-shopu a vyčíslí ztráty v Kč. Během 24 hodin dostanete report.</p>
-      <a class="btn" href="mailto:info@profivix.ai?subject=Bezplatný%20report%20e-shopu">Chci bezplatný report</a>
-      <div class="hero-stats">
-        <div class="hero-stat">
-          <strong>24 h</strong>
-          <span>Dodání reportu</span>
-        </div>
-        <div class="hero-stat">
-          <strong>6+</strong>
-          <span>Oblastí auditu</span>
-        </div>
-        <div class="hero-stat">
-          <strong>Kč</strong>
-          <span>Finanční dopad každé chyby</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- JAK TO FUNGUJE -->
-  <section id="jak">
-    <div class="container">
-      <p class="section-label">Jak to funguje</p>
-      <h2 class="section-title">Tři kroky k přehledu o vašem e-shopu</h2>
-      <p class="section-sub">Bez složité instalace. Stačí URL vašeho e-shopu a my se postaráme o zbytek.</p>
-      <div class="steps">
-        <div class="step">
-          <div class="step-num">1</div>
-          <h3>Zadáte URL vašeho e-shopu</h3>
-          <p>Pošlete nám adresu vašeho obchodu e-mailem nebo přes formulář.</p>
-        </div>
-        <div class="step">
-          <div class="step-num">2</div>
-          <h3>Profivix provede automatický sken</h3>
-          <p>Analyzujeme rychlost, SEO, odkazy, mobilní verzi a další kritické oblasti.</p>
-        </div>
-        <div class="step">
-          <div class="step-num">3</div>
-          <h3>Do 24 hodin dostanete PDF report</h3>
-          <p>Přehledný report s chybami, finančním dopadem a doporučenými opravami.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CO ZJISTÍME -->
-  <section id="co">
-    <div class="container">
-      <p class="section-label">Co zjistíme</p>
-      <h2 class="section-title">Každá chyba má svou cenu</h2>
-      <p class="section-sub">Nenecháváme vás jen se seznamem problémů — u každého ukážeme, kolik vás stojí.</p>
-      <div class="cards">
-        <div class="card">
-          <div class="card-icon">⚡</div>
-          <h3>Rychlost načítání</h3>
-          <p>Pomalá stránka odhání zákazníky dřív, než uvidí produkt. Vyčíslíme finanční dopad každé sekundy zpoždění.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">🔍</div>
-          <h3>SEO chyby</h3>
-          <p>Chybějící titulky, meta popisy a H1 nadpisy stojí vás pozice ve vyhledávání — a tím i objednávky.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">🔗</div>
-          <h3>Nefunkční odkazy</h3>
-          <p>Broken linky vedou zákazníky do slepé uličky. Zjistíme, kde ztrácíte konverze.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">📱</div>
-          <h3>Mobilní optimalizace</h3>
-          <p>Většina nákupů probíhá z mobilu. Ověříme, zda váš e-shop mobilním zákazníkům nebrání v nákupu.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">✏️</div>
-          <h3>Chybějící meta texty</h3>
-          <p>Title tagy, meta descriptions a Open Graph — bez nich váš e-shop ve výsledcích vyhledávání nezáří.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">🤖</div>
-          <h3>AI doporučené opravy</h3>
-          <p>Nepíšeme jen co je špatně — AI vygeneruje opravné texty v češtině, připravené k přímému vložení.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- UKÁZKOVÝ REPORT -->
-  <section id="ukazka">
-    <div class="container">
-      <p class="section-label">Ukázkový report</p>
-      <h2 class="section-title">Reálná čísla, ne obecné rady</h2>
-      <div class="sample">
-        <p class="sample-detail">
-          Příklad: <span class="sample-shop">Sportisimo.cz</span> — odhadovaná<br>
-          měsíční ztráta kvůli pomalému načítání
+  <main>
+    <!-- 1. HERO -->
+    <section class="hero">
+      <div class="container">
+        <span class="hero-tag">E-shop · AI · CZ / EU</span>
+        <h1>AI, která zefektivní váš e-shop — bez práce a naplno automatizovaně</h1>
+        <p class="hero-sub">
+          Ušetřete desítky hodin měsíčně, zvyšte konverze a mějte jistotu, že vaše AI řešení
+          <strong>splňuje požadavky pro EU trh</strong>. Profivix najde chyby, vyčíslí ztráty v&nbsp;Kč
+          a připraví konkrétní kroky k opravě.
         </p>
-        <div class="sample-loss">5 100 Kč</div>
-        <p class="sample-detail">/ měsíc · pouze jedna zjištěná chyba</p>
-        <a class="btn" href="mailto:info@profivix.ai?subject=Report%20pro%20můj%20e-shop">Chci report pro můj e-shop</a>
+        <a class="btn" href="#registrace">Chci vyzkoušet pilotní provoz zdarma</a>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- CENÍK -->
-  <section id="cenik">
-    <div class="container">
-      <p class="section-label">Ceník</p>
-      <h2 class="section-title">Vyberte si úroveň auditu</h2>
-      <p class="section-sub">Začněte zdarma, nebo rovnou s kompletním auditem a AI opravami.</p>
-      <div class="pricing">
-
-        <div class="price-card">
-          <p class="price-name">Bezplatný report</p>
-          <p class="price-amount">0 Kč</p>
-          <ul class="price-features">
-            <li>Jedna největší chyba</li>
-            <li>Finanční dopad</li>
-            <li>Zdarma</li>
-          </ul>
-          <a class="btn btn-outline" href="mailto:info@profivix.ai?subject=Bezplatný%20report">Chci zdarma</a>
+    <!-- 2. TRUST BADGES -->
+    <section class="trust">
+      <div class="container">
+        <div class="trust-grid">
+          <div class="trust-badge">
+            <span class="trust-icon" aria-hidden="true">🇪🇺</span>
+            <div>
+              <strong>Registrovaná ochranná známka EU AI</strong>
+              Řešení navržené s ohledem na evropský trh a transparentní AI audit e-shopu.
+            </div>
+          </div>
+          <div class="trust-badge">
+            <span class="trust-icon" aria-hidden="true">🛒</span>
+            <div>
+              <strong>Kompatibilní s běžnými platformami</strong>
+              Shoptet, WooCommerce a další — bez zásahu do jádra vašeho obchodu.
+            </div>
+          </div>
         </div>
-
-        <div class="price-card featured">
-          <span class="price-badge">Nejoblíbenější</span>
-          <p class="price-name">Kompletní audit</p>
-          <p class="price-amount">4 990 Kč</p>
-          <ul class="price-features">
-            <li>Všechny chyby</li>
-            <li>Finanční dopad každé chyby</li>
-            <li>AI opravné texty připravené k vložení</li>
-            <li>Návod na opravu</li>
-          </ul>
-          <a class="btn" href="mailto:info@profivix.ai?subject=Kompletní%20audit%20e-shopu">Objednat audit</a>
-        </div>
-
-        <div class="price-card">
-          <p class="price-name">Paušální monitoring</p>
-          <p class="price-amount">3 990 Kč <small>/ měsíc</small></p>
-          <ul class="price-features">
-            <li>Týdenní skenování</li>
-            <li>Měsíční report</li>
-            <li>Asistenční opravy</li>
-            <li>Před/Po dokumentace</li>
-          </ul>
-          <a class="btn btn-outline" href="mailto:info@profivix.ai?subject=Monitoring%20e-shopu">Mám zájem</a>
-        </div>
-
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- FOOTER -->
+    <!-- 3. PAIN vs ŘEŠENÍ -->
+    <section class="block alt" id="reseni">
+      <div class="container">
+        <p class="section-label">Proč Profivix</p>
+        <h2 class="section-title">Co vás brzdí — a jak to vyřešíme</h2>
+        <p class="section-sub">
+          Majitelé e-shopů nepotřebují další obecný checklist. Potřebují jasná čísla a konkrétní postup.
+        </p>
+        <div class="compare">
+          <div class="compare-col pain">
+            <h3>Co vás trápí</h3>
+            <ul>
+              <li>Nedostatek času na audit a optimalizaci</li>
+              <li>Drahé a pomalé manuální procesy</li>
+              <li>Složitá administrace a technické termíny</li>
+              <li>E-shop optimalizovaný „jak-tak“, ne daty</li>
+              <li>Nevíte, kolik vás každá chyba stojí</li>
+            </ul>
+          </div>
+          <div class="compare-col solve">
+            <h3>Jak to řeší Profivix</h3>
+            <ul>
+              <li>Automatický sken rychlosti, SEO, odkazů a mobilu</li>
+              <li>Finanční dopad každého problému v Kč / měsíc</li>
+              <li>PDF report s jasnou prioritou oprav</li>
+              <li>AI opravné texty připravené k vložení</li>
+              <li>Konkrétní návod — co opravit jako první</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. EARLY ADOPTERS -->
+    <section class="block" id="pilot">
+      <div class="container">
+        <div class="offer">
+          <span class="offer-badge">Pilotní provoz</span>
+          <h2>Hledáme prvních 5 e-shopů</h2>
+          <p style="color: var(--text-light); max-width: 46ch; margin: 0 auto;">
+            Zapojte se do pilotu a ovlivněte směr produktu. Vaše zpětná vazba půjde přímo do vývoje.
+          </p>
+          <p class="offer-price"><s>4 990 Kč</s> 0 Kč</p>
+          <p style="color: var(--text-muted); font-size: 0.95rem;">Kompletní report v pilotu zdarma</p>
+          <ul class="offer-list">
+            <li>Kompletní report ZDARMA (běžná cena 4 990 Kč)</li>
+            <li>Přímá linka na vývoj — podněty zapracujeme přednostně</li>
+            <li>Prioritní podpora během pilotního provozu</li>
+          </ul>
+          <a class="btn" href="#registrace">Chci vyzkoušet pilotní provoz zdarma</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. REGISTRAČNÍ FORMULÁŘ -->
+    <section class="block alt" id="registrace">
+      <div class="container">
+        <p class="section-label">Registrace do pilotu</p>
+        <h2 class="section-title">Přihlaste se do pilotního provozu</h2>
+        <p class="section-sub">Vyplňte formulář — ozveme se do 48 hodin s dalším postupem.</p>
+
+        <div class="form-wrap">
+          <div class="form-success" id="form-success" role="status">
+            <h3>Děkujeme!</h3>
+            <p>Ozveme se vám do 48 hodin s dalšími informacemi k pilotnímu provozu.</p>
+          </div>
+
+          <!--
+            Formspree: založte účet na https://formspree.io
+            Vytvořte formulář a nahraďte FORMSPREE_ENDPOINT_ZDE skutečným ID, např.:
+            action="https://formspree.io/f/xyzabcde"
+          -->
+          <form
+            id="registration-form"
+            action="https://formspree.io/f/FORMSPREE_ENDPOINT_ZDE"
+            method="POST"
+            novalidate
+          >
+            <input type="hidden" name="_subject" value="Profivix — registrace do pilotu">
+            <input type="text" name="_gotcha" tabindex="-1" autocomplete="off" style="display:none" aria-hidden="true">
+
+            <div class="form-group" id="fg-name">
+              <label for="name">Jméno</label>
+              <input type="text" id="name" name="name" required autocomplete="name" placeholder="Jan Novák">
+              <span class="form-error">Vyplňte prosím jméno.</span>
+            </div>
+
+            <div class="form-group" id="fg-email">
+              <label for="email">E-mail</label>
+              <input type="email" id="email" name="email" required autocomplete="email" placeholder="jan@eshop.cz">
+              <span class="form-error">Zadejte platný e-mail.</span>
+            </div>
+
+            <div class="form-group" id="fg-shop">
+              <label for="shop">Název e-shopu / URL</label>
+              <input type="text" id="shop" name="shop" required placeholder="https://www.muj-eshop.cz">
+              <span class="form-error">Vyplňte URL nebo název e-shopu.</span>
+            </div>
+
+            <button type="submit" class="btn btn-block">Odeslat přihlášku do pilotu</button>
+            <p class="form-note">Odesláním souhlasíte se zpracováním údajů pro účely pilotního provozu Profivix.</p>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
   <footer>
     <div class="container">
-      <p>© 2026 Profivix &nbsp;|&nbsp; <a href="https://profivix.ai">profivix.ai</a> &nbsp;|&nbsp; <a href="mailto:info@profivix.ai">info@profivix.ai</a></p>
+      <p>© 2026 Profivix</p>
+      <div class="footer-links">
+        <a href="https://profivix.com">profivix.com</a>
+        <span aria-hidden="true">|</span>
+        <a href="mailto:info@profivix.ai">info@profivix.ai</a>
+      </div>
     </div>
   </footer>
 
+  <script>
+    (function () {
+      var form = document.getElementById('registration-form');
+      var success = document.getElementById('form-success');
+      if (!form) return;
+
+      function isEmail(v) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+      }
+
+      function setError(groupId, show) {
+        var g = document.getElementById(groupId);
+        if (!g) return;
+        g.classList.toggle('has-error', show);
+        var input = g.querySelector('input');
+        if (input) input.classList.toggle('invalid', show);
+      }
+
+      form.addEventListener('submit', function (e) {
+        var name = form.name.value.trim();
+        var email = form.email.value.trim();
+        var shop = form.shop.value.trim();
+        var ok = true;
+
+        setError('fg-name', !name);
+        setError('fg-email', !isEmail(email));
+        setError('fg-shop', !shop);
+        if (!name || !isEmail(email) || !shop) {
+          e.preventDefault();
+          ok = false;
+        }
+
+        if (ok && form.action.indexOf('FORMSPREE_ENDPOINT_ZDE') !== -1) {
+          e.preventDefault();
+          alert('Doplňte Formspree endpoint do action atributu formuláře (viz komentář v HTML).');
+        }
+      });
+
+      if (window.location.search.indexOf('sent=1') !== -1) {
+        form.classList.add('hidden');
+        success.classList.add('visible');
+      }
+    })();
+  </script>
 </body>
 </html>
