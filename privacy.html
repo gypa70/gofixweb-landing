@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Zásady ochrany osobních údajů služby GoFixWeb.">
+  <title>Ochrana osobních údajů — GoFixWeb</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2332;
+      --white: #ffffff;
+      --text-light: #cbd5e1;
+      --text-muted: #94a3b8;
+      --green: #16a34a;
+      --border: rgba(255, 255, 255, 0.08);
+      --max: 760px;
+    }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--navy);
+      color: var(--white);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--green); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { width: min(var(--max), 92vw); margin: 0 auto; }
+    header {
+      padding: 1.15rem 0;
+      border-bottom: 1px solid var(--border);
+      background: rgba(26, 35, 50, 0.92);
+    }
+    .logo { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.02em; }
+    .logo span { color: var(--green); }
+    main { padding: 3rem 0 4rem; }
+    h1 { font-size: clamp(1.6rem, 4vw, 2rem); font-weight: 800; margin-bottom: 0.5rem; }
+    .updated { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 2rem; }
+    h2 { font-size: 1.15rem; font-weight: 700; margin: 1.75rem 0 0.65rem; color: var(--text-light); }
+    p, li { color: var(--text-light); font-size: 0.95rem; margin-bottom: 0.75rem; }
+    ul { padding-left: 1.25rem; margin-bottom: 1rem; }
+    footer {
+      padding: 2rem 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    .footer-links {
+      margin-top: 0.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem 1rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <a href="index.html" class="logo">GoFix<span>Web</span></a>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <h1>Zásady ochrany osobních údajů</h1>
+      <p class="updated">Platné od: 13. 8. 2026 · Správce: GoFixWeb</p>
+
+      <p>
+        GoFixWeb respektuje vaše soukromí. Tento dokument popisuje, jak zpracováváme osobní údaje
+        při provozu webu a poskytování služeb analýzy e-shopů.
+      </p>
+
+      <h2>1. Správce údajů</h2>
+      <p>
+        Správcem je <strong>GoFixWeb</strong>. Kontakt pro dotazy k ochraně údajů:
+        <a href="mailto:info@gofixweb.ai">info@gofixweb.ai</a>.
+      </p>
+
+      <h2>2. Jaké údaje zpracováváme</h2>
+      <p>Můžeme zpracovávat zejména:</p>
+      <ul>
+        <li>identifikační a kontaktní údaje (jméno, e-mail),</li>
+        <li>URL nebo název e-shopu zadaný ve formuláři,</li>
+        <li>technické údaje o návštěvě webu (IP adresa, cookies, typ prohlížeče),</li>
+        <li>fakturační údaje při objednávce placené služby,</li>
+        <li>obsah komunikace (e-maily, podpora).</li>
+      </ul>
+
+      <h2>3. Účely a právní základy</h2>
+      <ul>
+        <li><strong>Registrace do pilotu / kontakt</strong> — plnění smlouvy nebo kroky před jejím uzavřením, případně souhlas.</li>
+        <li><strong>Poskytování analýzy e-shopu</strong> — plnění smlouvy.</li>
+        <li><strong>Platby</strong> — plnění smlouvy, plnění právních povinností (účetnictví).</li>
+        <li><strong>Provoz webu a bezpečnost</strong> — oprávněný zájem správce.</li>
+        <li><strong>Marketing</strong> — pouze se souhlasem, pokud je vyžádán.</li>
+      </ul>
+
+      <h2>4. Doba uchování</h2>
+      <p>
+        Údaje uchováváme po dobu trvání smluvního vztahu a dále po dobu vyžadovanou právními
+        předpisy (typicky 3–10 let u účetních a daňových dokladů). Kontaktní údaje z pilotní
+        registrace mažeme po ukončení pilotu nebo na žádost, pokud nemáme jiný právní důvod
+        k jejich uchování.
+      </p>
+
+      <h2>5. Příjemci a předávání</h2>
+      <p>
+        Údaje můžeme svěřit zpracovatelům nezbytným pro provoz služby (hosting, e-mail,
+        platební brána Stripe, analytika, formulářové služby). Osobní údaje neprodáváme třetím stranám.
+        Předávání mimo EU/EHP probíhá pouze s odpovídajícími zárukami (např. standardní smluvní doložky).
+      </p>
+
+      <h2>6. Vaše práva</h2>
+      <p>Máte právo na:</p>
+      <ul>
+        <li>přístup ke svým údajům a jejich kopii,</li>
+        <li>opravu nebo doplnění nepřesných údajů,</li>
+        <li>výmaz (pokud nejsou dány jiné důvody pro zpracování),</li>
+        <li>omezení zpracování a námitku proti zpracování,</li>
+        <li>přenositelnost údajů,</li>
+        <li>odvolání souhlasu kdykoli (bez vlivu na dřívější zpracování),</li>
+        <li>podání stížnosti u ÚOOÚ (<a href="https://www.uoou.cz">uoou.cz</a>).</li>
+      </ul>
+      <p>Žádosti zasílejte na <a href="mailto:info@gofixweb.ai">info@gofixweb.ai</a>.</p>
+
+      <h2>7. Cookies</h2>
+      <p>
+        Web může používat technicky nezbytné cookies pro správné zobrazení stránky.
+        Analytické nebo marketingové cookies používáme pouze s vaším souhlasem, pokud jsou na webu aktivní.
+      </p>
+
+      <h2>8. Zabezpečení</h2>
+      <p>
+        Přijímáme přiměřená technická a organizační opatření k ochraně údajů před ztrátou,
+        zneužitím nebo neoprávněným přístupem.
+      </p>
+
+      <h2>9. Změny zásad</h2>
+      <p>
+        Tyto zásady můžeme aktualizovat. Aktuální verze je vždy dostupná na této stránce.
+      </p>
+
+      <p style="margin-top: 2rem; font-size: 0.85rem; color: var(--text-muted);">
+        <em>Výchozí verze pro účely registrace platební brány. Před ostrým provozem doporučujeme
+        právní revizi textu, zejména doplnění identifikačních údajů provozovatele (IČO, sídlo).</em>
+      </p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>© 2026 GoFixWeb</p>
+      <div class="footer-links">
+        <a href="index.html">Domů</a>
+        <span aria-hidden="true">|</span>
+        <a href="terms.html">Obchodní podmínky</a>
+        <span aria-hidden="true">|</span>
+        <a href="privacy.html">Ochrana osobních údajů</a>
+        <span aria-hidden="true">|</span>
+        <a href="mailto:info@gofixweb.ai">info@gofixweb.ai</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
