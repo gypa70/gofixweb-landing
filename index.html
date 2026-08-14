@@ -82,6 +82,25 @@
 
     .btn-block { width: 100%; text-align: center; }
 
+    .btn-outline {
+      background: transparent;
+      color: var(--green);
+      border: 2px solid var(--green);
+    }
+
+    .btn-outline:hover {
+      background: var(--green-bg);
+      color: var(--green-light);
+      border-color: var(--green-light);
+    }
+
+    .hero-cta {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.85rem;
+    }
+
     /* ── HERO ── */
     .hero {
       padding: 4.5rem 0 3.5rem;
@@ -460,7 +479,10 @@
           <strong>splňuje požadavky pro EU trh</strong>. GoFixWeb najde chyby, vyčíslí ztráty v&nbsp;Kč
           a připraví konkrétní kroky k opravě.
         </p>
-        <a class="btn" href="#registrace">Chci vyzkoušet pilotní provoz zdarma</a>
+        <div class="hero-cta">
+          <a class="btn" href="#registrace">Chci vyzkoušet pilotní provoz zdarma</a>
+          <a class="btn btn-outline" href="samples/ukazkovy-report.pdf" target="_blank" rel="noopener">Zobrazit ukázkový report</a>
+        </div>
       </div>
     </section>
 
