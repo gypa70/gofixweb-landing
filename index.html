@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="GoFixWeb — AI automatizace pro e-shopy. Sken chyb, finanční dopad v Kč, návod na opravu. Pilotní provoz zdarma pro prvních 5 e-shopů.">
+  <meta name="description" content="GoFixWeb — AI automatizace pro e-shopy. Sken chyb, finanční dopad v Kč, návod na opravu. Tarify od 1 490 Kč/měs.">
   <title>GoFixWeb — AI, která zefektivní váš e-shop</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -207,13 +207,15 @@
 
     #reseni .section-label,
     #reseni .section-title,
-    #registrace .section-label,
-    #registrace .section-title {
+    #tarify .section-label,
+    #tarify .section-title,
+    #kontakt .section-title {
       text-align: center;
     }
 
     #reseni .section-sub,
-    #registrace .section-sub {
+    #tarify .section-sub,
+    #kontakt .section-sub {
       text-align: center;
       margin-left: auto;
       margin-right: auto;
@@ -281,148 +283,129 @@
       font-weight: 700;
     }
 
-    /* ── EARLY ADOPTERS ── */
-    .offer {
-      background: linear-gradient(135deg, rgba(22, 163, 74, 0.18), rgba(26, 35, 50, 0.9));
-      border: 1px solid rgba(22, 163, 74, 0.45);
-      border-radius: 16px;
-      padding: 2.5rem 2rem;
-      text-align: center;
-      max-width: 720px;
-      margin: 0 auto;
+    /* ── PRICING ── */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+      align-items: stretch;
     }
 
-    .offer-badge {
-      display: inline-block;
+    .pricing-card {
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.75rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .pricing-card.featured {
+      border-color: rgba(22, 163, 74, 0.55);
+      box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.25), 0 12px 40px rgba(0, 0, 0, 0.25);
+      position: relative;
+    }
+
+    .pricing-badge {
+      position: absolute;
+      top: -0.65rem;
+      left: 50%;
+      transform: translateX(-50%);
       background: var(--green);
       color: var(--white);
-      font-size: 0.75rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 0.28rem 0.75rem;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    .pricing-name {
+      font-size: 0.85rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      padding: 0.3rem 0.75rem;
-      border-radius: 999px;
-      margin-bottom: 1rem;
+      color: var(--green);
+      margin-bottom: 0.5rem;
     }
 
-    .offer h2 {
-      font-size: clamp(1.5rem, 3vw, 1.95rem);
-      font-weight: 800;
-      margin-bottom: 1rem;
-    }
-
-    .offer-price {
+    .pricing-price {
       font-size: 2rem;
       font-weight: 800;
-      color: var(--green);
-      margin: 0.75rem 0;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.25rem;
     }
 
-    .offer-price s {
-      color: var(--text-muted);
-      font-size: 1.1rem;
-      font-weight: 500;
-      margin-right: 0.5rem;
-    }
-
-    .offer-list {
-      list-style: none;
-      text-align: left;
-      max-width: 420px;
-      margin: 1.5rem auto 2rem;
-    }
-
-    .offer-list li {
-      padding: 0.4rem 0 0.4rem 1.4rem;
-      position: relative;
-      color: var(--text-light);
+    .pricing-price span {
       font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text-muted);
     }
 
-    .offer-list li::before {
-      content: "→";
+    .pricing-desc {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 1.25rem;
+      min-height: 2.6rem;
+    }
+
+    .pricing-features {
+      list-style: none;
+      margin-bottom: 1.5rem;
+      flex: 1;
+    }
+
+    .pricing-features li {
+      position: relative;
+      padding: 0.42rem 0 0.42rem 1.35rem;
+      font-size: 0.92rem;
+      color: var(--text-light);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .pricing-features li:last-child { border-bottom: none; }
+
+    .pricing-features li::before {
+      content: "✓";
       position: absolute;
       left: 0;
       color: var(--green);
       font-weight: 700;
     }
 
-    /* ── FORM ── */
-    .form-wrap {
-      max-width: 520px;
-      margin: 0 auto;
-      background: var(--navy-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 2rem 1.75rem;
-    }
-
-    .form-group {
-      margin-bottom: 1.15rem;
-    }
-
-    .form-group label {
-      display: block;
-      font-size: 0.85rem;
-      font-weight: 600;
-      margin-bottom: 0.4rem;
-      color: var(--text-light);
-    }
-
-    .form-group input {
-      width: 100%;
-      padding: 0.75rem 0.9rem;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--navy);
-      color: var(--white);
-      font-family: inherit;
-      font-size: 1rem;
-    }
-
-    .form-group input:focus {
-      outline: none;
-      border-color: var(--green);
-      box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
-    }
-
-    .form-group input.invalid {
-      border-color: var(--red-soft);
-    }
-
-    .form-error {
-      color: var(--red-soft);
-      font-size: 0.8rem;
-      margin-top: 0.35rem;
-      display: none;
-    }
-
-    .form-group.has-error .form-error { display: block; }
-
-    .form-success {
-      display: none;
+    .pricing-note {
       text-align: center;
-      padding: 2rem 1rem;
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      margin-top: 1.75rem;
     }
 
-    .form-success.visible { display: block; }
+    /* ── CONTACT ── */
+    .contact-wrap {
+      max-width: 560px;
+      margin: 0 auto;
+      text-align: center;
+    }
 
-    .form-success h3 {
-      color: var(--green);
-      font-size: 1.35rem;
+    .contact-wrap h2 {
+      font-size: clamp(1.35rem, 3vw, 1.75rem);
+      font-weight: 800;
       margin-bottom: 0.75rem;
     }
 
-    .form-success p { color: var(--text-light); }
-
-    #registration-form.hidden { display: none; }
-
-    .form-note {
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      margin-top: 0.85rem;
-      text-align: center;
+    .contact-wrap p {
+      color: var(--text-light);
+      margin-bottom: 1.25rem;
     }
+
+    .contact-email {
+      color: var(--green);
+      font-weight: 600;
+    }
+
+    .contact-email:hover { text-decoration: underline; }
 
     /* ── FOOTER ── */
     footer {
@@ -455,8 +438,8 @@
       .compare { grid-template-columns: 1fr; }
       .trust-grid { flex-direction: column; align-items: stretch; }
       .trust-badge { max-width: none; }
-      .offer { padding: 2rem 1.25rem; }
-      .form-wrap { padding: 1.5rem 1.15rem; }
+      .pricing-grid { grid-template-columns: 1fr; }
+      .pricing-card.featured { order: -1; }
     }
   </style>
 </head>
@@ -480,7 +463,7 @@
           a připraví konkrétní kroky k opravě.
         </p>
         <div class="hero-cta">
-          <a class="btn" href="#registrace">Chci vyzkoušet pilotní provoz zdarma</a>
+          <a class="btn" href="#tarify">Vybrat tarif</a>
           <a class="btn btn-outline" href="samples/ukazkovy-report.pdf" target="_blank" rel="noopener">Zobrazit ukázkový report</a>
         </div>
       </div>
@@ -541,83 +524,83 @@
       </div>
     </section>
 
-    <!-- 4. EARLY ADOPTERS -->
-    <section class="block" id="pilot">
+    <!-- 4. TARIFY -->
+    <section class="block" id="tarify">
       <div class="container">
-        <div class="offer">
-          <span class="offer-badge">Pilotní provoz</span>
-          <h2>Hledáme prvních 5 e-shopů</h2>
-          <p style="color: var(--text-light); max-width: 46ch; margin: 0 auto;">
-            Zapojte se do pilotu a ovlivněte směr produktu. Vaše zpětná vazba půjde přímo do vývoje.
-          </p>
-          <p class="offer-price"><s>4 990 Kč</s> 0 Kč</p>
-          <p style="color: var(--text-muted); font-size: 0.95rem;">Kompletní report v pilotu zdarma</p>
-          <ul class="offer-list">
-            <li>Kompletní report ZDARMA (běžná cena 4 990 Kč)</li>
-            <li>Přímá linka na vývoj — podněty zapracujeme přednostně</li>
-            <li>Prioritní podpora během pilotního provozu</li>
-          </ul>
-          <a class="btn" href="#registrace">Chci vyzkoušet pilotní provoz zdarma</a>
+        <p class="section-label">Tarify</p>
+        <h2 class="section-title">Vyberte plán pro váš e-shop</h2>
+        <p class="section-sub">
+          Pravidelný sken, PDF reporty a AI opravné texty — bez složité administrace.
+          Platba měsíčně, zrušení kdykoliv.
+        </p>
+
+        <div class="pricing-grid">
+          <article class="pricing-card">
+            <p class="pricing-name">Basic</p>
+            <p class="pricing-price">1&nbsp;490&nbsp;Kč <span>/ měsíc</span></p>
+            <p class="pricing-desc">Měsíční skenování pro menší e-shopy.</p>
+            <ul class="pricing-features">
+              <li>Měsíční sken e-shopu</li>
+              <li>1 oprava / měsíc</li>
+              <li>PDF report s prioritami</li>
+              <li>Finanční dopad v Kč</li>
+            </ul>
+            <!-- TODO: Nahradit skutečným Stripe Payment Link URL (dashboard.stripe.com → Payment Links) -->
+            <a class="btn btn-block" href="https://buy.stripe.com/STRIPE_BASIC_ZDE" rel="noopener">Objednat Basic</a>
+          </article>
+
+          <article class="pricing-card featured">
+            <span class="pricing-badge">Nejoblíbenější</span>
+            <p class="pricing-name">Pro</p>
+            <p class="pricing-price">3&nbsp;990&nbsp;Kč <span>/ měsíc</span></p>
+            <p class="pricing-desc">Týdenní skenování a více oprav pro rostoucí obchody.</p>
+            <ul class="pricing-features">
+              <li>Týdenní sken e-shopu</li>
+              <li>3 opravy / měsíc</li>
+              <li>PDF report + Před/Po</li>
+              <li>AI opravné texty</li>
+              <li>Finanční dopad v Kč</li>
+            </ul>
+            <!-- TODO: Nahradit skutečným Stripe Payment Link URL -->
+            <a class="btn btn-block" href="https://buy.stripe.com/STRIPE_PRO_ZDE" rel="noopener">Objednat Pro</a>
+          </article>
+
+          <article class="pricing-card">
+            <p class="pricing-name">Premium</p>
+            <p class="pricing-price">7&nbsp;990&nbsp;Kč <span>/ měsíc</span></p>
+            <p class="pricing-desc">Denní monitoring a plná podpora pro náročné e-shopy.</p>
+            <ul class="pricing-features">
+              <li>Denní monitoring</li>
+              <li>Bez omezení oprav</li>
+              <li>PDF report + Před/Po</li>
+              <li>AI opravné texty</li>
+              <li>Konzultace 2 h / měsíc</li>
+            </ul>
+            <!-- TODO: Nahradit skutečným Stripe Payment Link URL -->
+            <a class="btn btn-block" href="https://buy.stripe.com/STRIPE_PREMIUM_ZDE" rel="noopener">Objednat Premium</a>
+          </article>
         </div>
+
+        <p class="pricing-note">Ceny včetně DPH. Po zaplacení vás kontaktujeme s dalším postupem.</p>
       </div>
     </section>
 
-    <!-- 5. REGISTRAČNÍ FORMULÁŘ -->
-    <section class="block alt" id="registrace">
-      <div class="container">
-        <p class="section-label">Registrace do pilotu</p>
-        <h2 class="section-title">Přihlaste se do pilotního provozu</h2>
-        <p class="section-sub">Vyplňte formulář — ozveme se do 48 hodin s dalším postupem.</p>
-
-        <div class="form-wrap">
-          <div class="form-success" id="form-success" role="status">
-            <h3>Děkujeme!</h3>
-            <p>Ozveme se vám do 48 hodin s dalšími informacemi k pilotnímu provozu.</p>
-          </div>
-
-          <!--
-            Formspree: založte účet na https://formspree.io
-            Vytvořte formulář a nahraďte FORMSPREE_ENDPOINT_ZDE skutečným ID, např.:
-            action="https://formspree.io/f/xyzabcde"
-          -->
-          <form
-            id="registration-form"
-            action="https://formspree.io/f/FORMSPREE_ENDPOINT_ZDE"
-            method="POST"
-            novalidate
-          >
-            <input type="hidden" name="_subject" value="GoFixWeb — registrace do pilotu">
-            <input type="text" name="_gotcha" tabindex="-1" autocomplete="off" style="display:none" aria-hidden="true">
-
-            <div class="form-group" id="fg-name">
-              <label for="name">Jméno</label>
-              <input type="text" id="name" name="name" required autocomplete="name" placeholder="Jan Novák">
-              <span class="form-error">Vyplňte prosím jméno.</span>
-            </div>
-
-            <div class="form-group" id="fg-email">
-              <label for="email">E-mail</label>
-              <input type="email" id="email" name="email" required autocomplete="email" placeholder="jan@eshop.cz">
-              <span class="form-error">Zadejte platný e-mail.</span>
-            </div>
-
-            <div class="form-group" id="fg-shop">
-              <label for="shop">Název e-shopu / URL</label>
-              <input type="text" id="shop" name="shop" required placeholder="https://www.muj-eshop.cz">
-              <span class="form-error">Vyplňte URL nebo název e-shopu.</span>
-            </div>
-
-            <button type="submit" class="btn btn-block">Odeslat přihlášku do pilotu</button>
-            <p class="form-note">Odesláním souhlasíte se zpracováním údajů pro účely pilotního provozu GoFixWeb.</p>
-          </form>
-        </div>
+    <!-- 5. KONTAKT -->
+    <section class="block alt" id="kontakt">
+      <div class="container contact-wrap">
+        <p class="section-label">Kontakt</p>
+        <h2>Nejste si jistí?</h2>
+        <p class="section-sub">
+          Napište nám — poradíme s výběrem tarifu nebo připravíme individuální nabídku.
+        </p>
+        <a class="btn btn-outline" href="mailto:info@gofixweb.com?subject=Dotaz%20k%20GoFixWeb">info@gofixweb.com</a>
       </div>
     </section>
   </main>
 
   <footer>
     <div class="container">
-      <p>© 2026 GoFixWeb · Kompletní report e-shopu od <strong>4&nbsp;990&nbsp;Kč</strong></p>
+      <p>© 2026 GoFixWeb · Tarify od <strong>1&nbsp;490&nbsp;Kč/měs</strong></p>
       <div class="footer-links">
         <a href="https://gofixweb.com">gofixweb.com</a>
         <span aria-hidden="true">|</span>
@@ -630,49 +613,5 @@
     </div>
   </footer>
 
-  <script>
-    (function () {
-      var form = document.getElementById('registration-form');
-      var success = document.getElementById('form-success');
-      if (!form) return;
-
-      function isEmail(v) {
-        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-      }
-
-      function setError(groupId, show) {
-        var g = document.getElementById(groupId);
-        if (!g) return;
-        g.classList.toggle('has-error', show);
-        var input = g.querySelector('input');
-        if (input) input.classList.toggle('invalid', show);
-      }
-
-      form.addEventListener('submit', function (e) {
-        var name = form.name.value.trim();
-        var email = form.email.value.trim();
-        var shop = form.shop.value.trim();
-        var ok = true;
-
-        setError('fg-name', !name);
-        setError('fg-email', !isEmail(email));
-        setError('fg-shop', !shop);
-        if (!name || !isEmail(email) || !shop) {
-          e.preventDefault();
-          ok = false;
-        }
-
-        if (ok && form.action.indexOf('FORMSPREE_ENDPOINT_ZDE') !== -1) {
-          e.preventDefault();
-          alert('Doplňte Formspree endpoint do action atributu formuláře (viz komentář v HTML).');
-        }
-      });
-
-      if (window.location.search.indexOf('sent=1') !== -1) {
-        form.classList.add('hidden');
-        success.classList.add('visible');
-      }
-    })();
-  </script>
 </body>
 </html>
