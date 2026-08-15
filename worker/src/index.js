@@ -2,14 +2,18 @@
  * GoFixWeb — příjem lead formuláře a spuštění GitHub Actions (repository_dispatch).
  *
  * Secrets (wrangler secret put):
- *   GITHUB_TOKEN  — PAT s repo scope pro gofixweb-scanner
- *   WEBHOOK_SECRET — volitelný shared secret z formuláře
+ *   GITHUB_TOKEN       — PAT s repo scope pro gofixweb-scanner
+ *   TURNSTILE_SECRET   — Turnstile secret key (siteverify)
+ *   WEBHOOK_SECRET     — volitelný shared secret z formuláře
  */
 
 const ALLOWED_ORIGINS = new Set([
   "https://gofixweb.com",
   "https://www.gofixweb.com",
 ]);
+
+const TURNSTILE_ACTION = "free-report";
+const TURNSTILE_HOSTNAMES = new Set(["gofixweb.com", "www.gofixweb.com"]);
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -47,6 +51,51 @@ async function isRateLimited(email, cache) {
   if (hit) return true;
   await cache.put(key, new Response("1"), { expirationTtl: 86400 });
   return false;
+}
+
+function clientIp(request) {
+  return request.headers.get("CF-Connecting-IP") || request.headers.get("X-Forwarded-For") || "";
+}
+
+async function verifyTurnstile(env, token, remoteIp) {
+  const secret = env.TURNSTILE_SECRET;
+  if (!secret) {
+    return { ok: false, error: "turnstile_not_configured" };
+  }
+
+  if (typeof token !== "string" || token.length === 0 || token.length > 2048) {
+    return { ok: false, error: "turnstile_missing" };
+  }
+
+  let result;
+  try {
+    const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        secret,
+        response: token,
+        remoteip: remoteIp,
+      }),
+    });
+    if (!response.ok) {
+      return { ok: false, error: "turnstile_verify_failed" };
+    }
+    result = await response.json();
+  } catch (err) {
+    console.error("turnstile_siteverify_error", err);
+    return { ok: false, error: "turnstile_verify_failed" };
+  }
+
+  if (
+    !result.success ||
+    result.action !== TURNSTILE_ACTION ||
+    !TURNSTILE_HOSTNAMES.has(result.hostname)
+  ) {
+    return { ok: false, error: "turnstile_invalid" };
+  }
+
+  return { ok: true };
 }
 
 async function dispatchGithub(env, payload) {
@@ -96,6 +145,22 @@ export default {
 
     if (env.WEBHOOK_SECRET && body.secret !== env.WEBHOOK_SECRET) {
       return jsonResponse({ ok: false, error: "unauthorized" }, 401, origin);
+    }
+
+    const turnstileToken = String(
+      body.turnstile_token || body["cf-turnstile-response"] || "",
+    ).trim();
+    const turnstileCheck = await verifyTurnstile(env, turnstileToken, clientIp(request));
+    if (!turnstileCheck.ok) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: turnstileCheck.error,
+          message: "Ověření proti robotům selhalo. Obnovte stránku a zkuste to znovu.",
+        },
+        403,
+        origin,
+      );
     }
 
     const name = String(body.name || "").trim();

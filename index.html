@@ -515,6 +515,11 @@
       transform: none;
     }
 
+    .turnstile-wrap {
+      margin: 0.25rem 0 1rem;
+      min-height: 65px;
+    }
+
     /* ── FOOTER ── */
     footer {
       padding: 2.25rem 0;
@@ -637,6 +642,8 @@
               <input type="url" id="shop_url" name="shop_url" required autocomplete="url" placeholder="https://www.muj-eshop.cz">
               <span class="form-error">Zadejte platnou URL e-shopu.</span>
             </div>
+
+            <div id="turnstile-wrap" class="turnstile-wrap" aria-label="Ověření proti robotům"></div>
 
             <button type="submit" class="btn btn-block" id="signup-submit">Odeslat poptávku</button>
             <p class="form-note">Odesláním souhlasíte se zpracováním údajů dle <a href="privacy.html?v=20260815">ochrany osobních údajů</a>.</p>
@@ -768,14 +775,45 @@
     </div>
   </footer>
 
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
   <script>
     (function () {
       var REPORT_API_URL = 'https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev/submit';
+      var TURNSTILE_SITE_KEY = '0x4AAAAAAERBDgPD_ejGBr5Q';
       var form = document.getElementById('signup-form-form');
       var success = document.getElementById('form-success');
       var globalError = document.getElementById('form-error-global');
       var submitBtn = document.getElementById('signup-submit');
+      var turnstileWidgetId = null;
       if (!form) return;
+
+      function renderTurnstile() {
+        if (!window.turnstile || turnstileWidgetId !== null) return;
+        var wrap = document.getElementById('turnstile-wrap');
+        if (!wrap) return;
+        turnstileWidgetId = window.turnstile.render(wrap, {
+          sitekey: TURNSTILE_SITE_KEY,
+          action: 'free-report',
+          theme: 'dark',
+        });
+      }
+
+      if (window.turnstile) {
+        renderTurnstile();
+      } else {
+        window.addEventListener('load', renderTurnstile);
+      }
+
+      function resetTurnstile() {
+        if (window.turnstile && turnstileWidgetId !== null) {
+          window.turnstile.reset(turnstileWidgetId);
+        }
+      }
+
+      function getTurnstileToken() {
+        if (!window.turnstile || turnstileWidgetId === null) return '';
+        return window.turnstile.getResponse(turnstileWidgetId) || '';
+      }
 
       function isEmail(v) {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
@@ -826,13 +864,24 @@
         setError('fg-shop', !isUrl(shop));
         if (!name || !isEmail(email) || !isUrl(shop)) return;
 
+        var turnstileToken = getTurnstileToken();
+        if (!turnstileToken) {
+          showGlobalError('Potvrďte prosím, že nejste robot.');
+          return;
+        }
+
         submitBtn.disabled = true;
         submitBtn.textContent = 'Odesílám…';
 
         fetch(REPORT_API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name, email: email, shop_url: shop }),
+          body: JSON.stringify({
+            name: name,
+            email: email,
+            shop_url: shop,
+            turnstile_token: turnstileToken,
+          }),
         })
           .then(function (res) {
             return res.json().then(function (data) {
@@ -849,12 +898,17 @@
               showGlobalError(result.data.message || 'Pro tento e-mail už dnes byl report odeslán.');
               return;
             }
+            if (result.data && (result.data.error || '').indexOf('turnstile') === 0) {
+              showGlobalError(result.data.message || 'Ověření proti robotům selhalo. Zkuste to znovu.');
+              return;
+            }
             showGlobalError('Odeslání se nepodařilo. Zkuste to prosím znovu nebo napište na info@gofixweb.com.');
           })
           .catch(function () {
             showGlobalError('Odeslání se nepodařilo. Zkuste to prosím znovu nebo napište na info@gofixweb.com.');
           })
           .finally(function () {
+            resetTurnstile();
             submitBtn.disabled = false;
             submitBtn.textContent = 'Odeslat poptávku';
           });
