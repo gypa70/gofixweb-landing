@@ -219,12 +219,15 @@
     #reseni .section-title,
     #tarify .section-label,
     #tarify .section-title,
+    #signup-form .section-label,
+    #signup-form .section-title,
     #kontakt .section-title {
       text-align: center;
     }
 
     #reseni .section-sub,
     #tarify .section-sub,
+    #signup-form .section-sub,
     #kontakt .section-sub {
       text-align: center;
       margin-left: auto;
@@ -417,6 +420,83 @@
 
     .contact-email:hover { text-decoration: underline; }
 
+    /* ── SIGNUP FORM ── */
+    .form-wrap {
+      max-width: 520px;
+      margin: 0 auto;
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem 1.75rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.15rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+      color: var(--text-light);
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 0.75rem 0.9rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--navy);
+      color: var(--white);
+      font-family: inherit;
+      font-size: 1rem;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+    }
+
+    .form-group input.invalid {
+      border-color: var(--red-soft);
+    }
+
+    .form-error {
+      color: var(--red-soft);
+      font-size: 0.8rem;
+      margin-top: 0.35rem;
+      display: none;
+    }
+
+    .form-group.has-error .form-error { display: block; }
+
+    .form-success {
+      display: none;
+      text-align: center;
+      padding: 2rem 1rem;
+    }
+
+    .form-success.visible { display: block; }
+
+    .form-success h3 {
+      color: var(--green);
+      font-size: 1.35rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .form-success p { color: var(--text-light); }
+
+    #signup-form-form.hidden { display: none; }
+
+    .form-note {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 0.85rem;
+      text-align: center;
+    }
+
     /* ── FOOTER ── */
     footer {
       padding: 2.25rem 0;
@@ -449,6 +529,7 @@
       .trust-grid { flex-direction: column; align-items: stretch; }
       .trust-badge { max-width: none; }
       .pricing-grid { grid-template-columns: 1fr; }
+      .form-wrap { padding: 1.5rem 1.15rem; }
     }
   </style>
 </head>
@@ -472,7 +553,7 @@
           a připraví konkrétní kroky k opravě
         </p>
         <div class="hero-cta">
-          <a class="btn" href="mailto:info@gofixweb.com?subject=Zdarma%20report%20GoFixWeb">Získej zdarma svůj report</a>
+          <a class="btn" href="#signup-form">Získej zdarma svůj report</a>
           <div class="hero-cta-secondary">
             <a class="btn btn-outline" href="#tarify">Vybrat tarif</a>
             <a class="btn btn-outline" href="samples/ukazkovy-report.pdf?v=20260815" target="_blank" rel="noopener">Ukázkový report</a>
@@ -499,6 +580,56 @@
               Shoptet, WooCommerce a další — bez zásahu do jádra vašeho obchodu.
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2b. LEAD FORM -->
+    <section class="block alt" id="signup-form">
+      <div class="container">
+        <p class="section-label">Zdarma report</p>
+        <h2 class="section-title">Získejte analýzu svého e-shopu</h2>
+        <p class="section-sub">Vyplňte formulář — report vám pošleme e-mailem do 24 hodin.</p>
+
+        <div class="form-wrap">
+          <div class="form-success" id="form-success" role="status">
+            <h3>Děkujeme!</h3>
+            <p>Poptávku jsme přijali. Ozveme se vám co nejdříve s bezplatným reportem.</p>
+          </div>
+
+          <form
+            id="signup-form-form"
+            action="https://formsubmit.co/info@gofixweb.com"
+            method="POST"
+            novalidate
+          >
+            <input type="hidden" name="_subject" value="GoFixWeb — poptávka zdarma report">
+            <input type="hidden" name="_template" value="table">
+            <input type="hidden" name="_captcha" value="false">
+            <input type="hidden" name="_next" value="https://gofixweb.com/?odeslano=1#signup-form">
+            <input type="text" name="_honey" tabindex="-1" autocomplete="off" style="display:none" aria-hidden="true">
+
+            <div class="form-group" id="fg-name">
+              <label for="name">Jméno</label>
+              <input type="text" id="name" name="Jméno" required autocomplete="name" placeholder="Jan Novák">
+              <span class="form-error">Vyplňte prosím jméno.</span>
+            </div>
+
+            <div class="form-group" id="fg-email">
+              <label for="email">E-mail</label>
+              <input type="email" id="email" name="E-mail" required autocomplete="email" placeholder="jan@eshop.cz">
+              <span class="form-error">Zadejte platný e-mail.</span>
+            </div>
+
+            <div class="form-group" id="fg-shop">
+              <label for="shop_url">URL e-shopu</label>
+              <input type="url" id="shop_url" name="URL e-shopu" required autocomplete="url" placeholder="https://www.muj-eshop.cz">
+              <span class="form-error">Zadejte platnou URL e-shopu.</span>
+            </div>
+
+            <button type="submit" class="btn btn-block">Odeslat poptávku</button>
+            <p class="form-note">Odesláním souhlasíte se zpracováním údajů dle <a href="privacy.html?v=20260815">ochrany osobních údajů</a>.</p>
+          </form>
         </div>
       </div>
     </section>
@@ -625,6 +756,56 @@
       </div>
     </div>
   </footer>
+
+  <script>
+    (function () {
+      var form = document.getElementById('signup-form-form');
+      var success = document.getElementById('form-success');
+      if (!form) return;
+
+      if (window.location.search.indexOf('odeslano=1') !== -1) {
+        form.classList.add('hidden');
+        success.classList.add('visible');
+      }
+
+      function isEmail(v) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+      }
+
+      function isUrl(v) {
+        try {
+          new URL(v);
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function setError(groupId, show) {
+        var g = document.getElementById(groupId);
+        if (!g) return;
+        g.classList.toggle('has-error', show);
+        var input = g.querySelector('input');
+        if (input) input.classList.toggle('invalid', show);
+      }
+
+      form.addEventListener('submit', function (e) {
+        var name = form.querySelector('#name').value.trim();
+        var email = form.querySelector('#email').value.trim();
+        var shop = form.querySelector('#shop_url').value.trim();
+        var ok = true;
+
+        setError('fg-name', !name);
+        setError('fg-email', !isEmail(email));
+        setError('fg-shop', !isUrl(shop));
+        if (!name || !isEmail(email) || !isUrl(shop)) {
+          e.preventDefault();
+          ok = false;
+        }
+        return ok;
+      });
+    })();
+  </script>
 
 </body>
 </html>
