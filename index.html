@@ -127,6 +127,19 @@
       gap: 0.85rem;
     }
 
+    /* Stejná výška primárního i outline tlačítka (border započítán do boxu). */
+    .hero-cta .btn {
+      border: 2px solid transparent;
+    }
+
+    .hero-cta .btn-outline {
+      border-color: var(--green);
+    }
+
+    .hero-cta .btn-outline:hover {
+      border-color: var(--green-light);
+    }
+
     /* ── HERO ── */
     .hero {
       padding: 5rem 0 3.5rem;
