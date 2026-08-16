@@ -720,7 +720,7 @@
 
             <div class="form-group" id="fg-shop">
               <label for="shop_url">URL e-shopu</label>
-              <input type="url" id="shop_url" name="shop_url" required autocomplete="url" placeholder="https://www.muj-eshop.cz">
+              <input type="text" id="shop_url" name="shop_url" required autocomplete="url" inputmode="url" placeholder="https://www.muj-eshop.cz">
               <span class="form-error">Zadejte platnou URL e-shopu.</span>
             </div>
 
@@ -903,10 +903,19 @@
       function isUrl(v) {
         try {
           var u = new URL(v.indexOf('://') === -1 ? 'https://' + v : v);
-          return !!u.hostname;
+          return !!u.hostname && u.hostname.indexOf('.') !== -1;
         } catch (e) {
           return false;
         }
+      }
+
+      function normalizeShopUrl(v) {
+        var value = String(v || '').trim();
+        if (!value) throw new Error('empty');
+        if (value.indexOf('://') === -1) value = 'https://' + value;
+        var u = new URL(value);
+        if (!u.hostname) throw new Error('invalid');
+        return u.toString();
       }
 
       function setError(groupId, show) {
@@ -945,6 +954,14 @@
         setError('fg-shop', !isUrl(shop));
         if (!name || !isEmail(email) || !isUrl(shop)) return;
 
+        var shopUrl;
+        try {
+          shopUrl = normalizeShopUrl(shop);
+        } catch (err) {
+          setError('fg-shop', true);
+          return;
+        }
+
         var turnstileToken = getTurnstileToken();
         if (!turnstileToken) {
           showGlobalError('Potvrďte prosím, že nejste robot.');
@@ -960,7 +977,7 @@
           body: JSON.stringify({
             name: name,
             email: email,
-            shop_url: shop,
+            shop_url: shopUrl,
             turnstile_token: turnstileToken,
           }),
         })
