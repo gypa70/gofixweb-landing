@@ -544,7 +544,7 @@
     .form-success {
       display: none;
       text-align: center;
-      padding: 2rem 1rem;
+      padding: 1.5rem 1rem;
     }
 
     .form-success.visible { display: block; }
@@ -552,10 +552,9 @@
     .form-success h3 {
       color: var(--green);
       font-size: 1.35rem;
-      margin-bottom: 0.75rem;
+      font-weight: 700;
+      margin: 0;
     }
-
-    .form-success p { color: var(--text-light); }
 
     #signup-form-form.hidden { display: none; }
 
@@ -696,7 +695,6 @@
         <div class="form-wrap">
           <div class="form-success" id="form-success" role="status">
             <h3>Děkujeme!</h3>
-            <p>Váš report vám pošleme do 10 minut na e-mail.</p>
           </div>
 
           <form id="signup-form-form" novalidate>
@@ -718,7 +716,7 @@
 
             <div class="form-group" id="fg-shop">
               <label for="shop_url">URL e-shopu</label>
-              <input type="text" id="shop_url" name="shop_url" required autocomplete="url" inputmode="url" placeholder="https://www.muj-eshop.cz">
+              <input type="text" id="shop_url" name="shop_url" required autocomplete="url" inputmode="url" placeholder="example.cz">
               <span class="form-error">Zadejte platnou URL e-shopu.</span>
             </div>
 
