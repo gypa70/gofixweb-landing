@@ -17,6 +17,11 @@ const TURNSTILE_HOSTNAMES = new Set(["gofixweb.com", "www.gofixweb.com"]);
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** E-maily, které obcházejí rate limit (1 report/den) — jen pro interní testování. */
+const RATE_LIMIT_WHITELIST = new Set([
+  "trueforexway@gmail.com",
+]);
+
 function corsHeaders(origin) {
   const allowed = origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://gofixweb.com";
   return {
@@ -43,6 +48,10 @@ function normalizeUrl(raw) {
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function isRateLimitWhitelisted(email) {
+  return RATE_LIMIT_WHITELIST.has(String(email || "").trim().toLowerCase());
 }
 
 async function isRateLimited(email, cache) {
@@ -178,8 +187,9 @@ export default {
       return jsonResponse({ ok: false, error: "invalid_url" }, 400, origin);
     }
 
+    const testRequest = isRateLimitWhitelisted(email);
     const cache = caches.default;
-    if (await isRateLimited(email, cache)) {
+    if (!testRequest && (await isRateLimited(email, cache))) {
       return jsonResponse(
         { ok: false, error: "rate_limited", message: "Pro tento e-mail už dnes byl report odeslán." },
         429,
@@ -188,7 +198,13 @@ export default {
     }
 
     try {
-      await dispatchGithub(env, { name, email, shop_url });
+      await dispatchGithub(env, {
+        name,
+        email,
+        shop_url,
+        skip_rate_limit: testRequest,
+        test_request: testRequest,
+      });
     } catch (err) {
       console.error(err);
       return jsonResponse({ ok: false, error: "dispatch_failed" }, 502, origin);
