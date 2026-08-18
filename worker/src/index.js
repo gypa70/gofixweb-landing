@@ -3,6 +3,7 @@
  *
  * Secrets (wrangler secret put):
  *   GITHUB_TOKEN       — PAT s repo scope pro gofixweb-scanner
+ *   STRIPE_WEBHOOK_SECRET — Stripe webhook signing secret pro /stripe-webhook
  *   TURNSTILE_SECRET   — Turnstile secret key (siteverify)
  *   WEBHOOK_SECRET     — volitelný shared secret z formuláře
  */
@@ -14,8 +15,11 @@ const ALLOWED_ORIGINS = new Set([
 
 const TURNSTILE_ACTION = "free-report";
 const TURNSTILE_HOSTNAMES = new Set(["gofixweb.com", "www.gofixweb.com"]);
+const COMPLETE_AUDIT_AMOUNT = 499000;
+const COMPLETE_AUDIT_CURRENCY = "czk";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const STRIPE_TIMESTAMP_TOLERANCE_SEC = 300;
 
 /** E-maily, které obcházejí rate limit (1 report/den) — jen pro interní testování. */
 const RATE_LIMIT_WHITELIST = new Set([
@@ -132,6 +136,159 @@ async function dispatchGithub(env, payload) {
   }
 }
 
+async function dispatchGithubEvent(env, eventType, payload) {
+  const repo = env.GITHUB_REPO || "gypa70/gofixweb-scanner";
+  const token = env.GITHUB_TOKEN;
+  if (!token) throw new Error("missing_github_token");
+
+  const res = await fetch(`https://api.github.com/repos/${repo}/dispatches`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "User-Agent": "gofixweb-report-worker",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      event_type: eventType,
+      client_payload: payload,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`github_dispatch_failed:${res.status}:${text}`);
+  }
+}
+
+async function hmacSha256Hex(secret, message) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
+  return [...new Uint8Array(sig)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function timingSafeEqualHex(a, b) {
+  if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) {
+    return false;
+  }
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+function parseStripeSignatureHeader(header) {
+  const parsed = { t: null, v1: [] };
+  for (const part of String(header || "").split(",")) {
+    const [key, value] = part.split("=", 2);
+    if (!key || !value) continue;
+    if (key === "t") parsed.t = value;
+    if (key === "v1") parsed.v1.push(value);
+  }
+  return parsed;
+}
+
+function isCompleteAuditCheckout(session) {
+  const currency = String(session?.currency || "").trim().toLowerCase();
+  const amountTotal = Number(session?.amount_total ?? NaN);
+  return currency === COMPLETE_AUDIT_CURRENCY && amountTotal === COMPLETE_AUDIT_AMOUNT;
+}
+
+async function verifyStripeWebhookSignature(rawBody, signatureHeader, secret) {
+  if (!secret) {
+    return { ok: false, error: "stripe_not_configured" };
+  }
+  if (!signatureHeader) {
+    return { ok: false, error: "stripe_signature_missing" };
+  }
+
+  const parsed = parseStripeSignatureHeader(signatureHeader);
+  const timestamp = Number(parsed.t);
+  if (!Number.isFinite(timestamp) || parsed.v1.length === 0) {
+    return { ok: false, error: "stripe_signature_invalid" };
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSec - timestamp) > STRIPE_TIMESTAMP_TOLERANCE_SEC) {
+    return { ok: false, error: "stripe_signature_expired" };
+  }
+
+  const signedPayload = `${timestamp}.${rawBody}`;
+  const expected = await hmacSha256Hex(secret, signedPayload);
+  const matched = parsed.v1.some((sig) => timingSafeEqualHex(sig, expected));
+  return matched ? { ok: true } : { ok: false, error: "stripe_signature_invalid" };
+}
+
+function stripeOkResponse(body = { ok: true }) {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+async function handleStripeWebhook(request, env) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+
+  const signature = request.headers.get("Stripe-Signature") || "";
+  const rawBody = await request.text();
+  const verify = await verifyStripeWebhookSignature(
+    rawBody,
+    signature,
+    env.STRIPE_WEBHOOK_SECRET,
+  );
+  if (!verify.ok) {
+    return new Response(verify.error, { status: 400 });
+  }
+
+  let event;
+  try {
+    event = JSON.parse(rawBody);
+  } catch {
+    return new Response("invalid_json", { status: 400 });
+  }
+
+  if (event?.type !== "checkout.session.completed") {
+    return stripeOkResponse({ ok: true, ignored: true });
+  }
+
+  const session = event?.data?.object || {};
+  if (!isCompleteAuditCheckout(session)) {
+    return stripeOkResponse({ ok: true, ignored: true, reason: "not_complete_audit" });
+  }
+  const email = String(
+    session.customer_email || session.customer_details?.email || "",
+  ).trim().toLowerCase();
+  const eventId = String(event?.id || "").trim();
+
+  if (!email || !EMAIL_RE.test(email) || !eventId) {
+    return new Response("missing_email_or_event_id", { status: 400 });
+  }
+
+  try {
+    await dispatchGithubEvent(env, "paid-audit-payment", {
+      email,
+      event_id: eventId,
+    });
+  } catch (err) {
+    console.error("stripe_dispatch_failed", err);
+    return new Response("dispatch_failed", { status: 502 });
+  }
+
+  return stripeOkResponse({ ok: true, queued: true });
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -139,6 +296,10 @@ export default {
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
+    }
+
+    if (url.pathname === "/stripe-webhook") {
+      return handleStripeWebhook(request, env);
     }
 
     if (url.pathname !== "/submit" || request.method !== "POST") {
