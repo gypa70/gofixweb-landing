@@ -287,10 +287,17 @@
     #reseni .section-title,
     #tarify .section-label,
     #tarify .section-title,
-    #signup-form .section-label,
-    #signup-form .section-title,
     #kontakt .section-title {
       text-align: center;
+    }
+
+    #signup-form .section-title {
+      text-align: center;
+      color: var(--white);
+      font-size: clamp(1.2rem, 2.3vw, 1.55rem);
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      margin-bottom: 1.5rem;
     }
 
     #reseni .section-sub,
@@ -689,8 +696,7 @@
     <!-- 2b. LEAD FORM -->
     <section class="block alt" id="signup-form">
       <div class="container">
-        <p class="section-label">Zdarma report</p>
-        <h2 class="section-title">Sken do 10 minut v e-mailu</h2>
+        <h2 class="section-title">Report zdarma do 10 minut</h2>
 
         <div class="form-wrap">
           <div class="form-success" id="form-success" role="status">
