@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+  <title>Připojení e-shopu · GoFixWeb</title>
+  <style>
+    :root {
+      --navy: #1a2332;
+      --green: #16a34a;
+      --green-dark: #166534;
+      --red: #dc2626;
+      --red-dark: #991b1b;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --warning-bg: #fef3c7;
+      --warning-fg: #92400e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--navy);
+    }
+    .wrap { max-width: 560px; margin: 0 auto; padding: 40px 20px 64px; }
+    .brand { display: flex; text-decoration: none; margin-bottom: 8px; }
+    .brand-go { font-size: 28px; font-weight: 800; color: var(--navy); letter-spacing: -0.04em; }
+    .brand-web { font-size: 28px; font-weight: 800; color: var(--green); letter-spacing: -0.04em; }
+    .kicker { margin: 0 0 24px; color: var(--muted); font-size: 14px; }
+    .nav { display: flex; gap: 16px; margin: 0 0 24px; font-size: 13px; }
+    .nav a { color: var(--green-dark); font-weight: 600; text-decoration: none; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 28px 28px 24px;
+      box-shadow: 0 8px 30px rgba(26, 35, 50, 0.06);
+    }
+    h1 { margin: 0 0 8px; font-size: 22px; letter-spacing: -0.02em; }
+    .lede { margin: 0 0 22px; color: var(--muted); font-size: 15px; line-height: 1.5; }
+    label { display: block; font-size: 13px; font-weight: 600; margin: 0 0 6px; }
+    .field { margin-bottom: 16px; }
+    input[type="url"], input[type="text"], input[type="password"], input[type="email"] {
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-size: 15px;
+      color: var(--navy);
+      background: #fff;
+    }
+    input:focus { outline: 2px solid rgba(22, 163, 74, 0.35); border-color: var(--green); }
+    .hint { margin: 6px 0 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
+    .hint a { color: var(--green-dark); font-weight: 600; }
+    .toggle { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; color: var(--muted); font-weight: 500; }
+    button[type="submit"] {
+      width: 100%;
+      margin-top: 8px;
+      padding: 12px 16px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--green);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button[type="submit"]:disabled { opacity: 0.7; cursor: wait; }
+    .banner { border-radius: 8px; padding: 12px 14px; margin-bottom: 18px; font-size: 14px; line-height: 1.45; border: 1px solid transparent; }
+    .banner-success { background: #dcfce7; color: var(--green-dark); border-color: #86efac; }
+    .banner-error { background: #fee2e2; color: var(--red-dark); border-color: #fecaca; }
+    .banner-warning { background: var(--warning-bg); color: var(--warning-fg); border-color: #fcd34d; }
+    .meta { margin: 8px 0 0; font-size: 13px; opacity: 0.9; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="brand" href="/wordpress-autofix/">
+      <span class="brand-go">GoFix</span><span class="brand-web">Web</span>
+    </a>
+    <p class="kicker">WordPress Autofix · onboarding</p>
+    <nav class="nav">
+      <a href="/wordpress-autofix/">Připojit e-shop</a>
+      <a href="/wordpress-autofix/navod/">Návod</a>
+    </nav>
+    <div class="card">
+      <h1>Připojit WordPress e-shop</h1>
+      <p class="lede">
+        Zadejte URL e-shopu, e-mail a Application Password. Nejdřív ověříme přístup
+        k WordPress REST API, a teprve potom údaje uložíme šifrovaně.
+      </p>
+      <div id="banner" class="banner hidden" role="status"></div>
+      <form id="onboarding-form" autocomplete="off">
+        <div class="field">
+          <label for="site_url">URL e-shopu</label>
+          <input id="site_url" name="site_url" type="url" required placeholder="https://muj-eshop.cz" spellcheck="false">
+          <p class="hint">Musí začínat na <code>https://</code> (WordPress / WooCommerce).</p>
+        </div>
+        <div class="field">
+          <label for="email">E-mail zákazníka</label>
+          <input id="email" name="email" type="email" required autocomplete="email" placeholder="jana@muj-eshop.cz">
+          <p class="hint">Stejný e-mail jako u objednávky Kompletního auditu (Stripe).</p>
+        </div>
+        <div class="field">
+          <label for="username">Uživatelské jméno</label>
+          <input id="username" name="username" type="text" required autocomplete="username" placeholder="admin">
+          <p class="hint">Účet s právem upravovat stránky (Editor nebo Administrátor).</p>
+        </div>
+        <div class="field">
+          <label for="app_password">Application Password</label>
+          <input id="app_password" name="app_password" type="password" required autocomplete="new-password" placeholder="xxxx xxxx xxxx xxxx xxxx xxxx">
+          <label class="toggle">
+            <input type="checkbox" onclick="document.getElementById('app_password').type = this.checked ? 'text' : 'password'">
+            Zobrazit heslo
+          </label>
+          <p class="hint">
+            Heslo aplikace z WordPressu, ne běžné přihlašovací heslo.
+            <a href="/wordpress-autofix/navod/">Jak ho vygenerovat</a>
+          </p>
+        </div>
+        <button type="submit" id="submit-btn">Ověřit připojení</button>
+      </form>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var API = "https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev/wp-onboarding";
+      var form = document.getElementById("onboarding-form");
+      var banner = document.getElementById("banner");
+      var btn = document.getElementById("submit-btn");
+
+      function showBanner(kind, html) {
+        banner.className = "banner banner-" + kind;
+        banner.innerHTML = html;
+      }
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var siteUrl = document.getElementById("site_url").value.trim();
+        if (!/^https:\/\//i.test(siteUrl)) {
+          showBanner("error", "URL e-shopu musí začínat na https://.");
+          return;
+        }
+        btn.disabled = true;
+        btn.textContent = "Ověřuji…";
+        fetch(API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            site_url: siteUrl,
+            email: document.getElementById("email").value.trim(),
+            username: document.getElementById("username").value.trim(),
+            app_password: document.getElementById("app_password").value
+          })
+        }).then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
+          .then(function (out) {
+            var data = out.data || {};
+            var kind = data.kind || (data.ok ? "success" : "error");
+            var msg = data.message || "Nepodařilo se ověřit připojení.";
+            if (data.ok && data.user_name) {
+              msg += '<div class="meta">Přihlášený účet: ' + data.user_name + "</div>";
+            }
+            if (data.ok && data.roles && data.roles.length) {
+              msg += '<div class="meta">Role: ' + data.roles.join(", ") + "</div>";
+            }
+            if (data.saved && data.domain) {
+              msg += '<div class="meta">Uloženo pro doménu ' + data.domain + "</div>";
+            }
+            showBanner(kind, msg);
+            if (data.ok) {
+              document.getElementById("app_password").value = "";
+            }
+          })
+          .catch(function () {
+            showBanner("error", "Nelze se spojit s GoFixWeb serverem. Zkuste to znovu.");
+          })
+          .finally(function () {
+            btn.disabled = false;
+            btn.textContent = "Ověřit připojení";
+          });
+      });
+    })();
+  </script>
+</body>
+</html>

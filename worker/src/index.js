@@ -6,6 +6,8 @@
  *   STRIPE_WEBHOOK_SECRET — Stripe webhook signing secret pro /stripe-webhook
  *   TURNSTILE_SECRET   — Turnstile secret key (siteverify)
  *   WEBHOOK_SECRET     — volitelný shared secret z formuláře
+ *
+ * POST /wp-onboarding — handshake WordPress REST + uložení credentials (GHA).
  */
 
 const ALLOWED_ORIGINS = new Set([
@@ -289,6 +291,216 @@ async function handleStripeWebhook(request, env) {
   return stripeOkResponse({ ok: true, queued: true });
 }
 
+const WP_STATUS_MESSAGES = {
+  ok: "Připojení k WordPressu ověřeno (200 OK). Údaje ukládáme šifrovaně.",
+  unauthorized:
+    "Přihlášení selhalo (401 Unauthorized). Zkontrolujte uživatelské jméno a Application Password.",
+  forbidden:
+    "Přístup zamítnut (403 Forbidden). Application Passwords mohou být vypnuté, e-shop neběží na HTTPS, nebo účet nemá oprávnění Editor / Administrátor.",
+  timeout: "E-shop neodpověděl včas (connection timeout). Zkontrolujte URL a dostupnost webu.",
+  connection_error: "Nelze se připojit k WordPress REST API. Zkontrolujte URL e-shopu.",
+  invalid_url: "URL e-shopu musí začínat na https://.",
+  invalid_input: "Vyplňte URL e-shopu, e-mail zákazníka, uživatelské jméno i Application Password.",
+  http_error: "WordPress REST API vrátilo neočekávanou odpověď.",
+};
+
+function basicAuthHeader(username, appPassword) {
+  const stripped = String(appPassword || "").replace(/\s+/g, "");
+  const raw = `${username}:${stripped}`;
+  const bytes = new TextEncoder().encode(raw);
+  let bin = "";
+  bytes.forEach((b) => {
+    bin += String.fromCharCode(b);
+  });
+  return `Basic ${btoa(bin)}`;
+}
+
+function shopOriginFromUrl(siteUrl) {
+  const parsed = new URL(siteUrl);
+  return `${parsed.protocol}//${parsed.host}`;
+}
+
+async function handshakeWordpress(siteUrl, username, appPassword) {
+  const raw = String(siteUrl || "").trim();
+  if (!raw.toLowerCase().startsWith("https://")) {
+    return {
+      ok: false,
+      status: "invalid_url",
+      message: WP_STATUS_MESSAGES.invalid_url,
+      site_url: raw,
+    };
+  }
+
+  let origin;
+  try {
+    origin = shopOriginFromUrl(raw);
+  } catch {
+    return {
+      ok: false,
+      status: "invalid_url",
+      message: WP_STATUS_MESSAGES.invalid_url,
+      site_url: raw,
+    };
+  }
+
+  const restUrl = `${origin}/wp-json/wp/v2/users/me?context=edit`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(restUrl, {
+      method: "GET",
+      headers: {
+        Authorization: basicAuthHeader(username, appPassword),
+        Accept: "application/json",
+        "User-Agent": "GoFixWeb-WordPressClient/1.0",
+      },
+      signal: controller.signal,
+    });
+    if (response.status === 401) {
+      return {
+        ok: false,
+        status: "unauthorized",
+        status_code: 401,
+        message: WP_STATUS_MESSAGES.unauthorized,
+        site_url: origin,
+      };
+    }
+    if (response.status === 403) {
+      return {
+        ok: false,
+        status: "forbidden",
+        status_code: 403,
+        message: WP_STATUS_MESSAGES.forbidden,
+        site_url: origin,
+      };
+    }
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: "http_error",
+        status_code: response.status,
+        message: WP_STATUS_MESSAGES.http_error,
+        site_url: origin,
+      };
+    }
+    const data = await response.json();
+    return {
+      ok: true,
+      status: "ok",
+      status_code: 200,
+      message: WP_STATUS_MESSAGES.ok,
+      site_url: origin,
+      user_name: data.name || data.slug || username,
+      roles: Array.isArray(data.roles) ? data.roles : [],
+      domain: origin.replace(/^https:\/\//, "").replace(/^www\./, ""),
+    };
+  } catch (err) {
+    const aborted = err && (err.name === "AbortError" || String(err).includes("abort"));
+    return {
+      ok: false,
+      status: aborted ? "timeout" : "connection_error",
+      message: aborted ? WP_STATUS_MESSAGES.timeout : WP_STATUS_MESSAGES.connection_error,
+      site_url: origin,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function handleWpOnboarding(request, env, origin) {
+  if (request.method !== "POST") {
+    return jsonResponse({ ok: false, error: "method_not_allowed" }, 405, origin);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ ok: false, status: "invalid_input", message: WP_STATUS_MESSAGES.invalid_input }, 400, origin);
+  }
+
+  const siteUrl = String(body.site_url || "").trim();
+  const username = String(body.username || "").trim();
+  const email = String(body.email || "").trim().toLowerCase();
+  const appPassword = String(body.app_password || "");
+
+  if (!siteUrl || !username || !EMAIL_RE.test(email) || !appPassword.trim()) {
+    return jsonResponse(
+      {
+        ok: false,
+        handshake_ok: false,
+        saved: false,
+        status: "invalid_input",
+        kind: "error",
+        message: WP_STATUS_MESSAGES.invalid_input,
+      },
+      400,
+      origin,
+    );
+  }
+
+  const handshake = await handshakeWordpress(siteUrl, username, appPassword);
+  if (!handshake.ok) {
+    return jsonResponse(
+      {
+        ok: false,
+        handshake_ok: false,
+        saved: false,
+        status: handshake.status,
+        kind: "error",
+        message: handshake.message,
+        status_code: handshake.status_code || null,
+        site_url: handshake.site_url,
+      },
+      200,
+      origin,
+    );
+  }
+
+  try {
+    await dispatchGithubEvent(env, "wp-onboarding-save", {
+      site_url: handshake.site_url,
+      username,
+      email,
+      app_password: appPassword,
+    });
+  } catch (err) {
+    console.error("wp_onboarding_dispatch_failed", err);
+    return jsonResponse(
+      {
+        ok: false,
+        handshake_ok: true,
+        saved: false,
+        status: "save_failed",
+        kind: "warning",
+        message:
+          "Připojení k WordPressu funguje, ale údaje se nepodařilo uložit. Napište na info@gofixweb.com.",
+        user_name: handshake.user_name,
+        roles: handshake.roles,
+        domain: handshake.domain,
+      },
+      502,
+      origin,
+    );
+  }
+
+  return jsonResponse(
+    {
+      ok: true,
+      handshake_ok: true,
+      saved: true,
+      status: "ok",
+      kind: "success",
+      message: handshake.message,
+      user_name: handshake.user_name,
+      roles: handshake.roles,
+      domain: handshake.domain,
+    },
+    200,
+    origin,
+  );
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -300,6 +512,10 @@ export default {
 
     if (url.pathname === "/stripe-webhook") {
       return handleStripeWebhook(request, env);
+    }
+
+    if (url.pathname === "/wp-onboarding") {
+      return handleWpOnboarding(request, env, origin);
     }
 
     if (url.pathname !== "/submit" || request.method !== "POST") {
