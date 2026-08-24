@@ -523,7 +523,7 @@ async function handleCheckout(request, env) {
   const product = String(url.searchParams.get("product") || "").trim();
   const domain = String(url.searchParams.get("domain") || "").trim();
   const email = String(url.searchParams.get("email") || "").trim().toLowerCase();
-  const secret = env.STRIPE_SECRET_KEY;
+  const secret = String(env.STRIPE_SECRET_KEY || "").trim();
   if (!secret) {
     return new Response("Stripe Checkout není nakonfigurovaný (STRIPE_SECRET_KEY).", {
       status: 503,
