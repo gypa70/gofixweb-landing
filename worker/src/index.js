@@ -3,10 +3,12 @@
  *
  * Secrets (wrangler secret put):
  *   GITHUB_TOKEN       — PAT s repo scope pro gofixweb-scanner
+ *   STRIPE_SECRET_KEY  — Stripe secret key pro GET /checkout (Checkout Session)
  *   STRIPE_WEBHOOK_SECRET — Stripe webhook signing secret pro /stripe-webhook
  *   TURNSTILE_SECRET   — Turnstile secret key (siteverify)
  *   WEBHOOK_SECRET     — volitelný shared secret z formuláře
  *
+ * GET /checkout — Stripe Checkout Session (manual_fix 3 990 Kč / wp_autofix 4 990 Kč).
  * POST /wp-onboarding — handshake WordPress REST + uložení credentials (GHA).
  */
 
@@ -18,7 +20,9 @@ const ALLOWED_ORIGINS = new Set([
 const TURNSTILE_ACTION = "free-report";
 const TURNSTILE_HOSTNAMES = new Set(["gofixweb.com", "www.gofixweb.com"]);
 const COMPLETE_AUDIT_AMOUNT = 499000;
+const MANUAL_FIX_AMOUNT = 399000;
 const COMPLETE_AUDIT_CURRENCY = "czk";
+const ONBOARDING_URL = "https://gofixweb.com/wordpress-autofix";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STRIPE_TIMESTAMP_TOLERANCE_SEC = 300;
@@ -200,10 +204,21 @@ function parseStripeSignatureHeader(header) {
   return parsed;
 }
 
-function isCompleteAuditCheckout(session) {
+function paidAuditProduct(session) {
   const currency = String(session?.currency || "").trim().toLowerCase();
+  if (currency && currency !== COMPLETE_AUDIT_CURRENCY) return null;
   const amountTotal = Number(session?.amount_total ?? NaN);
-  return currency === COMPLETE_AUDIT_CURRENCY && amountTotal === COMPLETE_AUDIT_AMOUNT;
+  const ref = String(
+    session?.client_reference_id || session?.metadata?.product || "",
+  ).trim();
+  if (ref === "manual_fix" || amountTotal === MANUAL_FIX_AMOUNT) return "manual_fix";
+  if (ref === "wp_autofix") return "wp_autofix";
+  if (amountTotal === COMPLETE_AUDIT_AMOUNT || ref === "complete_audit") return "complete_audit";
+  return null;
+}
+
+function isCompleteAuditCheckout(session) {
+  return paidAuditProduct(session) != null;
 }
 
 async function verifyStripeWebhookSignature(rawBody, signatureHeader, secret) {
@@ -266,7 +281,8 @@ async function handleStripeWebhook(request, env) {
   }
 
   const session = event?.data?.object || {};
-  if (!isCompleteAuditCheckout(session)) {
+  const product = paidAuditProduct(session);
+  if (!product) {
     return stripeOkResponse({ ok: true, ignored: true, reason: "not_complete_audit" });
   }
   const email = String(
@@ -282,6 +298,7 @@ async function handleStripeWebhook(request, env) {
     await dispatchGithubEvent(env, "paid-audit-payment", {
       email,
       event_id: eventId,
+      product,
     });
   } catch (err) {
     console.error("stripe_dispatch_failed", err);
@@ -501,6 +518,72 @@ async function handleWpOnboarding(request, env, origin) {
   );
 }
 
+async function handleCheckout(request, env) {
+  const url = new URL(request.url);
+  const product = String(url.searchParams.get("product") || "").trim();
+  const domain = String(url.searchParams.get("domain") || "").trim();
+  const email = String(url.searchParams.get("email") || "").trim().toLowerCase();
+  const secret = env.STRIPE_SECRET_KEY;
+  if (!secret) {
+    return new Response("Stripe Checkout není nakonfigurovaný (STRIPE_SECRET_KEY).", {
+      status: 503,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
+  if (product !== "manual_fix" && product !== "wp_autofix") {
+    return new Response("Neznámý produkt.", { status: 400 });
+  }
+
+  const amount = product === "manual_fix" ? MANUAL_FIX_AMOUNT : COMPLETE_AUDIT_AMOUNT;
+  const name =
+    product === "manual_fix"
+      ? "GoFixWeb — manuální oprava e-shopu"
+      : "GoFixWeb — automatická oprava WordPress";
+  let successUrl = "https://gofixweb.com/";
+  if (product === "wp_autofix") {
+    const next = new URL(ONBOARDING_URL);
+    if (email && EMAIL_RE.test(email)) next.searchParams.set("email", email);
+    if (domain) {
+      const shop = /^https?:\/\//i.test(domain) ? domain : `https://${domain}`;
+      next.searchParams.set("shop", shop);
+    }
+    successUrl = next.toString();
+  }
+
+  const body = new URLSearchParams();
+  body.set("mode", "payment");
+  body.set("success_url", successUrl);
+  body.set("cancel_url", "https://gofixweb.com/");
+  body.set("client_reference_id", product);
+  body.set("metadata[product]", product);
+  if (domain) body.set("metadata[domain]", domain);
+  if (email && EMAIL_RE.test(email)) body.set("customer_email", email);
+  body.set("line_items[0][quantity]", "1");
+  body.set("line_items[0][price_data][currency]", COMPLETE_AUDIT_CURRENCY);
+  body.set("line_items[0][price_data][unit_amount]", String(amount));
+  body.set("line_items[0][price_data][product_data][name]", name);
+  body.set("locale", "cs");
+
+  const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${secret}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    console.error("stripe_checkout_create_failed", response.status, text);
+    return new Response("Nepodařilo se otevřít platbu. Zkuste to znovu.", { status: 502 });
+  }
+  const session = await response.json();
+  if (!session.url) {
+    return new Response("Stripe Checkout nevrátil URL.", { status: 502 });
+  }
+  return Response.redirect(session.url, 303);
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -512,6 +595,10 @@ export default {
 
     if (url.pathname === "/stripe-webhook") {
       return handleStripeWebhook(request, env);
+    }
+
+    if (url.pathname === "/checkout") {
+      return handleCheckout(request, env);
     }
 
     if (url.pathname === "/wp-onboarding") {

@@ -31,3 +31,23 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: worker
+
+      - name: Ensure STRIPE_SECRET_KEY on Worker
+        if: steps.cf.outputs.present == 'true'
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "$STRIPE_SECRET_KEY" ]; then
+            printf '%s' "$STRIPE_SECRET_KEY" | npx wrangler secret put STRIPE_SECRET_KEY --name gofixweb-report-trigger
+          else
+            echo "GitHub secret STRIPE_SECRET_KEY is not set on gofixweb-landing; checking existing Worker secrets."
+          fi
+          npx wrangler secret list --name gofixweb-report-trigger > /tmp/cf-secrets.json
+          cat /tmp/cf-secrets.json
+          if ! grep -q 'STRIPE_SECRET_KEY' /tmp/cf-secrets.json; then
+            echo "::error::STRIPE_SECRET_KEY is not a Cloudflare Worker secret. Set it with wrangler secret put or as a GitHub secret on gofixweb-landing."
+            exit 1
+          fi

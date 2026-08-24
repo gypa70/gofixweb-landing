@@ -135,6 +135,15 @@
       var form = document.getElementById("onboarding-form");
       var banner = document.getElementById("banner");
       var btn = document.getElementById("submit-btn");
+      var params = new URLSearchParams(window.location.search);
+      var prefillEmail = params.get("email") || "";
+      var prefillShop = params.get("shop") || params.get("site_url") || "";
+      if (prefillEmail) document.getElementById("email").value = prefillEmail;
+      if (prefillShop) {
+        var shop = prefillShop.trim();
+        if (shop && !/^https?:\/\//i.test(shop)) shop = "https://" + shop;
+        document.getElementById("site_url").value = shop;
+      }
 
       function showBanner(kind, html) {
         banner.className = "banner banner-" + kind;
