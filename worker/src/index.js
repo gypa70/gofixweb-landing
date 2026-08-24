@@ -562,6 +562,8 @@ async function handleCheckout(request, env) {
   body.set("line_items[0][price_data][currency]", COMPLETE_AUDIT_CURRENCY);
   body.set("line_items[0][price_data][unit_amount]", String(amount));
   body.set("line_items[0][price_data][product_data][name]", name);
+  body.set("line_items[0][price_data][product_data][tax_code]", "txcd_10000000");
+  body.set("managed_payments[enabled]", "false");
   body.set("locale", "cs");
 
   const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {

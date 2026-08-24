@@ -79,6 +79,8 @@ jobs:
             -d 'line_items[0][price_data][currency]=czk' \
             -d 'line_items[0][price_data][unit_amount]=399000' \
             -d 'line_items[0][price_data][product_data][name]=GoFixWeb probe' \
+            -d 'line_items[0][price_data][product_data][tax_code]=txcd_10000000' \
+            -d 'managed_payments[enabled]=false' \
             -d locale=cs
           python3 - <<'PY'
           import json
