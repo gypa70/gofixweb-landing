@@ -59,6 +59,18 @@
     .hint { margin: 6px 0 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
     .hint a { color: var(--green-dark); font-weight: 600; }
     .toggle { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; color: var(--muted); font-weight: 500; }
+    .consent-box {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 14px 10px;
+      margin: 4px 0 16px;
+      background: #f8fafc;
+    }
+    .consent-box h2 { margin: 0 0 8px; font-size: 15px; }
+    .consent-box ul { margin: 0 0 12px; padding-left: 20px; font-size: 14px; line-height: 1.45; }
+    .consent-box.consent-smush { background: #fff; }
+    .consent-check { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; font-weight: 600; line-height: 1.4; }
+    .consent-check input { margin-top: 3px; flex-shrink: 0; }
     button[type="submit"] {
       width: 100%;
       margin-top: 8px;
@@ -112,6 +124,7 @@
           <label for="username">Uživatelské jméno</label>
           <input id="username" name="username" type="text" required autocomplete="username" placeholder="admin">
           <p class="hint">Účet s právem upravovat stránky (Editor nebo Administrátor).</p>
+          <p class="hint">Pro základní SEO opravy stačí role Editor. Pro rychlostní vylepšení (komprese obrázků, správa pluginů) potřebujeme roli Administrator.</p>
         </div>
         <div class="field">
           <label for="app_password">Application Password</label>
@@ -124,6 +137,25 @@
             Heslo aplikace z WordPressu, ne běžné přihlašovací heslo.
             <a href="/wordpress-autofix/navod/">Jak ho vygenerovat</a>
           </p>
+        </div>
+        <div class="consent-box">
+          <h2>Co automatická oprava udělá</h2>
+          <ul>
+            <li>Upravíme titulky a meta popisy stránek pro lepší SEO.</li>
+            <li>Vypneme jasně identifikované nepoužívané pluginy (např. demo plugin Hello Dolly, duplicitní SEO plugin).</li>
+            <li>Zkontrolujeme líné načítání obrázků (lazy loading) a doporučíme úpravy.</li>
+            <li>Se souhlasem nainstalujeme nástroj na kompresi obrázků (Smush) a spustíme kompresi.</li>
+          </ul>
+          <label class="consent-check">
+            <input id="consent_steps" name="consent_steps" type="checkbox" value="1" required>
+            <span>Souhlasím s výše uvedenými kroky</span>
+          </label>
+        </div>
+        <div class="consent-box consent-smush">
+          <label class="consent-check">
+            <input id="consent_install_plugins" name="consent_install_plugins" type="checkbox" value="1">
+            <span>Souhlasím, že GoFixWeb může na mém WordPressu nainstalovat plugin na kompresi obrázků z oficiálního adresáře wordpress.org (např. Smush) a že tento zásah mohu vzít zpět odinstalací pluginu.</span>
+          </label>
         </div>
         <button type="submit" id="submit-btn">Ověřit připojení</button>
       </form>
@@ -157,6 +189,10 @@
           showBanner("error", "URL e-shopu musí začínat na https://.");
           return;
         }
+        if (!document.getElementById("consent_steps").checked) {
+          showBanner("error", "Potvrďte souhlas s kroky automatické opravy.");
+          return;
+        }
         btn.disabled = true;
         btn.textContent = "Ověřuji…";
         fetch(API, {
@@ -166,7 +202,9 @@
             site_url: siteUrl,
             email: document.getElementById("email").value.trim(),
             username: document.getElementById("username").value.trim(),
-            app_password: document.getElementById("app_password").value
+            app_password: document.getElementById("app_password").value,
+            consent_steps: true,
+            consent_install_plugins: document.getElementById("consent_install_plugins").checked
           })
         }).then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
           .then(function (out) {

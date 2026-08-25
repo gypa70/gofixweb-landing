@@ -317,7 +317,7 @@ const WP_STATUS_MESSAGES = {
   timeout: "E-shop neodpověděl včas (connection timeout). Zkontrolujte URL a dostupnost webu.",
   connection_error: "Nelze se připojit k WordPress REST API. Zkontrolujte URL e-shopu.",
   invalid_url: "URL e-shopu musí začínat na https://.",
-  invalid_input: "Vyplňte URL e-shopu, e-mail zákazníka, uživatelské jméno i Application Password.",
+  invalid_input: "Vyplňte URL e-shopu, e-mail zákazníka, uživatelské jméno i Application Password a potvrďte souhlas s kroky automatické opravy.",
   http_error: "WordPress REST API vrátilo neočekávanou odpověď.",
 };
 
@@ -440,8 +440,10 @@ async function handleWpOnboarding(request, env, origin) {
   const username = String(body.username || "").trim();
   const email = String(body.email || "").trim().toLowerCase();
   const appPassword = String(body.app_password || "");
+  const consentSteps = body.consent_steps === true || body.consent_steps === "1" || body.consent_steps === "on";
+  const consentInstall = body.consent_install_plugins === true || body.consent_install_plugins === "1" || body.consent_install_plugins === "on";
 
-  if (!siteUrl || !username || !EMAIL_RE.test(email) || !appPassword.trim()) {
+  if (!siteUrl || !username || !EMAIL_RE.test(email) || !appPassword.trim() || !consentSteps) {
     return jsonResponse(
       {
         ok: false,
@@ -480,6 +482,8 @@ async function handleWpOnboarding(request, env, origin) {
       username,
       email,
       app_password: appPassword,
+      consent_steps: true,
+      consent_install_plugins: consentInstall,
     });
   } catch (err) {
     console.error("wp_onboarding_dispatch_failed", err);
@@ -512,9 +516,46 @@ async function handleWpOnboarding(request, env, origin) {
       user_name: handshake.user_name,
       roles: handshake.roles,
       domain: handshake.domain,
+      consent_install_plugins: consentInstall,
     },
     200,
     origin,
+  );
+}
+
+async function handleWpRollback(request, env) {
+  const url = new URL(request.url);
+  let token = String(url.searchParams.get("token") || "").trim();
+  if (!token && request.method === "POST") {
+    try {
+      const body = await request.json();
+      token = String((body && body.token) || "").trim();
+    } catch {
+      token = "";
+    }
+  }
+  if (!token) {
+    return new Response("Chybí token pro vrácení změny.", {
+      status: 400,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
+  try {
+    await dispatchGithubEvent(env, "wp-rollback", { token });
+  } catch (err) {
+    console.error("wp_rollback_dispatch_failed", err);
+    return new Response(
+      "Požadavek na vrácení se nepodařilo odeslat. Napište na info@gofixweb.com.",
+      { status: 502, headers: { "Content-Type": "text/plain; charset=utf-8" } },
+    );
+  }
+  return new Response(
+    "<!DOCTYPE html><html lang=\"cs\"><head><meta charset=\"utf-8\"><title>Vrácení opravy</title></head>" +
+      "<body style=\"font-family:Segoe UI,sans-serif;max-width:560px;margin:40px auto;color:#1a2332;\">" +
+      "<h1>Žádost o vrácení změny jsme přijali</h1>" +
+      "<p>WordPress vrátíme do stavu před automatickou opravou. Pokud se to nepodaří, napište na info@gofixweb.com.</p>" +
+      "</body></html>",
+    { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } },
   );
 }
 
@@ -605,6 +646,10 @@ export default {
 
     if (url.pathname === "/wp-onboarding") {
       return handleWpOnboarding(request, env, origin);
+    }
+
+    if (url.pathname === "/wp-rollback") {
+      return handleWpRollback(request, env);
     }
 
     if (url.pathname !== "/submit" || request.method !== "POST") {
