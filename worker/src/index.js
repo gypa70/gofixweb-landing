@@ -8,7 +8,8 @@
  *   TURNSTILE_SECRET   — Turnstile secret key (siteverify)
  *   WEBHOOK_SECRET     — volitelný shared secret z formuláře
  *
- * GET /checkout — Stripe Checkout Session (manual_fix 3 990 Kč / wp_autofix 4 990 Kč).
+ * GET /checkout — Stripe Checkout Session (manual_fix 3 990 Kč ihned;
+ *   wp_autofix 4 990 Kč až po povinném souhlasu s VOP).
  * POST /wp-onboarding — handshake WordPress REST + uložení credentials (GHA).
  */
 
@@ -23,6 +24,9 @@ const COMPLETE_AUDIT_AMOUNT = 499000;
 const MANUAL_FIX_AMOUNT = 399000;
 const COMPLETE_AUDIT_CURRENCY = "czk";
 const ONBOARDING_URL = "https://gofixweb.com/wordpress-autofix";
+const VOP_VERSION = "2026-08-25";
+const VOP_TERMS_URL = "https://gofixweb.com/terms.html";
+const VOP_AUTOFIX_SECTION_URL = `${VOP_TERMS_URL}#vop-autofix-section`;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STRIPE_TIMESTAMP_TOLERANCE_SEC = 300;
@@ -559,11 +563,120 @@ async function handleWpRollback(request, env) {
   );
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function isVopConsented(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  return raw === "1" || raw === "on" || raw === "true" || raw === "yes";
+}
+
+function autofixConsentPage({ domain = "", email = "", errorMessage = "" } = {}) {
+  const err = errorMessage
+    ? `<p class="err" id="vop-error">${escapeHtml(errorMessage)}</p>`
+    : "";
+  const html = `<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Souhlas s VOP — automatická oprava — GoFixWeb</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, system-ui, sans-serif; background: #1a2332; color: #fff; line-height: 1.6; min-height: 100vh; }
+    .wrap { width: min(560px, 92vw); margin: 0 auto; padding: 3rem 0 4rem; }
+    h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 0.75rem; }
+    p { color: #cbd5e1; margin-bottom: 1rem; }
+    a { color: #16a34a; }
+    .card { border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.25rem; background: #243044; }
+    label { display: flex; gap: 0.7rem; align-items: flex-start; color: #e2e8f0; font-size: 0.95rem; cursor: pointer; }
+    input[type="checkbox"] { margin-top: 0.3rem; width: 1.1rem; height: 1.1rem; flex-shrink: 0; }
+    button { margin-top: 1.25rem; width: 100%; border: 0; border-radius: 8px; padding: 0.85rem 1rem; font-weight: 700; font-size: 1rem; background: #16a34a; color: #fff; cursor: pointer; }
+    button:disabled { background: #475569; color: #cbd5e1; cursor: not-allowed; }
+    .err { color: #fca5a5; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Automatická oprava WordPress</h1>
+    <p>Před platbou je potřeba souhlas s obchodními podmínkami a se zásahem do webu.</p>
+    ${err}
+    <form id="vop-consent-form" method="post" action="/checkout" class="card">
+      <input type="hidden" name="product" value="wp_autofix">
+      <input type="hidden" name="domain" value="${escapeHtml(domain)}">
+      <input type="hidden" name="email" value="${escapeHtml(email)}">
+      <label for="vop-consent">
+        <input type="checkbox" id="vop-consent" name="vop_consent" value="1" required>
+        <span>
+          Souhlasím s
+          <a href="${VOP_TERMS_URL}" target="_blank" rel="noopener">obchodními podmínkami</a>
+          a s tím, že GoFixWeb provede automatické úpravy mého webu popsané v
+          <a href="${VOP_AUTOFIX_SECTION_URL}" target="_blank" rel="noopener">čl. 8 VOP</a>
+        </span>
+      </label>
+      <button type="submit" id="pay-btn" disabled>Pokračovat k platbě</button>
+    </form>
+  </div>
+  <script>
+    (function () {
+      var cb = document.getElementById("vop-consent");
+      var btn = document.getElementById("pay-btn");
+      if (!cb || !btn) return;
+      function sync() { btn.disabled = !cb.checked; }
+      cb.addEventListener("change", sync);
+      sync();
+    })();
+  </script>
+</body>
+</html>`;
+  return new Response(html, {
+    status: errorMessage ? 400 : 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
 async function handleCheckout(request, env) {
   const url = new URL(request.url);
-  const product = String(url.searchParams.get("product") || "").trim();
-  const domain = String(url.searchParams.get("domain") || "").trim();
-  const email = String(url.searchParams.get("email") || "").trim().toLowerCase();
+  let product = String(url.searchParams.get("product") || "").trim();
+  let domain = String(url.searchParams.get("domain") || "").trim();
+  let email = String(url.searchParams.get("email") || "").trim().toLowerCase();
+  let consent = "";
+
+  if (request.method === "POST") {
+    const form = await request.formData();
+    product = String(form.get("product") || product).trim();
+    domain = String(form.get("domain") || domain).trim();
+    email = String(form.get("email") || email).trim().toLowerCase();
+    consent = String(form.get("vop_consent") || "").trim();
+  }
+
+  if (product !== "manual_fix" && product !== "wp_autofix") {
+    return new Response("Neznámý produkt.", { status: 400 });
+  }
+
+  if (product === "wp_autofix") {
+    const consented = isVopConsented(consent);
+    if (request.method !== "POST" || !consented) {
+      return autofixConsentPage({
+        domain,
+        email,
+        errorMessage:
+          request.method === "POST" && !consented
+            ? "Bez souhlasu s VOP nelze pokračovat k platbě."
+            : "",
+      });
+    }
+  }
+
   const secret = String(env.STRIPE_SECRET_KEY || "").trim();
   if (!secret) {
     return new Response("Stripe Checkout není nakonfigurovaný (STRIPE_SECRET_KEY).", {
@@ -571,8 +684,24 @@ async function handleCheckout(request, env) {
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
   }
-  if (product !== "manual_fix" && product !== "wp_autofix") {
-    return new Response("Neznámý produkt.", { status: 400 });
+
+  if (product === "wp_autofix") {
+    try {
+      await dispatchGithubEvent(env, "wp-vop-consent", {
+        email,
+        domain,
+        ip: clientIp(request),
+        vop_version: VOP_VERSION,
+        consent_at: new Date().toISOString(),
+        product,
+      });
+    } catch (err) {
+      console.error("vop_consent_dispatch_failed", err);
+      return new Response("Souhlas se nepodařilo zaznamenat. Zkuste to znovu.", {
+        status: 502,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
   }
 
   const amount = product === "manual_fix" ? MANUAL_FIX_AMOUNT : COMPLETE_AUDIT_AMOUNT;
@@ -597,6 +726,10 @@ async function handleCheckout(request, env) {
   body.set("cancel_url", "https://gofixweb.com/");
   body.set("client_reference_id", product);
   body.set("metadata[product]", product);
+  if (product === "wp_autofix") {
+    body.set("metadata[vop_consent]", "1");
+    body.set("metadata[vop_version]", VOP_VERSION);
+  }
   if (domain) body.set("metadata[domain]", domain);
   if (email && EMAIL_RE.test(email)) body.set("customer_email", email);
   body.set("line_items[0][quantity]", "1");
