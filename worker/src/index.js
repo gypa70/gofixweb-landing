@@ -305,6 +305,7 @@ async function handleStripeWebhook(request, env) {
       email,
       event_id: eventId,
       product,
+      domain: String(session?.metadata?.domain || "").trim(),
     });
   } catch (err) {
     console.error("stripe_dispatch_failed", err);
