@@ -23,6 +23,8 @@ const TURNSTILE_HOSTNAMES = new Set(["gofixweb.com", "www.gofixweb.com"]);
 const COMPLETE_AUDIT_AMOUNT = 499000;
 const MANUAL_FIX_AMOUNT = 399000;
 const COMPLETE_AUDIT_CURRENCY = "czk";
+const MANUAL_FIX_NAME = "Manuální oprava e-shopu";
+const AUTO_FIX_NAME = "Automatická oprava e-shopu";
 const ONBOARDING_URL = "https://gofixweb.com/wordpress-autofix";
 const VOP_VERSION = "2026-08-25";
 const VOP_TERMS_URL = "https://gofixweb.com/terms.html";
@@ -705,10 +707,7 @@ async function handleCheckout(request, env) {
   }
 
   const amount = product === "manual_fix" ? MANUAL_FIX_AMOUNT : COMPLETE_AUDIT_AMOUNT;
-  const name =
-    product === "manual_fix"
-      ? "GoFixWeb — manuální oprava e-shopu"
-      : "GoFixWeb — automatická oprava WordPress";
+  const name = product === "manual_fix" ? MANUAL_FIX_NAME : AUTO_FIX_NAME;
   let successUrl = "https://gofixweb.com/";
   if (product === "wp_autofix") {
     const next = new URL(ONBOARDING_URL);
