@@ -516,6 +516,16 @@ async function handleWpOnboarding(request, env, origin) {
     );
   }
 
+  try {
+    await dispatchGithubEvent(env, "wp-autofix-resume", {
+      email,
+      domain: handshake.domain,
+      site_url: handshake.site_url,
+    });
+  } catch (err) {
+    console.error("wp_autofix_resume_dispatch_failed", err);
+  }
+
   return jsonResponse(
     {
       ok: true,
