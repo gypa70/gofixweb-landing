@@ -25,6 +25,10 @@ const MANUAL_FIX_AMOUNT = 399000;
 const COMPLETE_AUDIT_CURRENCY = "czk";
 const MANUAL_FIX_NAME = "Manuální oprava e-shopu";
 const AUTO_FIX_NAME = "Automatická oprava e-shopu";
+const MANUAL_FIX_DESCRIPTION =
+  "Přesný návod k opravě nálezů — zásahy provedete sami ve své administraci (jednorázová platba).";
+const AUTO_FIX_DESCRIPTION =
+  "Automatické zapsání SEO a rychlostních oprav přímo do vašeho WordPress webu (jednorázový zásah)";
 const ONBOARDING_URL = "https://gofixweb.com/wordpress-autofix";
 const VOP_VERSION = "2026-08-25";
 const VOP_TERMS_URL = "https://gofixweb.com/terms.html";
@@ -709,6 +713,7 @@ async function handleCheckout(request, env) {
 
   const amount = product === "manual_fix" ? MANUAL_FIX_AMOUNT : COMPLETE_AUDIT_AMOUNT;
   const name = product === "manual_fix" ? MANUAL_FIX_NAME : AUTO_FIX_NAME;
+  const description = product === "manual_fix" ? MANUAL_FIX_DESCRIPTION : AUTO_FIX_DESCRIPTION;
   let successUrl = "https://gofixweb.com/";
   if (product === "wp_autofix") {
     const next = new URL(ONBOARDING_URL);
@@ -736,6 +741,7 @@ async function handleCheckout(request, env) {
   body.set("line_items[0][price_data][currency]", COMPLETE_AUDIT_CURRENCY);
   body.set("line_items[0][price_data][unit_amount]", String(amount));
   body.set("line_items[0][price_data][product_data][name]", name);
+  body.set("line_items[0][price_data][product_data][description]", description);
   body.set("line_items[0][price_data][product_data][tax_code]", "txcd_10000000");
   body.set("managed_payments[enabled]", "false");
   body.set("locale", "cs");
