@@ -217,8 +217,15 @@
             if (data.ok && data.roles && data.roles.length) {
               msg += '<div class="meta">Role: ' + data.roles.join(", ") + "</div>";
             }
-            if (data.saved && data.domain) {
+            if (data.queued_meta) {
+              msg += '<div class="meta">' + data.queued_meta + "</div>";
+            } else if (data.saved && data.domain) {
               msg += '<div class="meta">Uloženo pro doménu ' + data.domain + "</div>";
+            } else if (data.queued && data.domain) {
+              var queuedSk = data.locale === "sk";
+              msg += queuedSk
+                ? '<div class="meta">Overené pre ' + data.domain + ". Údaje sa ukladajú na serveri — výsledok pošleme e-mailom.</div>"
+                : '<div class="meta">Ověřeno pro ' + data.domain + ". Údaje se ukládají na serveru — výsledek pošleme e-mailem.</div>";
             }
             showBanner(kind, msg);
             if (data.ok) {
