@@ -533,6 +533,7 @@ async function handleWpOnboarding(request, env, origin) {
   try {
     await dispatchGithubEvent(env, "wp-onboarding-save", {
       site_url: handshake.site_url,
+      domain: handshake.domain,
       username,
       email,
       app_password: appPassword,
