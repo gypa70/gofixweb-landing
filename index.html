@@ -112,41 +112,12 @@
       border-color: var(--green-light);
     }
 
-    .btn-hero-primary {
-      color: #000;
-    }
-
-    .hero-cta .btn-hero-primary {
-      white-space: nowrap;
-      padding: 0.95rem 2.1rem;
-      font-size: 1.05rem;
-      letter-spacing: 0.01em;
-    }
-
-    .btn-hero-primary:hover {
-      color: #000;
-    }
-
     .btn-pricing {
       color: #000;
     }
 
     .btn-pricing:hover {
       color: #000;
-    }
-
-    .hero-cta {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      /* Původní výška: primární + mezera + řada sekundárních tlačítek. */
-      min-height: 8.5rem;
-    }
-
-    /* Zachovat stávající výšku SKENUJ ZDARMA (dřív srovnaná s outline border). */
-    .hero-cta .btn {
-      border: 2px solid transparent;
     }
 
     /* ── HERO ── */
@@ -279,7 +250,6 @@
       text-align: center;
     }
 
-    #signup-form .section-title,
     #tarify .section-title,
     #kontakt .section-title,
     #reseni .section-sub {
@@ -290,7 +260,6 @@
       letter-spacing: -0.01em;
     }
 
-    #signup-form .section-title,
     #kontakt .section-title {
       margin-bottom: 1.5rem;
     }
@@ -302,7 +271,6 @@
 
     #reseni .section-sub,
     #tarify .section-sub,
-    #signup-form .section-sub,
     #kontakt .section-sub {
       text-align: center;
       margin-left: auto;
@@ -495,105 +463,6 @@
 
     .contact-email:hover { text-decoration: underline; }
 
-    /* ── SIGNUP FORM ── */
-    .form-wrap {
-      max-width: 520px;
-      margin: 0 auto;
-      background: var(--navy-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 2rem 1.75rem;
-    }
-
-    .form-group {
-      margin-bottom: 1.15rem;
-    }
-
-    .form-group label {
-      display: block;
-      font-size: 0.85rem;
-      font-weight: 600;
-      margin-bottom: 0.4rem;
-      color: var(--text-light);
-    }
-
-    .form-group input {
-      width: 100%;
-      padding: 0.75rem 0.9rem;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--navy);
-      color: var(--white);
-      font-family: inherit;
-      font-size: 1rem;
-    }
-
-    .form-group input:focus {
-      outline: none;
-      border-color: var(--green);
-      box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
-    }
-
-    .form-group input.invalid {
-      border-color: var(--red-soft);
-    }
-
-    .form-error {
-      color: var(--red-soft);
-      font-size: 0.8rem;
-      margin-top: 0.35rem;
-      display: none;
-    }
-
-    .form-group.has-error .form-error { display: block; }
-
-    .form-success {
-      display: none;
-      text-align: center;
-      padding: 1.5rem 1rem;
-    }
-
-    .form-success.visible { display: block; }
-
-    .form-success h3 {
-      color: var(--green);
-      font-size: 1.35rem;
-      font-weight: 700;
-      margin: 0;
-    }
-
-    #signup-form-form.hidden { display: none; }
-
-    .form-note {
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      margin-top: 0.85rem;
-      text-align: center;
-    }
-
-    .form-note a { color: var(--green); }
-
-    .form-error-global {
-      display: none;
-      color: var(--red-soft);
-      font-size: 0.88rem;
-      margin-bottom: 1rem;
-      text-align: center;
-    }
-
-    .form-error-global.visible { display: block; }
-
-    .btn:disabled {
-      opacity: 0.65;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    .turnstile-wrap {
-      margin: 0.25rem 0 1rem;
-      min-height: 65px;
-    }
-
     /* ── FOOTER ── */
     footer {
       padding: 2.25rem 0;
@@ -629,16 +498,11 @@
       .hero-scan-scope {
         display: block;
       }
-      .hero-cta .btn-hero-primary {
-        font-size: 1rem;
-        padding: 0.95rem 1.6rem;
-      }
       section.block { padding: 3rem 0; }
       .compare { grid-template-columns: 1fr; }
       .trust-grid { flex-direction: column; align-items: stretch; }
       .trust-badge { max-width: none; }
       .pricing-grid { grid-template-columns: 1fr; }
-      .form-wrap { padding: 1.5rem 1.15rem; }
     }
   </style>
 </head>
@@ -657,16 +521,13 @@
     <!-- 1. HERO -->
     <section class="hero">
       <div class="container">
-        <h1 class="sr-only">Bezplatná výkonnostní analýza vašeho e-shopu</h1>
+        <h1 class="sr-only">Sken, opravy a optimalizace vašeho e-shopu</h1>
         <div class="hero-headlines-wrap">
           <ul class="hero-headlines">
-            <li>bezplatný sken e-shopu <span class="hero-scan-scope">(rychlost, SEO, odkazy, mobilní zobrazení)</span></li>
-            <li>bezplatný PDF report s aktuálními nálezy a finančním dopadem v Kč</li>
+            <li>sken e-shopu <span class="hero-scan-scope">(rychlost, SEO, odkazy, mobilní zobrazení)</span></li>
+            <li>PDF report s aktuálními nálezy a finančním dopadem v Kč</li>
             <li>Opravy a optimalizace e-shopu do 10 minut</li>
           </ul>
-        </div>
-        <div class="hero-cta">
-          <a class="btn btn-hero-primary" href="#signup-form">SKENUJ ZDARMA</a>
         </div>
       </div>
     </section>
@@ -689,48 +550,6 @@
               Shoptet, Shopify, WooCommerce, Magento a další
             </div>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 2b. LEAD FORM -->
-    <section class="block alt" id="signup-form">
-      <div class="container">
-        <h2 class="section-title">Report zdarma do 10 minut</h2>
-
-        <div class="form-wrap">
-          <div class="form-success" id="form-success" role="status">
-            <h3>Děkujeme!</h3>
-          </div>
-
-          <form id="signup-form-form" novalidate>
-            <input type="text" name="_honey" tabindex="-1" autocomplete="off" style="display:none" aria-hidden="true">
-
-            <p class="form-error-global" id="form-error-global" role="alert"></p>
-
-            <div class="form-group" id="fg-name">
-              <label for="name">Jméno</label>
-              <input type="text" id="name" name="name" required autocomplete="name" placeholder="Jan Novák">
-              <span class="form-error">Vyplňte prosím jméno.</span>
-            </div>
-
-            <div class="form-group" id="fg-email">
-              <label for="email">E-mail</label>
-              <input type="email" id="email" name="email" required autocomplete="email" placeholder="jan@eshop.cz">
-              <span class="form-error">Zadejte platný e-mail.</span>
-            </div>
-
-            <div class="form-group" id="fg-shop">
-              <label for="shop_url">E-shop</label>
-              <input type="text" id="shop_url" name="shop_url" required autocomplete="url" inputmode="url" placeholder="example.cz">
-              <span class="form-error">Zadejte platnou URL e-shopu.</span>
-            </div>
-
-            <div id="turnstile-wrap" class="turnstile-wrap" aria-label="Ověření proti robotům"></div>
-
-            <button type="submit" class="btn btn-block btn-hero-primary" id="signup-submit">Získat analýzu e-shopu</button>
-            <p class="form-note">Odesláním souhlasíte se zpracováním údajů dle <a href="privacy.html?v=20260815">ochrany osobních údajů</a></p>
-          </form>
         </div>
       </div>
     </section>
@@ -853,164 +672,6 @@
       </div>
     </div>
   </footer>
-
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
-  <script>
-    (function () {
-      var REPORT_API_URL = 'https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev/submit';
-      var TURNSTILE_SITE_KEY = '0x4AAAAAAERBDgPD_ejGBr5Q';
-      var form = document.getElementById('signup-form-form');
-      var success = document.getElementById('form-success');
-      var globalError = document.getElementById('form-error-global');
-      var submitBtn = document.getElementById('signup-submit');
-      var turnstileWidgetId = null;
-      if (!form) return;
-
-      function renderTurnstile() {
-        if (!window.turnstile || turnstileWidgetId !== null) return;
-        var wrap = document.getElementById('turnstile-wrap');
-        if (!wrap) return;
-        turnstileWidgetId = window.turnstile.render(wrap, {
-          sitekey: TURNSTILE_SITE_KEY,
-          action: 'free-report',
-          theme: 'dark',
-        });
-      }
-
-      if (window.turnstile) {
-        renderTurnstile();
-      } else {
-        window.addEventListener('load', renderTurnstile);
-      }
-
-      function resetTurnstile() {
-        if (window.turnstile && turnstileWidgetId !== null) {
-          window.turnstile.reset(turnstileWidgetId);
-        }
-      }
-
-      function getTurnstileToken() {
-        if (!window.turnstile || turnstileWidgetId === null) return '';
-        return window.turnstile.getResponse(turnstileWidgetId) || '';
-      }
-
-      function isEmail(v) {
-        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-      }
-
-      function isUrl(v) {
-        try {
-          var u = new URL(v.indexOf('://') === -1 ? 'https://' + v : v);
-          return !!u.hostname && u.hostname.indexOf('.') !== -1;
-        } catch (e) {
-          return false;
-        }
-      }
-
-      function normalizeShopUrl(v) {
-        var value = String(v || '').trim();
-        if (!value) throw new Error('empty');
-        if (value.indexOf('://') === -1) value = 'https://' + value;
-        var u = new URL(value);
-        if (!u.hostname) throw new Error('invalid');
-        return u.toString();
-      }
-
-      function setError(groupId, show) {
-        var g = document.getElementById(groupId);
-        if (!g) return;
-        g.classList.toggle('has-error', show);
-        var input = g.querySelector('input');
-        if (input) input.classList.toggle('invalid', show);
-      }
-
-      function showGlobalError(message) {
-        if (!globalError) return;
-        globalError.textContent = message;
-        globalError.classList.add('visible');
-      }
-
-      function clearGlobalError() {
-        if (!globalError) return;
-        globalError.textContent = '';
-        globalError.classList.remove('visible');
-      }
-
-      form.addEventListener('submit', function (e) {
-        e.preventDefault();
-        clearGlobalError();
-
-        var honey = form.querySelector('[name="_honey"]').value.trim();
-        if (honey) return;
-
-        var name = form.querySelector('#name').value.trim();
-        var email = form.querySelector('#email').value.trim();
-        var shop = form.querySelector('#shop_url').value.trim();
-
-        setError('fg-name', !name);
-        setError('fg-email', !isEmail(email));
-        setError('fg-shop', !isUrl(shop));
-        if (!name || !isEmail(email) || !isUrl(shop)) return;
-
-        var shopUrl;
-        try {
-          shopUrl = normalizeShopUrl(shop);
-        } catch (err) {
-          setError('fg-shop', true);
-          return;
-        }
-
-        var turnstileToken = getTurnstileToken();
-        if (!turnstileToken) {
-          showGlobalError('Potvrďte prosím, že nejste robot.');
-          return;
-        }
-
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Odesílám…';
-
-        fetch(REPORT_API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: name,
-            email: email,
-            shop_url: shopUrl,
-            turnstile_token: turnstileToken,
-          }),
-        })
-          .then(function (res) {
-            return res.json().then(function (data) {
-              return { ok: res.ok, data: data };
-            });
-          })
-          .then(function (result) {
-            if (result.ok && result.data && result.data.ok) {
-              form.classList.add('hidden');
-              success.classList.add('visible');
-              return;
-            }
-            if (result.data && result.data.error === 'rate_limited') {
-              showGlobalError(result.data.message || 'Pro tento e-mail už dnes byl report odeslán.');
-              return;
-            }
-            if (result.data && (result.data.error || '').indexOf('turnstile') === 0) {
-              showGlobalError(result.data.message || 'Ověření proti robotům selhalo. Zkuste to znovu.');
-              return;
-            }
-            showGlobalError('Odeslání se nepodařilo. Zkuste to prosím znovu nebo napište na info@gofixweb.com.');
-          })
-          .catch(function () {
-            showGlobalError('Odeslání se nepodařilo. Zkuste to prosím znovu nebo napište na info@gofixweb.com.');
-          })
-          .finally(function () {
-            resetTurnstile();
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Získat analýzu e-shopu';
-          });
-      });
-    })();
-  </script>
 
 </body>
 </html>
