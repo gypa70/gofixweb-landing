@@ -26,7 +26,7 @@ const MANUAL_FIX_DESCRIPTION =
 const AUTO_FIX_DESCRIPTION =
   "Automatické zapsání SEO a rychlostních oprav přímo do vašeho WordPress webu (jednorázový zásah)";
 const ONBOARDING_URL = "https://gofixweb.com/wordpress-autofix";
-const VOP_VERSION = "2026-08-25";
+const VOP_VERSION = "2026-08-30";
 const VOP_TERMS_URL = "https://gofixweb.com/terms.html";
 const VOP_AUTOFIX_SECTION_URL = `${VOP_TERMS_URL}#vop-autofix-section`;
 
