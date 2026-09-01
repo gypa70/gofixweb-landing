@@ -696,7 +696,7 @@ async function handleWpRollback(request, env) {
 }
 
 function escapeHtml(value) {
-  return String(value || "")
+  return String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -1092,7 +1092,7 @@ function renderAdminHtml(snapshot, { error = "", queued = false } = {}) {
       <div class="card"><div class="k">Bounced</div><div class="v bad">${escapeHtml(stats.bounced ?? 0)}</div></div>
       <div class="card"><div class="k">Uncertain</div><div class="v warn">${escapeHtml(stats.uncertain ?? 0)}</div></div>
       <div class="card"><div class="k">Pending</div><div class="v">${escapeHtml(stats.pending ?? 0)}</div></div>
-      <div class="card"><div class="k">Bounce rate</div><div class="v">${escapeHtml(stats.bounce_rate ?? 0)} %</div></div>
+      <div class="card"><div class="k">Bounce rate</div><div class="v">${escapeHtml(Number(stats.bounce_rate ?? 0).toFixed(2))} %</div></div>
       <div class="card"><div class="k">Halt</div><div class="v ${haltClass}">${haltLabel}</div></div>
     </div>
     ${haltBox}
