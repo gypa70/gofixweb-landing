@@ -2,7 +2,7 @@ name = "gofixweb-report-trigger"
 main = "src/index.js"
 compatibility_date = "2024-08-01"
 
-# Production Worker for /submit, /checkout, /stripe-webhook, /wp-onboarding, /wp-rollback, and /admin.
+# Production Worker for /submit, /checkout, /stripe-webhook, /wp-onboarding, /wp-rollback, /admin, and /unsubscribe.
 
 [vars]
 GITHUB_REPO = "gypa70/gofixweb-scanner"

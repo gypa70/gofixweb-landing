@@ -9,6 +9,7 @@
  *
  *   ADMIN_BASIC_PASSWORD — heslo Basic Auth pro GET /admin
  *   ADMIN_BASIC_USER     — volitelně (default gofixweb)
+ *   UNSUBSCRIBE_SECRET   — HMAC pro /unsubscribe a /unsub-status
  *
  * GET /checkout — Stripe Checkout Session (manual_fix 3 990 Kč ihned;
  *   wp_autofix 4 990 Kč až po povinném souhlasu s VOP).
@@ -1457,6 +1458,93 @@ async function handleAdminLaunch(request, env) {
   return Response.redirect(new URL("/admin?launched=1", request.url).toString(), 303);
 }
 
+const UNSUB_CACHE_TTL = 31536000;
+
+function unsubCacheKey(email) {
+  return `https://unsub.gofixweb/e/${String(email || "").trim().toLowerCase()}`;
+}
+
+function unsubscribeHtml(title, message) {
+  const safeTitle = String(title || "");
+  const safeMessage = String(message || "");
+  return `<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${safeTitle} — GoFixWeb</title>
+</head>
+<body style="margin:0;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;background:#ffffff;color:#1a2332;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;margin:0 auto;">
+    <tr><td style="padding:0 0 16px 0;font-size:22px;font-weight:700;">GoFix<span style="color:#16a34a;">Web</span></td></tr>
+    <tr><td style="padding:0 0 12px 0;font-size:20px;font-weight:700;">${safeTitle}</td></tr>
+    <tr><td style="padding:0;font-size:16px;line-height:1.5;">${safeMessage}</td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+async function tokenMatchesUnsubscribe(env, email, token) {
+  const secret = String(env.UNSUBSCRIBE_SECRET || "").trim();
+  if (!secret) return false;
+  const expected = await hmacSha256Hex(secret, String(email || "").trim().toLowerCase());
+  return timingSafeEqualHex(expected, String(token || "").trim().toLowerCase());
+}
+
+async function markUnsubscribed(env, email) {
+  const cache = caches.default;
+  await cache.put(unsubCacheKey(email), new Response("1"), { expirationTtl: UNSUB_CACHE_TTL });
+  try {
+    await dispatchGithubEvent(env, "email-unsubscribe", {
+      email,
+      source: "link",
+    });
+  } catch (err) {
+    console.error("unsubscribe_dispatch_failed", err);
+  }
+}
+
+async function cacheHasUnsub(email) {
+  const hit = await caches.default.match(unsubCacheKey(email));
+  return Boolean(hit);
+}
+
+async function handleUnsubscribe(request, env) {
+  const url = new URL(request.url);
+  const email = String(url.searchParams.get("email") || "").trim().toLowerCase();
+  const token = String(url.searchParams.get("token") || "").trim();
+  const invalid = unsubscribeHtml(
+    "Odhlášení se nezdařilo",
+    "Odkaz je neplatný nebo vypršel. Napište na info@gofixweb.com a odhlášení vyřídíme ručně.",
+  );
+  if (!EMAIL_RE.test(email) || !(await tokenMatchesUnsubscribe(env, email, token))) {
+    return new Response(invalid, {
+      status: 400,
+      headers: { "Content-Type": "text/html; charset=UTF-8" },
+    });
+  }
+  await markUnsubscribed(env, email);
+  const ok = unsubscribeHtml(
+    "Odhlášení dokončeno",
+    `E-mail ${email} jsme odhlásili. Další obchodní zprávy z kampaní GoFixWeb na něj posílat nebudeme.`,
+  );
+  return new Response(ok, {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=UTF-8" },
+  });
+}
+
+async function handleUnsubStatus(request, env) {
+  const url = new URL(request.url);
+  const email = String(url.searchParams.get("email") || "").trim().toLowerCase();
+  const token = String(url.searchParams.get("token") || "").trim();
+  if (!EMAIL_RE.test(email) || !(await tokenMatchesUnsubscribe(env, email, token))) {
+    return jsonResponse({ ok: false, error: "invalid" }, 400);
+  }
+  const suppressed = await cacheHasUnsub(email);
+  return jsonResponse({ ok: true, suppressed }, 200);
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -1492,6 +1580,28 @@ export default {
 
     if (url.pathname === "/admin/launch") {
       return handleAdminLaunch(request, env);
+    }
+
+    if (url.pathname === "/unsubscribe") {
+      if (request.method !== "GET" && request.method !== "POST") {
+        return jsonResponse({ ok: false, error: "method_not_allowed" }, 405, origin);
+      }
+      return handleUnsubscribe(request, env);
+    }
+
+    if (url.pathname === "/unsub-status") {
+      return handleUnsubStatus(request, env);
+    }
+
+    if (url.pathname === "/admin/unsub-clear") {
+      const denied = await requireAdminAuth(request, env);
+      if (denied) return denied;
+      const email = String(url.searchParams.get("email") || "").trim().toLowerCase();
+      if (!EMAIL_RE.test(email)) {
+        return jsonResponse({ ok: false, error: "invalid_email" }, 400);
+      }
+      await caches.default.delete(unsubCacheKey(email));
+      return jsonResponse({ ok: true, email, cleared: true }, 200);
     }
 
     if (url.pathname === "/submit") {
