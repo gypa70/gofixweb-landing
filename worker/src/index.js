@@ -7,6 +7,9 @@
  *   STRIPE_WEBHOOK_SECRET — Stripe webhook signing secret pro /stripe-webhook
  *   TURNSTILE_SECRET   — Turnstile secret key (siteverify)
  *
+ *   ADMIN_BASIC_PASSWORD — heslo Basic Auth pro GET /admin
+ *   ADMIN_BASIC_USER     — volitelně (default gofixweb)
+ *
  * GET /checkout — Stripe Checkout Session (manual_fix 3 990 Kč ihned;
  *   wp_autofix 4 990 Kč až po povinném souhlasu s VOP).
  * POST /submit — formulář: whitelist e-mail spustí free scan, ostatní jen poptávku.
@@ -888,6 +891,285 @@ async function handleCheckout(request, env) {
   return Response.redirect(session.url, 303);
 }
 
+const GMAIL_BOUNCE_SEARCH_URL =
+  "https://mail.google.com/mail/u/0/#search/" +
+  "from%3A(mailer-daemon%20OR%20mail-delivery-subsystem)%20" +
+  "OR%20subject%3A(undeliverable%20OR%20%22delivery%20status%22%20OR%20failure)";
+
+const ADMIN_LINKS = {
+  scans: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/free-report.yml",
+  bounce: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-bounce-monitor.yml",
+  resume: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-campaign-resume.yml",
+  actions: "https://github.com/gypa70/gofixweb-scanner/actions",
+};
+
+async function sha256Hex(value) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value)));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function unauthorizedAdmin() {
+  return new Response("Vyžadováno přihlášení.", {
+    status: 401,
+    headers: {
+      "WWW-Authenticate": 'Basic realm="GoFixWeb kampan", charset="UTF-8"',
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex, nofollow",
+      "Content-Type": "text/plain; charset=utf-8",
+    },
+  });
+}
+
+async function requireAdminAuth(request, env) {
+  const expectedPass = String(env.ADMIN_BASIC_PASSWORD || "").trim();
+  if (!expectedPass) {
+    return new Response("Admin není nakonfigurovaný (ADMIN_BASIC_PASSWORD).", {
+      status: 503,
+      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+    });
+  }
+  const expectedUser = String(env.ADMIN_BASIC_USER || "gofixweb").trim() || "gofixweb";
+  const header = request.headers.get("Authorization") || "";
+  const match = /^Basic\s+(\S+)/i.exec(header);
+  if (!match) return unauthorizedAdmin();
+  let decoded = "";
+  try {
+    decoded = atob(match[1]);
+  } catch {
+    return unauthorizedAdmin();
+  }
+  const idx = decoded.indexOf(":");
+  const user = idx >= 0 ? decoded.slice(0, idx) : decoded;
+  const pass = idx >= 0 ? decoded.slice(idx + 1) : "";
+  const left = await sha256Hex(`${user}\0${pass}`);
+  const right = await sha256Hex(`${expectedUser}\0${expectedPass}`);
+  if (!timingSafeEqualHex(left, right)) return unauthorizedAdmin();
+  return null;
+}
+
+async function fetchCampaignSnapshot(env) {
+  const repo = env.GITHUB_REPO || "gypa70/gofixweb-scanner";
+  const token = env.GITHUB_TOKEN;
+  if (!token) throw new Error("missing_github_token");
+  const res = await fetch(
+    `https://api.github.com/repos/${repo}/contents/data/email_campaign_admin.json?ref=main`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github.raw",
+        "User-Agent": "gofixweb-report-worker",
+        "Cache-Control": "no-cache",
+      },
+      cf: { cacheTtl: 0, cacheEverything: false },
+    },
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`github_snapshot_${res.status}:${text.slice(0, 300)}`);
+  }
+  return res.json();
+}
+
+function formatWhen(value) {
+  if (!value) return "—";
+  const raw = String(value);
+  try {
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return escapeHtml(raw);
+    return escapeHtml(d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC"));
+  } catch {
+    return escapeHtml(raw);
+  }
+}
+
+function statusClass(kind, value) {
+  const v = String(value || "").toLowerCase();
+  if (kind === "smtp") return v === "accepted" ? "ok" : "bad";
+  if (v === "bounced" || v === "rejected") return "bad";
+  if (v === "uncertain") return "warn";
+  if (v === "pending") return "muted";
+  return "";
+}
+
+function renderAdminHtml(snapshot, { error = "", queued = false } = {}) {
+  const stats = snapshot?.stats || {};
+  const halt = snapshot?.halt || {};
+  const rows = Array.isArray(snapshot?.rows) ? snapshot.rows : [];
+  const halted = Boolean(halt.halted || stats.halted);
+  const haltClass = halted ? "halt-on" : "halt-off";
+  const haltLabel = halted ? "ZAPNUTO" : "VYPNUTO";
+  const generated = snapshot?.generated_at
+    ? formatWhen(snapshot.generated_at)
+    : "—";
+  const err = error
+    ? `<p class="banner-err">Snapshot z DB se nepodařilo načíst: ${escapeHtml(error)}</p>`
+    : "";
+  const queuedNote = queued
+    ? `<p class="banner-ok">Požadavek na vypnutí halt je ve frontě. Obnovení DB trvá obvykle do minuty — stránka se sama obnoví.</p>`
+    : "";
+  const haltBox = halted
+    ? `<div class="halt-box">
+        <p><strong>Odesílání outreach kampaně je zastavené.</strong>
+        ${halt.halt_reason ? ` Důvod: ${escapeHtml(halt.halt_reason)}` : ""}</p>
+        <form method="post" action="/admin/resume">
+          <button type="submit">Vypnout halt a obnovit odesílání</button>
+        </form>
+        <p class="hint">Tlačítko spustí GitHub Action, která v DB nastaví halted=0 a persistne ji.
+        Pokud bounce rate pořád &gt; 3 % a je odesláno ≥ 10 mailů, další send halt znovu zapne.</p>
+      </div>`
+    : `<p class="hint">Halt je vypnutý. Další outreach dávka se může odeslat.</p>`;
+
+  const tableRows = rows.length
+    ? rows
+        .map((row) => {
+          const reason = row.bounce_reason
+            ? escapeHtml(String(row.bounce_reason).slice(0, 280))
+            : "—";
+          return `<tr>
+            <td>${escapeHtml(row.email)}</td>
+            <td>${escapeHtml(row.domain || "—")}</td>
+            <td>${formatWhen(row.sent_at)}</td>
+            <td class="${statusClass("smtp", row.smtp_status)}">${escapeHtml(row.smtp_status || "—")}</td>
+            <td class="${statusClass("bounce", row.bounce_status)}">${escapeHtml(row.bounce_status || "—")}</td>
+            <td class="reason">${reason}</td>
+          </tr>`;
+        })
+        .join("")
+    : `<tr><td colspan="6" class="muted">Zatím žádné outreach odeslání.</td></tr>`;
+
+  return `<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <meta http-equiv="refresh" content="60">
+  <title>Kampan — GoFixWeb admin</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2332; --navy-light: #243044; --text-light: #cbd5e1;
+      --text-muted: #94a3b8; --green: #16a34a; --red: #f87171; --warn: #fbbf24;
+      --border: rgba(255,255,255,0.08);
+    }
+    body { font-family: Inter, system-ui, sans-serif; background: var(--navy); color: #fff; line-height: 1.5; }
+    .wrap { width: min(1100px, 94vw); margin: 0 auto; padding: 1.5rem 0 3rem; }
+    h1 { font-size: 1.35rem; font-weight: 800; margin-bottom: 0.35rem; }
+    h1 span { color: var(--green); }
+    .sub { color: var(--text-muted); margin-bottom: 1.25rem; font-size: 0.9rem; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem; }
+    .card { background: var(--navy-light); border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem 1rem; }
+    .card .k { color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .card .v { font-size: 1.45rem; font-weight: 800; margin-top: 0.15rem; }
+    .halt-on { color: var(--red); }
+    .halt-off { color: var(--green); }
+    .ok { color: #4ade80; }
+    .bad { color: var(--red); }
+    .warn { color: var(--warn); }
+    .muted { color: var(--text-muted); }
+    .halt-box, .banner-err, .banner-ok, .links, table { margin-bottom: 1.15rem; }
+    .halt-box, .banner-err { background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.35); border-radius: 10px; padding: 1rem; }
+    .banner-ok { background: rgba(22,163,74,0.12); border: 1px solid rgba(22,163,74,0.35); border-radius: 10px; padding: 0.85rem 1rem; }
+    button { margin-top: 0.75rem; border: 0; border-radius: 8px; padding: 0.8rem 1.1rem; font-weight: 700; background: var(--red); color: #fff; cursor: pointer; }
+    .hint { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.6rem; }
+    a { color: var(--green); }
+    .links a { margin-right: 1rem; display: inline-block; margin-bottom: 0.35rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th, td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    td.reason { color: var(--text-light); max-width: 280px; word-break: break-word; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>GoFix<span>Web</span> — stav kampaně</h1>
+    <p class="sub">Interní přehled. Snapshot z DB: ${generated}. Obnova každých 60 s.</p>
+    ${err}${queuedNote}
+    <div class="cards">
+      <div class="card"><div class="k">Odesláno</div><div class="v">${escapeHtml(stats.sent ?? 0)}</div></div>
+      <div class="card"><div class="k">Accepted</div><div class="v ok">${escapeHtml(stats.accepted ?? 0)}</div></div>
+      <div class="card"><div class="k">Bounced</div><div class="v bad">${escapeHtml(stats.bounced ?? 0)}</div></div>
+      <div class="card"><div class="k">Uncertain</div><div class="v warn">${escapeHtml(stats.uncertain ?? 0)}</div></div>
+      <div class="card"><div class="k">Pending</div><div class="v">${escapeHtml(stats.pending ?? 0)}</div></div>
+      <div class="card"><div class="k">Bounce rate</div><div class="v">${escapeHtml(stats.bounce_rate ?? 0)} %</div></div>
+      <div class="card"><div class="k">Halt</div><div class="v ${haltClass}">${haltLabel}</div></div>
+    </div>
+    ${haltBox}
+    <div class="links">
+      <a href="${ADMIN_LINKS.scans}" target="_blank" rel="noopener">GHA scan jobs</a>
+      <a href="${ADMIN_LINKS.bounce}" target="_blank" rel="noopener">GHA bounce monitor</a>
+      <a href="${ADMIN_LINKS.resume}" target="_blank" rel="noopener">GHA resume halt</a>
+      <a href="${ADMIN_LINKS.actions}" target="_blank" rel="noopener">Všechny Actions</a>
+      <a href="${GMAIL_BOUNCE_SEARCH_URL}" target="_blank" rel="noopener">Gmail bounce search</a>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>E-mail</th><th>Doména</th><th>Odesláno</th>
+          <th>SMTP</th><th>Bounce</th><th>Důvod</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+  </div>
+  <script>setTimeout(function () { location.reload(); }, 60000);</script>
+</body>
+</html>`;
+}
+
+function adminHtmlResponse(html, status = 200) {
+  return new Response(html, {
+    status,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      "X-Robots-Tag": "noindex, nofollow",
+    },
+  });
+}
+
+async function handleAdminPage(request, env) {
+  if (request.method !== "GET") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const denied = await requireAdminAuth(request, env);
+  if (denied) return denied;
+  const url = new URL(request.url);
+  const queued = url.searchParams.get("queued") === "1";
+  let snapshot = null;
+  let error = "";
+  try {
+    snapshot = await fetchCampaignSnapshot(env);
+  } catch (err) {
+    error = String(err && err.message ? err.message : err);
+    snapshot = { stats: {}, halt: {}, rows: [] };
+  }
+  return adminHtmlResponse(renderAdminHtml(snapshot, { error, queued }));
+}
+
+async function handleAdminResume(request, env) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const denied = await requireAdminAuth(request, env);
+  if (denied) return denied;
+  try {
+    await dispatchGithubEvent(env, "email-campaign-resume", {
+      source: "admin",
+      at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("admin_resume_dispatch_failed", err);
+    const deniedPage = renderAdminHtml(
+      { stats: {}, halt: { halted: true }, rows: [] },
+      { error: "Resume GHA se nepodařilo spustit. Zkuste workflow ručně." },
+    );
+    return adminHtmlResponse(deniedPage, 502);
+  }
+  return Response.redirect(new URL("/admin?queued=1", request.url).toString(), 303);
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -911,6 +1193,14 @@ export default {
 
     if (url.pathname === "/wp-rollback") {
       return handleWpRollback(request, env);
+    }
+
+    if (url.pathname === "/admin" || url.pathname === "/admin/") {
+      return handleAdminPage(request, env);
+    }
+
+    if (url.pathname === "/admin/resume") {
+      return handleAdminResume(request, env);
     }
 
     if (url.pathname === "/submit") {
