@@ -8,6 +8,9 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>GoFixWeb — AI, která zefektivní váš e-shop</title>
+  <script>
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -29,7 +32,7 @@
       --max: 1080px;
     }
 
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: auto; }
 
     body {
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -798,6 +801,17 @@
 
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
   <script>
+    (function () {
+      if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+      function toTop() {
+        window.scrollTo(0, 0);
+      }
+      toTop();
+      document.addEventListener('DOMContentLoaded', toTop);
+      window.addEventListener('load', toTop);
+      window.addEventListener('pageshow', toTop);
+    })();
+
     (function () {
       var list = document.querySelector('.hero-headlines');
       if (!list) return;
