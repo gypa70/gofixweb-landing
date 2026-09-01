@@ -41,6 +41,7 @@ const TURNSTILE_HOSTNAMES = new Set(["gofixweb.com", "www.gofixweb.com"]);
 const RATE_LIMIT_WHITELIST = new Set([
   "trueforexway@gmail.com",
   "trademaker@seznam.cz",
+  "gofixweb@outlook.com",
 ]);
 
 function corsHeaders(origin) {
