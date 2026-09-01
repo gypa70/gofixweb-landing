@@ -900,8 +900,21 @@ const ADMIN_LINKS = {
   scans: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/free-report.yml",
   bounce: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-bounce-monitor.yml",
   resume: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-campaign-resume.yml",
+  outreach: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/outreach-batch.yml",
   actions: "https://github.com/gypa70/gofixweb-scanner/actions",
 };
+
+const OUTREACH_SERIES = [
+  { id: "nulte-kolo", name: "Nulté kolo" },
+  { id: "vlna-1", name: "Vlna 1" },
+  { id: "vlna-2", name: "Vlna 2" },
+];
+const MAX_BATCH = 20;
+const DEFAULT_BATCH = 5;
+const COOLDOWN_MS = 5 * 60 * 1000;
+const HALT_BLOCK_TEXT = "Kampaň je zastavená (bounce rate). Nejdřív odemkni halt výše.";
+const RUNNING_BLOCK_TEXT = "Právě běží jiná dávka, počkej na dokončení.";
+const WAVE_LOCK_TEXT = "Odemkne se po úspěšném dokončení nultého kola.";
 
 async function sha256Hex(value) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value)));
@@ -971,6 +984,144 @@ async function fetchCampaignSnapshot(env) {
   return res.json();
 }
 
+async function githubApi(env, path) {
+  const token = env.GITHUB_TOKEN;
+  if (!token) throw new Error("missing_github_token");
+  const res = await fetch(`https://api.github.com${path}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "User-Agent": "gofixweb-report-worker",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "Cache-Control": "no-cache",
+    },
+    cf: { cacheTtl: 0, cacheEverything: false },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`github_api_${res.status}:${text.slice(0, 300)}`);
+  }
+  return res.json();
+}
+
+function parseSeriesFromRunName(name) {
+  const match = String(name || "").match(/\b(nulte-kolo|vlna-1|vlna-2)\b/i);
+  return match ? match[1].toLowerCase() : "";
+}
+
+function isActiveRun(run) {
+  const status = String(run?.status || "").toLowerCase();
+  return status === "in_progress" || status === "queued" || status === "waiting" || status === "pending" || status === "requested";
+}
+
+async function fetchOutreachRunState(env) {
+  const repo = env.GITHUB_REPO || "gypa70/gofixweb-scanner";
+  const data = await githubApi(
+    env,
+    `/repos/${repo}/actions/workflows/outreach-batch.yml/runs?per_page=20`,
+  );
+  const runs = Array.isArray(data.workflow_runs) ? data.workflow_runs : [];
+  const active = runs.filter(isActiveRun);
+  const lastBySeries = {};
+  for (const run of runs) {
+    const series = parseSeriesFromRunName(run.name || run.display_title || "");
+    if (!series) continue;
+    const created = run.created_at;
+    if (!created) continue;
+    if (!lastBySeries[series] || String(created) > String(lastBySeries[series])) {
+      lastBySeries[series] = created;
+    }
+  }
+  return {
+    running: active.length > 0,
+    runningCount: active.length,
+    lastBySeries,
+  };
+}
+
+function clampBatchSize(raw) {
+  const n = Number.parseInt(String(raw ?? ""), 10);
+  if (!Number.isFinite(n)) return DEFAULT_BATCH;
+  return Math.min(MAX_BATCH, Math.max(1, n));
+}
+
+function cooldownUntilIso(lastLaunchedAt) {
+  if (!lastLaunchedAt) return "";
+  const started = new Date(lastLaunchedAt);
+  if (Number.isNaN(started.getTime())) return "";
+  return new Date(started.getTime() + COOLDOWN_MS).toISOString();
+}
+
+function seriesView(snapshot, runState, seriesDef) {
+  const fromSnap = snapshot?.series?.[seriesDef.id] || {};
+  const lastGithub = runState?.lastBySeries?.[seriesDef.id] || "";
+  const lastSnap = fromSnap.last_launched_at || "";
+  const last = !lastGithub ? lastSnap : !lastSnap ? lastGithub : lastGithub > lastSnap ? lastGithub : lastSnap;
+  const until = fromSnap.cooldown_until || cooldownUntilIso(last);
+  const untilMs = until ? new Date(until).getTime() : 0;
+  const cooldownActive = Boolean(untilMs && untilMs > Date.now());
+  const halted = Boolean(snapshot?.halt?.halted || snapshot?.stats?.halted || fromSnap.halted);
+  const nulte = snapshot?.series?.["nulte-kolo"] || {};
+  const nulteDone =
+    Number(nulte.contacted || 0) >= Number(nulte.total || 20) &&
+    Number(nulte.total || 0) > 0 &&
+    !nulte.halt_during &&
+    !halted;
+  const waveLocked = seriesDef.id !== "nulte-kolo" && !nulteDone;
+  return {
+    id: seriesDef.id,
+    name: fromSnap.name || seriesDef.name,
+    total: Number(fromSnap.total ?? 0),
+    expected: Number(fromSnap.expected ?? 0),
+    contacted: Number(fromSnap.contacted ?? 0),
+    remaining: Number(fromSnap.remaining ?? 0),
+    last_launched_at: last || "",
+    cooldown_until: until,
+    cooldown_active: cooldownActive,
+    locked: waveLocked || Boolean(fromSnap.locked),
+    halt_during: Boolean(fromSnap.halt_during),
+    halted,
+  };
+}
+
+function launchBlockReason(view, runState) {
+  if (view.halted) return HALT_BLOCK_TEXT;
+  if (runState?.running) return RUNNING_BLOCK_TEXT;
+  if (view.locked) return WAVE_LOCK_TEXT;
+  if (view.cooldown_active && view.cooldown_until) {
+    return `Další dávka této série až po ${view.cooldown_until}.`;
+  }
+  if (view.remaining <= 0 && view.total > 0) {
+    return "V této sérii už není koho kontaktovat.";
+  }
+  return "";
+}
+
+function validateLaunchServer(snapshot, runState, seriesId, limit) {
+  if (!OUTREACH_SERIES.some((item) => item.id === seriesId)) {
+    return { ok: false, error: "Neznámá série." };
+  }
+  if (limit < 1 || limit > MAX_BATCH) {
+    return { ok: false, error: `Velikost dávky musí být 1–${MAX_BATCH}.` };
+  }
+  const def = OUTREACH_SERIES.find((item) => item.id === seriesId);
+  const view = seriesView(snapshot, runState, def);
+  if (view.halted) return { ok: false, error: HALT_BLOCK_TEXT };
+  if (runState?.running) return { ok: false, error: RUNNING_BLOCK_TEXT };
+  if (view.locked) return { ok: false, error: WAVE_LOCK_TEXT };
+  if (view.cooldown_active) {
+    return { ok: false, error: `Další dávka této série až po ${view.cooldown_until}.` };
+  }
+  if (view.remaining <= 0 && view.total > 0) {
+    return { ok: false, error: "V této sérii už není koho kontaktovat." };
+  }
+  if (runState?.runningCount && runState.runningCount + limit > MAX_BATCH) {
+    return { ok: false, error: "Dávka by překročila strop 20 souběžných GHA jobů." };
+  }
+  return { ok: true, view };
+}
+
 function formatWhen(value) {
   if (!value) return "—";
   const raw = String(value);
@@ -992,7 +1143,13 @@ function statusClass(kind, value) {
   return "";
 }
 
-function renderAdminHtml(snapshot, { error = "", queued = false } = {}) {
+function renderAdminHtml(snapshot, {
+  error = "",
+  queued = false,
+  launched = false,
+  launchError = "",
+  runState = {},
+} = {}) {
   const stats = snapshot?.stats || {};
   const halt = snapshot?.halt || {};
   const rows = Array.isArray(snapshot?.rows) ? snapshot.rows : [];
@@ -1003,11 +1160,45 @@ function renderAdminHtml(snapshot, { error = "", queued = false } = {}) {
     ? formatWhen(snapshot.generated_at)
     : "—";
   const err = error
-    ? `<p class="banner-err">Snapshot z DB se nepodařilo načíst: ${escapeHtml(error)}</p>`
+    ? `<p class="banner-err">${escapeHtml(error)}</p>`
     : "";
   const queuedNote = queued
     ? `<p class="banner-ok">Požadavek na vypnutí halt je ve frontě. Obnovení DB trvá obvykle do minuty — stránka se sama obnoví.</p>`
     : "";
+  const launchedNote = launched
+    ? `<p class="banner-ok">Dávka je ve frontě GitHub Actions. Stav se obnoví po persistu DB (obvykle do minuty).</p>`
+    : "";
+  const launchErr = launchError
+    ? `<p class="banner-err">${escapeHtml(launchError)}</p>`
+    : "";
+  const seriesCards = OUTREACH_SERIES.map((def) => {
+    const view = seriesView(snapshot, runState, def);
+    const block = launchBlockReason(view, runState);
+    const disabled = Boolean(block);
+    const progress = view.total
+      ? `${view.contacted} / ${view.total} kontaktováno, zbývá ${view.remaining}`
+      : "Seznam série se ještě nenačetl ze snapshotu.";
+    const expectedNote = view.expected && view.total && view.expected !== view.total
+      ? `<p class="hint">V CSV je ${view.total} e-mailů (původní odhad ${view.expected}).</p>`
+      : "";
+    const cooldown = view.cooldown_active && view.cooldown_until
+      ? `<p class="hint">Další dávka této série až po ${formatWhen(view.cooldown_until)}</p>`
+      : "";
+    return `<div class="series-card">
+      <h3>${escapeHtml(view.name)}</h3>
+      <p class="hint">${escapeHtml(progress)}</p>
+      ${expectedNote}
+      <form class="launch-form" method="post" action="/admin/launch" data-series-name="${escapeHtml(view.name)}">
+        <input type="hidden" name="series" value="${escapeHtml(view.id)}">
+        <label>Velikost dávky
+          <input type="number" name="limit" min="1" max="${MAX_BATCH}" value="${DEFAULT_BATCH}" ${disabled ? "disabled" : ""}>
+        </label>
+        <button class="launch" type="submit" ${disabled ? "disabled" : ""}>Spustit dávku</button>
+      </form>
+      ${block ? `<p class="block-reason">${escapeHtml(block)}</p>` : ""}
+      ${cooldown}
+    </div>`;
+  }).join("");
   const haltBox = halted
     ? `<div class="halt-box">
         <p><strong>Odesílání outreach kampaně je zastavené.</strong>
@@ -1072,6 +1263,15 @@ function renderAdminHtml(snapshot, { error = "", queued = false } = {}) {
     .halt-box, .banner-err { background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.35); border-radius: 10px; padding: 1rem; }
     .banner-ok { background: rgba(22,163,74,0.12); border: 1px solid rgba(22,163,74,0.35); border-radius: 10px; padding: 0.85rem 1rem; }
     button { margin-top: 0.75rem; border: 0; border-radius: 8px; padding: 0.8rem 1.1rem; font-weight: 700; background: var(--red); color: #fff; cursor: pointer; }
+    button.launch { background: var(--green); margin-top: 0; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; background: #64748b; }
+    .series-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem; }
+    .series-card { background: var(--navy-light); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; }
+    .series-card h3 { font-size: 1.05rem; margin-bottom: 0.35rem; }
+    .launch-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.55rem; margin-top: 0.7rem; }
+    .launch-form label { color: var(--text-muted); font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.25rem; }
+    .launch-form input[type=number] { width: 5.5rem; padding: 0.45rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: #0f172a; color: #fff; }
+    .block-reason { color: var(--red); font-size: 0.85rem; margin-top: 0.55rem; }
     .hint { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.6rem; }
     a { color: var(--green); }
     .links a { margin-right: 1rem; display: inline-block; margin-bottom: 0.35rem; }
@@ -1085,7 +1285,7 @@ function renderAdminHtml(snapshot, { error = "", queued = false } = {}) {
   <div class="wrap">
     <h1>GoFix<span>Web</span> — stav kampaně</h1>
     <p class="sub">Interní přehled. Snapshot z DB: ${generated}. Obnova každých 60 s.</p>
-    ${err}${queuedNote}
+    ${err}${queuedNote}${launchedNote}${launchErr}
     <div class="cards">
       <div class="card"><div class="k">Odesláno</div><div class="v">${escapeHtml(stats.sent ?? 0)}</div></div>
       <div class="card"><div class="k">Accepted</div><div class="v ok">${escapeHtml(stats.accepted ?? 0)}</div></div>
@@ -1096,10 +1296,13 @@ function renderAdminHtml(snapshot, { error = "", queued = false } = {}) {
       <div class="card"><div class="k">Halt</div><div class="v ${haltClass}">${haltLabel}</div></div>
     </div>
     ${haltBox}
+    <h2 style="font-size:1.05rem;margin:0 0 0.65rem;">E-mailové série</h2>
+    <div class="series-grid">${seriesCards}</div>
     <div class="links">
       <a href="${ADMIN_LINKS.scans}" target="_blank" rel="noopener">GHA scan jobs</a>
       <a href="${ADMIN_LINKS.bounce}" target="_blank" rel="noopener">GHA bounce monitor</a>
       <a href="${ADMIN_LINKS.resume}" target="_blank" rel="noopener">GHA resume halt</a>
+      <a href="${ADMIN_LINKS.outreach}" target="_blank" rel="noopener">GHA outreach dávky</a>
       <a href="${ADMIN_LINKS.actions}" target="_blank" rel="noopener">Všechny Actions</a>
       <a href="${GMAIL_BOUNCE_SEARCH_URL}" target="_blank" rel="noopener">Gmail bounce search</a>
     </div>
@@ -1113,7 +1316,19 @@ function renderAdminHtml(snapshot, { error = "", queued = false } = {}) {
       <tbody>${tableRows}</tbody>
     </table>
   </div>
-  <script>setTimeout(function () { location.reload(); }, 60000);</script>
+  <script>
+    document.querySelectorAll("form.launch-form").forEach(function (form) {
+      form.addEventListener("submit", function (event) {
+        var input = form.querySelector('input[name="limit"]');
+        var n = Number(input && input.value);
+        var name = form.getAttribute("data-series-name") || "";
+        if (n > 10 && !window.confirm("Opravdu odeslat " + n + " e-mailů ze série " + name + "?")) {
+          event.preventDefault();
+        }
+      });
+    });
+    setTimeout(function () { location.reload(); }, 60000);
+  </script>
 </body>
 </html>`;
 }
@@ -1137,15 +1352,22 @@ async function handleAdminPage(request, env) {
   if (denied) return denied;
   const url = new URL(request.url);
   const queued = url.searchParams.get("queued") === "1";
+  const launched = url.searchParams.get("launched") === "1";
   let snapshot = null;
   let error = "";
+  let runState = { running: false, runningCount: 0, lastBySeries: {} };
   try {
     snapshot = await fetchCampaignSnapshot(env);
   } catch (err) {
-    error = String(err && err.message ? err.message : err);
-    snapshot = { stats: {}, halt: {}, rows: [] };
+    error = "Snapshot z DB se nepodařilo načíst: " + String(err && err.message ? err.message : err);
+    snapshot = { stats: {}, halt: {}, rows: [], series: {} };
   }
-  return adminHtmlResponse(renderAdminHtml(snapshot, { error, queued }));
+  try {
+    runState = await fetchOutreachRunState(env);
+  } catch (err) {
+    console.error("admin_run_state_failed", err);
+  }
+  return adminHtmlResponse(renderAdminHtml(snapshot, { error, queued, launched, runState }));
 }
 
 async function handleAdminResume(request, env) {
@@ -1168,6 +1390,68 @@ async function handleAdminResume(request, env) {
     return adminHtmlResponse(deniedPage, 502);
   }
   return Response.redirect(new URL("/admin?queued=1", request.url).toString(), 303);
+}
+
+async function handleAdminLaunch(request, env) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const denied = await requireAdminAuth(request, env);
+  if (denied) return denied;
+
+  const fail = async (message, status = 400) => {
+    let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
+    let runState = { running: false, runningCount: 0, lastBySeries: {} };
+    try {
+      snapshot = await fetchCampaignSnapshot(env);
+    } catch {}
+    try {
+      runState = await fetchOutreachRunState(env);
+    } catch {}
+    return adminHtmlResponse(
+      renderAdminHtml(snapshot, { launchError: message, runState }),
+      status,
+    );
+  };
+
+  let series = "";
+  let limit = DEFAULT_BATCH;
+  try {
+    const form = await request.formData();
+    series = String(form.get("series") || "").trim();
+    limit = clampBatchSize(form.get("limit"));
+  } catch {
+    return fail("Neplatný formulář.");
+  }
+
+  let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
+  let runState = { running: false, runningCount: 0, lastBySeries: {} };
+  try {
+    snapshot = await fetchCampaignSnapshot(env);
+  } catch (err) {
+    return fail("Snapshot z DB se nepodařilo načíst: " + String(err && err.message ? err.message : err), 502);
+  }
+  try {
+    runState = await fetchOutreachRunState(env);
+  } catch (err) {
+    console.error("admin_run_state_failed", err);
+  }
+
+  const verdict = validateLaunchServer(snapshot, runState, series, limit);
+  if (!verdict.ok) return fail(verdict.error);
+
+  try {
+    await dispatchGithubEvent(env, "outreach-batch", {
+      source: "admin",
+      series,
+      limit: String(limit),
+      at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("admin_launch_dispatch_failed", err);
+    return fail("Outreach GHA se nepodařilo spustit. Zkuste workflow ručně.", 502);
+  }
+  return Response.redirect(new URL("/admin?launched=1", request.url).toString(), 303);
 }
 
 export default {
@@ -1201,6 +1485,10 @@ export default {
 
     if (url.pathname === "/admin/resume") {
       return handleAdminResume(request, env);
+    }
+
+    if (url.pathname === "/admin/launch") {
+      return handleAdminLaunch(request, env);
     }
 
     if (url.pathname === "/submit") {
