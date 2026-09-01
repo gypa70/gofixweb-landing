@@ -1006,7 +1006,9 @@ async function githubApi(env, path) {
 }
 
 function parseSeriesFromRunName(name) {
-  const match = String(name || "").match(/\b(nulte-kolo|vlna-1|vlna-2)\b/i);
+  const raw = String(name || "");
+  if (/\bdry-run\b/i.test(raw)) return "";
+  const match = raw.match(/\b(nulte-kolo|vlna-1|vlna-2)\b/i);
   return match ? match[1].toLowerCase() : "";
 }
 
@@ -1025,6 +1027,7 @@ async function fetchOutreachRunState(env) {
   const active = runs.filter(isActiveRun);
   const lastBySeries = {};
   for (const run of runs) {
+    if (String(run.event || "") === "workflow_dispatch") continue;
     const series = parseSeriesFromRunName(run.name || run.display_title || "");
     if (!series) continue;
     const created = run.created_at;
