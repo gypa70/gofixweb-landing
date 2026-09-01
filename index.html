@@ -149,9 +149,8 @@
       margin: 0;
       max-width: min(52ch, 92vw);
       text-align: left;
-      display: grid;
-      grid-template-columns: max-content minmax(0, 1fr);
-      column-gap: 1em;
+      display: flex;
+      flex-direction: column;
       row-gap: 0.85rem;
       padding-left: 1.4rem;
       font-size: clamp(1.15rem, 2.5vw, 1.55rem);
@@ -161,15 +160,46 @@
     }
 
     .hero-headlines li {
-      display: contents;
+      display: grid;
+      grid-template-columns: 1ch minmax(0, 1fr);
+      column-gap: 1em;
       color: var(--white);
+      opacity: 0;
+      transform: translateX(-1.35rem);
     }
+
+    .hero-headlines.is-in li {
+      animation: hero-step-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .hero-headlines.is-in li:nth-child(1) { animation-delay: 0ms; }
+    .hero-headlines.is-in li:nth-child(2) { animation-delay: 180ms; }
+    .hero-headlines.is-in li:nth-child(3) { animation-delay: 360ms; }
 
     .hero-headlines .hero-step-n {
       font-weight: inherit;
       font-variant-numeric: tabular-nums;
       min-width: 1ch;
       text-align: left;
+    }
+
+    @keyframes hero-step-in {
+      from {
+        opacity: 0;
+        transform: translateX(-1.35rem);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hero-headlines li {
+        opacity: 1;
+        transform: none;
+        animation: none;
+      }
     }
 
     .sr-only {
@@ -635,5 +665,33 @@
     </div>
   </footer>
 
+  <script>
+    (function () {
+      var list = document.querySelector('.hero-headlines');
+      if (!list) return;
+
+      function reveal() {
+        list.classList.add('is-in');
+      }
+
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        reveal();
+        return;
+      }
+
+      if (!('IntersectionObserver' in window)) {
+        reveal();
+        return;
+      }
+
+      var io = new IntersectionObserver(function (entries) {
+        if (!entries[0] || !entries[0].isIntersecting) return;
+        reveal();
+        io.disconnect();
+      }, { threshold: 0.35 });
+
+      io.observe(list);
+    })();
+  </script>
 </body>
 </html>
