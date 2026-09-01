@@ -161,6 +161,14 @@
       position: relative;
       padding-left: 1.4rem;
       color: var(--white);
+      display: grid;
+      grid-template-columns: max-content minmax(0, 1fr);
+      column-gap: 1em;
+      align-items: baseline;
+    }
+
+    .hero-headlines .hero-step-n {
+      font-weight: inherit;
     }
 
     .sr-only {
@@ -516,9 +524,9 @@
         <h1 class="sr-only">Sken, opravy a optimalizace vašeho e-shopu</h1>
         <div class="hero-headlines-wrap">
           <ul class="hero-headlines">
-            <li>1 Provedeme scan e-shopu a vyhledáme chyby</li>
-            <li>2 Chyby popíšeme a vyčíslíme měsíční ztráty e-shopu</li>
-            <li>3 Opravíme chyby a zašleme výsledek optimalizace</li>
+            <li><span class="hero-step-n">1</span><span>Provedeme scan e-shopu a vyhledáme chyby</span></li>
+            <li><span class="hero-step-n">2</span><span>Chyby popíšeme a vyčíslíme měsíční ztráty e-shopu</span></li>
+            <li><span class="hero-step-n">3</span><span>Opravíme chyby a zašleme výsledek optimalizace</span></li>
           </ul>
         </div>
       </div>
