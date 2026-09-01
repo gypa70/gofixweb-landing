@@ -277,6 +277,7 @@
     }
 
     #tarify .section-title,
+    #poptavka .section-title,
     #reseni .section-sub {
       text-align: center;
       color: var(--white);
@@ -287,6 +288,17 @@
 
     #tarify .section-title {
       margin-bottom: 2.5rem;
+    }
+
+    #poptavka .section-title {
+      margin-bottom: 0.75rem;
+    }
+
+    #poptavka .section-sub {
+      text-align: center;
+      margin-left: auto;
+      margin-right: auto;
+      margin-bottom: 1.75rem;
     }
 
     #reseni .section-sub {
@@ -451,6 +463,122 @@
       margin-top: 1.75rem;
     }
 
+    .pricing-note a {
+      color: var(--green);
+      font-weight: 500;
+    }
+
+    .pricing-note a:hover { text-decoration: underline; }
+
+    /* ── POPTÁVKA ── */
+    .form-wrap {
+      max-width: 520px;
+      margin: 0 auto;
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem 1.75rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.15rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+      color: var(--text-light);
+    }
+
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: 0.75rem 0.9rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--navy);
+      color: var(--white);
+      font-family: inherit;
+      font-size: 1rem;
+    }
+
+    .form-group textarea {
+      min-height: 6rem;
+      resize: vertical;
+      line-height: 1.45;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+    }
+
+    .form-group input.invalid,
+    .form-group textarea.invalid {
+      border-color: var(--red-soft);
+    }
+
+    .form-error {
+      color: var(--red-soft);
+      font-size: 0.8rem;
+      margin-top: 0.35rem;
+      display: none;
+    }
+
+    .form-group.has-error .form-error { display: block; }
+
+    .form-success {
+      display: none;
+      text-align: center;
+      padding: 2rem 1rem;
+    }
+
+    .form-success.visible { display: block; }
+
+    .form-success h3 {
+      color: var(--green);
+      font-size: 1.35rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .form-success p { color: var(--text-light); }
+
+    #poptavka-form.hidden { display: none; }
+
+    .form-note {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 0.85rem;
+      text-align: center;
+    }
+
+    .form-note a { color: var(--green); }
+
+    .form-error-global {
+      display: none;
+      color: var(--red-soft);
+      font-size: 0.88rem;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+
+    .form-error-global.visible { display: block; }
+
+    .btn:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .turnstile-wrap {
+      margin: 0.25rem 0 1rem;
+      min-height: 65px;
+    }
+
     /* ── CONTACT ── */
     #kontakt {
       padding: 2.75rem 0;
@@ -514,6 +642,7 @@
       .trust-grid { flex-direction: column; align-items: stretch; }
       .trust-badge { max-width: none; }
       .pricing-grid { grid-template-columns: 1fr; }
+      .form-wrap { padding: 1.5rem 1.15rem; }
     }
   </style>
 </head>
@@ -638,7 +767,52 @@
           </article>
         </div>
 
-        <p class="pricing-note">Ceny včetně DPH. Po zaplacení vás kontaktujeme s dalším postupem.</p>
+        <p class="pricing-note">Ceny včetně DPH. Po zaplacení vás kontaktujeme s dalším postupem.<br>
+          <a href="#poptavka">Nechcete tarif hned? Pošlete poptávku.</a>
+        </p>
+      </div>
+    </section>
+
+    <!-- 4b. POPTÁVKA -->
+    <section class="block alt" id="poptavka" aria-label="Poptávka">
+      <div class="container">
+        <h2 class="section-title">Poptávka</h2>
+        <p class="section-sub">Napište e-mail a doménu e-shopu. Ozveme se s návrhem dalšího postupu.</p>
+
+        <div class="form-wrap">
+          <div class="form-success" id="form-success" role="status">
+            <h3>Děkujeme!</h3>
+            <p>Poptávku jsme přijali a brzy se ozveme.</p>
+          </div>
+
+          <form id="poptavka-form" novalidate>
+            <input type="text" name="_honey" tabindex="-1" autocomplete="off" style="display:none" aria-hidden="true">
+
+            <p class="form-error-global" id="form-error-global" role="alert"></p>
+
+            <div class="form-group" id="fg-email">
+              <label for="email">E-mail</label>
+              <input type="email" id="email" name="email" required autocomplete="email" placeholder="jan@eshop.cz">
+              <span class="form-error">Zadejte platný e-mail.</span>
+            </div>
+
+            <div class="form-group" id="fg-shop">
+              <label for="shop_url">Doména e-shopu</label>
+              <input type="text" id="shop_url" name="shop_url" required autocomplete="url" inputmode="url" placeholder="www.muj-eshop.cz">
+              <span class="form-error">Zadejte platnou doménu e-shopu.</span>
+            </div>
+
+            <div class="form-group" id="fg-note">
+              <label for="note">Poznámka <span style="font-weight:400;color:var(--text-muted)">(volitelná)</span></label>
+              <textarea id="note" name="note" maxlength="2000" rows="4" placeholder="Např. platforma, termín, co vás trápí…"></textarea>
+            </div>
+
+            <div id="turnstile-wrap" class="turnstile-wrap" aria-label="Ověření proti robotům"></div>
+
+            <button type="submit" class="btn btn-block" id="poptavka-submit">Odeslat poptávku</button>
+            <p class="form-note">Odesláním souhlasíte se zpracováním údajů dle <a href="privacy.html?v=20260815">ochrany osobních údajů</a>.</p>
+          </form>
+        </div>
       </div>
     </section>
 
@@ -665,6 +839,7 @@
     </div>
   </footer>
 
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
   <script>
     (function () {
       var list = document.querySelector('.hero-headlines');
@@ -691,6 +866,139 @@
       }, { threshold: 0.35 });
 
       io.observe(list);
+    })();
+
+    (function () {
+      var INQUIRY_API_URL = 'https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev/inquiry';
+      var TURNSTILE_SITE_KEY = '0x4AAAAAAERBDgPD_ejGBr5Q';
+      var form = document.getElementById('poptavka-form');
+      var success = document.getElementById('form-success');
+      var globalError = document.getElementById('form-error-global');
+      var submitBtn = document.getElementById('poptavka-submit');
+      var turnstileWidgetId = null;
+      if (!form) return;
+
+      function renderTurnstile() {
+        if (!window.turnstile || turnstileWidgetId !== null) return;
+        var wrap = document.getElementById('turnstile-wrap');
+        if (!wrap) return;
+        turnstileWidgetId = window.turnstile.render(wrap, {
+          sitekey: TURNSTILE_SITE_KEY,
+          action: 'landing-inquiry',
+          theme: 'dark'
+        });
+      }
+
+      if (window.turnstile) {
+        renderTurnstile();
+      } else {
+        window.addEventListener('load', renderTurnstile);
+      }
+
+      function resetTurnstile() {
+        if (window.turnstile && turnstileWidgetId !== null) {
+          window.turnstile.reset(turnstileWidgetId);
+        }
+      }
+
+      function getTurnstileToken() {
+        if (!window.turnstile || turnstileWidgetId === null) return '';
+        return window.turnstile.getResponse(turnstileWidgetId) || '';
+      }
+
+      function isEmail(value) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+      }
+
+      function isShop(value) {
+        var raw = String(value || '').trim();
+        if (!raw) return false;
+        try {
+          var url = new URL(/^https?:\/\//i.test(raw) ? raw : 'https://' + raw);
+          return Boolean(url.hostname && url.hostname.indexOf('.') !== -1);
+        } catch (err) {
+          return false;
+        }
+      }
+
+      function setGroupError(id, invalid) {
+        var group = document.getElementById(id);
+        var input = group && group.querySelector('input, textarea');
+        if (!group || !input) return;
+        group.classList.toggle('has-error', invalid);
+        input.classList.toggle('invalid', invalid);
+      }
+
+      function showGlobalError(message) {
+        if (!globalError) return;
+        globalError.textContent = message || '';
+        globalError.classList.toggle('visible', Boolean(message));
+      }
+
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (form.querySelector('[name="_honey"]').value) return;
+
+        var email = document.getElementById('email').value.trim();
+        var shop = document.getElementById('shop_url').value.trim();
+        var note = document.getElementById('note').value.trim();
+
+        var emailOk = isEmail(email);
+        var shopOk = isShop(shop);
+        setGroupError('fg-email', !emailOk);
+        setGroupError('fg-shop', !shopOk);
+        showGlobalError('');
+        if (!emailOk || !shopOk) return;
+
+        var turnstileToken = getTurnstileToken();
+        if (!turnstileToken) {
+          showGlobalError('Potvrďte prosím, že nejste robot.');
+          return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Odesílám…';
+
+        fetch(INQUIRY_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email,
+            shop_url: shop,
+            note: note,
+            turnstile_token: turnstileToken
+          })
+        })
+          .then(function (response) {
+            return response.json().then(function (data) {
+              return { ok: response.ok, status: response.status, data: data };
+            });
+          })
+          .then(function (result) {
+            if (result.ok && result.data && result.data.ok) {
+              form.classList.add('hidden');
+              success.classList.add('visible');
+              return;
+            }
+            if (result.status === 429) {
+              showGlobalError(result.data && result.data.message || 'Pro tento e-mail už dnes byla poptávka odeslána.');
+              return;
+            }
+            if (result.data && (result.data.error || '').indexOf('turnstile') === 0) {
+              showGlobalError(result.data.message || 'Ověření proti robotům selhalo. Zkuste to znovu.');
+              return;
+            }
+            showGlobalError('Odeslání se nepodařilo. Zkuste to znovu, nebo napište na info@gofixweb.com.');
+          })
+          .catch(function () {
+            showGlobalError('Odeslání se nepodařilo. Zkuste to znovu, nebo napište na info@gofixweb.com.');
+          })
+          .finally(function () {
+            resetTurnstile();
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Odeslat poptávku';
+          });
+      });
     })();
   </script>
 </body>

@@ -5,9 +5,11 @@
  *   GITHUB_TOKEN       — PAT s repo scope pro gofixweb-scanner
  *   STRIPE_SECRET_KEY  — Stripe secret key pro GET /checkout (Checkout Session)
  *   STRIPE_WEBHOOK_SECRET — Stripe webhook signing secret pro /stripe-webhook
+ *   TURNSTILE_SECRET   — Turnstile secret key (siteverify)
  *
  * GET /checkout — Stripe Checkout Session (manual_fix 3 990 Kč ihned;
  *   wp_autofix 4 990 Kč až po povinném souhlasu s VOP).
+ * POST /inquiry — poptávka z landing page (uložení + notifikace, bez scanu).
  * POST /wp-onboarding — handshake WordPress REST; uložení credentials běží v GHA.
  */
 
@@ -32,6 +34,14 @@ const VOP_AUTOFIX_SECTION_URL = `${VOP_TERMS_URL}#vop-autofix-section`;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STRIPE_TIMESTAMP_TOLERANCE_SEC = 300;
+const TURNSTILE_ACTION = "landing-inquiry";
+const TURNSTILE_HOSTNAMES = new Set(["gofixweb.com", "www.gofixweb.com"]);
+const NOTE_MAX_LEN = 2000;
+
+/** E-maily, které obcházejí rate limit (1 poptávka/den) — jen pro interní testování. */
+const RATE_LIMIT_WHITELIST = new Set([
+  "trueforexway@gmail.com",
+]);
 
 function corsHeaders(origin) {
   const allowed = origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://gofixweb.com";
@@ -51,6 +61,147 @@ function jsonResponse(body, status = 200, origin = null) {
 
 function clientIp(request) {
   return request.headers.get("CF-Connecting-IP") || request.headers.get("X-Forwarded-For") || "";
+}
+
+function normalizeUrl(raw) {
+  let value = String(raw || "").trim();
+  if (!/^https?:\/\//i.test(value)) value = `https://${value}`;
+  const url = new URL(value);
+  if (!url.hostname) throw new Error("invalid_url");
+  return url.toString();
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function isRateLimitWhitelisted(email) {
+  return RATE_LIMIT_WHITELIST.has(String(email || "").trim().toLowerCase());
+}
+
+async function isRateLimited(email, cache) {
+  const key = `https://rate.gofixweb/r/${todayKey()}/${email.toLowerCase()}`;
+  const hit = await cache.match(key);
+  if (hit) return true;
+  await cache.put(key, new Response("1"), { expirationTtl: 86400 });
+  return false;
+}
+
+async function verifyTurnstile(env, token, remoteIp) {
+  const secret = env.TURNSTILE_SECRET;
+  if (!secret) {
+    return { ok: false, error: "turnstile_not_configured" };
+  }
+
+  if (typeof token !== "string" || token.length === 0 || token.length > 2048) {
+    return { ok: false, error: "turnstile_missing" };
+  }
+
+  let result;
+  try {
+    const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        secret,
+        response: token,
+        remoteip: remoteIp,
+      }),
+    });
+    if (!response.ok) {
+      return { ok: false, error: "turnstile_verify_failed" };
+    }
+    result = await response.json();
+  } catch (err) {
+    console.error("turnstile_siteverify_error", err);
+    return { ok: false, error: "turnstile_verify_failed" };
+  }
+
+  if (
+    !result.success ||
+    result.action !== TURNSTILE_ACTION ||
+    !TURNSTILE_HOSTNAMES.has(result.hostname)
+  ) {
+    return { ok: false, error: "turnstile_invalid" };
+  }
+
+  return { ok: true };
+}
+
+async function handleLandingInquiry(request, env, origin) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ ok: false, error: "invalid_json" }, 400, origin);
+  }
+
+  const turnstileToken = String(
+    body.turnstile_token || body["cf-turnstile-response"] || "",
+  ).trim();
+  const turnstileCheck = await verifyTurnstile(env, turnstileToken, clientIp(request));
+  if (!turnstileCheck.ok) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: turnstileCheck.error,
+        message: "Ověření proti robotům selhalo. Obnovte stránku a zkuste to znovu.",
+      },
+      403,
+      origin,
+    );
+  }
+
+  const email = String(body.email || "").trim().toLowerCase();
+  const shopUrlRaw = String(body.shop_url || body.shopUrl || body.domain || "").trim();
+  const note = String(body.note || body.message || "").trim().slice(0, NOTE_MAX_LEN);
+
+  if (!EMAIL_RE.test(email) || !shopUrlRaw) {
+    return jsonResponse({ ok: false, error: "validation_failed" }, 400, origin);
+  }
+
+  let shop_url;
+  try {
+    shop_url = normalizeUrl(shopUrlRaw);
+  } catch {
+    return jsonResponse({ ok: false, error: "invalid_url" }, 400, origin);
+  }
+
+  const domain = new URL(shop_url).hostname.replace(/^www\./i, "");
+  const testRequest = isRateLimitWhitelisted(email);
+  const cache = caches.default;
+  if (!testRequest && (await isRateLimited(email, cache))) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "rate_limited",
+        message: "Pro tento e-mail už dnes byla poptávka odeslána.",
+      },
+      429,
+      origin,
+    );
+  }
+
+  try {
+    await dispatchGithubEvent(env, "landing-inquiry", {
+      email,
+      domain,
+      shop_url,
+      note,
+      source: "landing_organic",
+      skip_rate_limit: testRequest,
+      test_request: testRequest,
+    });
+  } catch (err) {
+    console.error(err);
+    return jsonResponse({ ok: false, error: "dispatch_failed" }, 502, origin);
+  }
+
+  return jsonResponse(
+    { ok: true, message: "Poptávku jsme přijali. Brzy se ozveme." },
+    200,
+    origin,
+  );
 }
 
 async function dispatchGithubEvent(env, eventType, payload) {
@@ -737,6 +888,13 @@ export default {
 
     if (url.pathname === "/wp-rollback") {
       return handleWpRollback(request, env);
+    }
+
+    if (url.pathname === "/inquiry") {
+      if (request.method !== "POST") {
+        return jsonResponse({ ok: false, error: "method_not_allowed" }, 405, origin);
+      }
+      return handleLandingInquiry(request, env, origin);
     }
 
     return jsonResponse({ ok: false, error: "not_found" }, 404, origin);
