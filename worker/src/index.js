@@ -9,7 +9,7 @@
  *
  * GET /checkout — Stripe Checkout Session (manual_fix 3 990 Kč ihned;
  *   wp_autofix 4 990 Kč až po povinném souhlasu s VOP).
- * POST /inquiry — poptávka z landing page (uložení + notifikace, bez scanu).
+ * POST /submit — formulář: whitelist e-mail spustí free scan, ostatní jen poptávku.
  * POST /wp-onboarding — handshake WordPress REST; uložení credentials běží v GHA.
  */
 
@@ -34,11 +34,10 @@ const VOP_AUTOFIX_SECTION_URL = `${VOP_TERMS_URL}#vop-autofix-section`;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STRIPE_TIMESTAMP_TOLERANCE_SEC = 300;
-const TURNSTILE_ACTION = "landing-inquiry";
+const TURNSTILE_ACTION = "free-report";
 const TURNSTILE_HOSTNAMES = new Set(["gofixweb.com", "www.gofixweb.com"]);
-const NOTE_MAX_LEN = 2000;
 
-/** E-maily, které obcházejí rate limit (1 poptávka/den) — jen pro interní testování. */
+/** E-maily, které obcházejí rate limit a spouští plný scan — jen interní QC. */
 const RATE_LIMIT_WHITELIST = new Set([
   "trueforexway@gmail.com",
 ]);
@@ -128,7 +127,7 @@ async function verifyTurnstile(env, token, remoteIp) {
   return { ok: true };
 }
 
-async function handleLandingInquiry(request, env, origin) {
+async function handleLeadSubmit(request, env, origin) {
   let body;
   try {
     body = await request.json();
@@ -152,11 +151,11 @@ async function handleLandingInquiry(request, env, origin) {
     );
   }
 
+  const name = String(body.name || "").trim();
   const email = String(body.email || "").trim().toLowerCase();
   const shopUrlRaw = String(body.shop_url || body.shopUrl || body.domain || "").trim();
-  const note = String(body.note || body.message || "").trim().slice(0, NOTE_MAX_LEN);
 
-  if (!EMAIL_RE.test(email) || !shopUrlRaw) {
+  if (!name || !EMAIL_RE.test(email) || !shopUrlRaw) {
     return jsonResponse({ ok: false, error: "validation_failed" }, 400, origin);
   }
 
@@ -168,14 +167,14 @@ async function handleLandingInquiry(request, env, origin) {
   }
 
   const domain = new URL(shop_url).hostname.replace(/^www\./i, "");
-  const testRequest = isRateLimitWhitelisted(email);
+  const qcScan = isRateLimitWhitelisted(email);
   const cache = caches.default;
-  if (!testRequest && (await isRateLimited(email, cache))) {
+  if (!qcScan && (await isRateLimited(email, cache))) {
     return jsonResponse(
       {
         ok: false,
         error: "rate_limited",
-        message: "Pro tento e-mail už dnes byla poptávka odeslána.",
+        message: "Pro tento e-mail už dnes byl formulář odeslán.",
       },
       429,
       origin,
@@ -183,14 +182,31 @@ async function handleLandingInquiry(request, env, origin) {
   }
 
   try {
+    if (qcScan) {
+      await dispatchGithubEvent(env, "free-report-request", {
+        name,
+        email,
+        shop_url,
+        skip_rate_limit: true,
+        test_request: true,
+      });
+      return jsonResponse(
+        {
+          ok: true,
+          mode: "scan",
+          message: "Report bude odeslán do 10 minut.",
+        },
+        200,
+        origin,
+      );
+    }
+
     await dispatchGithubEvent(env, "landing-inquiry", {
+      name,
       email,
       domain,
       shop_url,
-      note,
       source: "landing_organic",
-      skip_rate_limit: testRequest,
-      test_request: testRequest,
     });
   } catch (err) {
     console.error(err);
@@ -198,7 +214,11 @@ async function handleLandingInquiry(request, env, origin) {
   }
 
   return jsonResponse(
-    { ok: true, message: "Poptávku jsme přijali. Brzy se ozveme." },
+    {
+      ok: true,
+      mode: "inquiry",
+      message: "Děkujeme, brzy se vám ozveme.",
+    },
     200,
     origin,
   );
@@ -890,11 +910,11 @@ export default {
       return handleWpRollback(request, env);
     }
 
-    if (url.pathname === "/inquiry") {
+    if (url.pathname === "/submit") {
       if (request.method !== "POST") {
         return jsonResponse({ ok: false, error: "method_not_allowed" }, 405, origin);
       }
-      return handleLandingInquiry(request, env, origin);
+      return handleLeadSubmit(request, env, origin);
     }
 
     return jsonResponse({ ok: false, error: "not_found" }, 404, origin);

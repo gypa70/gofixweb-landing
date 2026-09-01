@@ -277,7 +277,7 @@
     }
 
     #tarify .section-title,
-    #poptavka .section-title,
+    #signup-form .section-title,
     #reseni .section-sub {
       text-align: center;
       color: var(--white);
@@ -290,14 +290,7 @@
       margin-bottom: 2.5rem;
     }
 
-    #poptavka .section-title {
-      margin-bottom: 0.75rem;
-    }
-
-    #poptavka .section-sub {
-      text-align: center;
-      margin-left: auto;
-      margin-right: auto;
+    #signup-form .section-title {
       margin-bottom: 1.75rem;
     }
 
@@ -463,14 +456,7 @@
       margin-top: 1.75rem;
     }
 
-    .pricing-note a {
-      color: var(--green);
-      font-weight: 500;
-    }
-
-    .pricing-note a:hover { text-decoration: underline; }
-
-    /* ── POPTÁVKA ── */
+    /* ── SIGNUP FORM ── */
     .form-wrap {
       max-width: 520px;
       margin: 0 auto;
@@ -492,8 +478,7 @@
       color: var(--text-light);
     }
 
-    .form-group input,
-    .form-group textarea {
+    .form-group input {
       width: 100%;
       padding: 0.75rem 0.9rem;
       border-radius: 8px;
@@ -504,21 +489,13 @@
       font-size: 1rem;
     }
 
-    .form-group textarea {
-      min-height: 6rem;
-      resize: vertical;
-      line-height: 1.45;
-    }
-
-    .form-group input:focus,
-    .form-group textarea:focus {
+    .form-group input:focus {
       outline: none;
       border-color: var(--green);
       box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
     }
 
-    .form-group input.invalid,
-    .form-group textarea.invalid {
+    .form-group input.invalid {
       border-color: var(--red-soft);
     }
 
@@ -547,7 +524,7 @@
 
     .form-success p { color: var(--text-light); }
 
-    #poptavka-form.hidden { display: none; }
+    #signup-form-form.hidden { display: none; }
 
     .form-note {
       font-size: 0.78rem;
@@ -767,28 +744,31 @@
           </article>
         </div>
 
-        <p class="pricing-note">Ceny včetně DPH. Po zaplacení vás kontaktujeme s dalším postupem.<br>
-          <a href="#poptavka">Nechcete tarif hned? Pošlete poptávku.</a>
-        </p>
+        <p class="pricing-note">Ceny včetně DPH. Po zaplacení vás kontaktujeme s dalším postupem.</p>
       </div>
     </section>
 
-    <!-- 4b. POPTÁVKA -->
-    <section class="block alt" id="poptavka" aria-label="Poptávka">
+    <!-- 4b. FORMULÁŘ -->
+    <section class="block alt" id="signup-form" aria-label="Analýza e-shopu">
       <div class="container">
-        <h2 class="section-title">Poptávka</h2>
-        <p class="section-sub">Napište e-mail a doménu e-shopu. Ozveme se s návrhem dalšího postupu.</p>
+        <h2 class="section-title">Report zdarma do 10 minut</h2>
 
         <div class="form-wrap">
           <div class="form-success" id="form-success" role="status">
             <h3>Děkujeme!</h3>
-            <p>Poptávku jsme přijali a brzy se ozveme.</p>
+            <p id="form-success-message">Děkujeme, brzy se vám ozveme.</p>
           </div>
 
-          <form id="poptavka-form" novalidate>
+          <form id="signup-form-form" novalidate>
             <input type="text" name="_honey" tabindex="-1" autocomplete="off" style="display:none" aria-hidden="true">
 
             <p class="form-error-global" id="form-error-global" role="alert"></p>
+
+            <div class="form-group" id="fg-name">
+              <label for="name">Jméno</label>
+              <input type="text" id="name" name="name" required autocomplete="name" placeholder="Jan Novák">
+              <span class="form-error">Vyplňte prosím jméno.</span>
+            </div>
 
             <div class="form-group" id="fg-email">
               <label for="email">E-mail</label>
@@ -797,19 +777,14 @@
             </div>
 
             <div class="form-group" id="fg-shop">
-              <label for="shop_url">Doména e-shopu</label>
-              <input type="text" id="shop_url" name="shop_url" required autocomplete="url" inputmode="url" placeholder="www.muj-eshop.cz">
-              <span class="form-error">Zadejte platnou doménu e-shopu.</span>
-            </div>
-
-            <div class="form-group" id="fg-note">
-              <label for="note">Poznámka <span style="font-weight:400;color:var(--text-muted)">(volitelná)</span></label>
-              <textarea id="note" name="note" maxlength="2000" rows="4" placeholder="Např. platforma, termín, co vás trápí…"></textarea>
+              <label for="shop_url">E-shop</label>
+              <input type="text" id="shop_url" name="shop_url" required autocomplete="url" inputmode="url" placeholder="example.cz">
+              <span class="form-error">Zadejte platnou URL e-shopu.</span>
             </div>
 
             <div id="turnstile-wrap" class="turnstile-wrap" aria-label="Ověření proti robotům"></div>
 
-            <button type="submit" class="btn btn-block" id="poptavka-submit">Odeslat poptávku</button>
+            <button type="submit" class="btn btn-block" id="signup-submit">Získat analýzu e-shopu</button>
             <p class="form-note">Odesláním souhlasíte se zpracováním údajů dle <a href="privacy.html?v=20260815">ochrany osobních údajů</a>.</p>
           </form>
         </div>
@@ -869,12 +844,13 @@
     })();
 
     (function () {
-      var INQUIRY_API_URL = 'https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev/inquiry';
+      var REPORT_API_URL = 'https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev/submit';
       var TURNSTILE_SITE_KEY = '0x4AAAAAAERBDgPD_ejGBr5Q';
-      var form = document.getElementById('poptavka-form');
+      var form = document.getElementById('signup-form-form');
       var success = document.getElementById('form-success');
+      var successMessage = document.getElementById('form-success-message');
       var globalError = document.getElementById('form-error-global');
-      var submitBtn = document.getElementById('poptavka-submit');
+      var submitBtn = document.getElementById('signup-submit');
       var turnstileWidgetId = null;
       if (!form) return;
 
@@ -884,7 +860,7 @@
         if (!wrap) return;
         turnstileWidgetId = window.turnstile.render(wrap, {
           sitekey: TURNSTILE_SITE_KEY,
-          action: 'landing-inquiry',
+          action: 'free-report',
           theme: 'dark'
         });
       }
@@ -910,20 +886,27 @@
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
       }
 
-      function isShop(value) {
-        var raw = String(value || '').trim();
-        if (!raw) return false;
+      function isUrl(value) {
         try {
-          var url = new URL(/^https?:\/\//i.test(raw) ? raw : 'https://' + raw);
+          var url = new URL(value.indexOf('://') === -1 ? 'https://' + value : value);
           return Boolean(url.hostname && url.hostname.indexOf('.') !== -1);
         } catch (err) {
           return false;
         }
       }
 
+      function normalizeShopUrl(value) {
+        var raw = String(value || '').trim();
+        if (!raw) throw new Error('empty');
+        if (raw.indexOf('://') === -1) raw = 'https://' + raw;
+        var url = new URL(raw);
+        if (!url.hostname) throw new Error('invalid');
+        return url.toString();
+      }
+
       function setGroupError(id, invalid) {
         var group = document.getElementById(id);
-        var input = group && group.querySelector('input, textarea');
+        var input = group && group.querySelector('input');
         if (!group || !input) return;
         group.classList.toggle('has-error', invalid);
         input.classList.toggle('invalid', invalid);
@@ -939,16 +922,23 @@
         event.preventDefault();
         if (form.querySelector('[name="_honey"]').value) return;
 
+        var name = document.getElementById('name').value.trim();
         var email = document.getElementById('email').value.trim();
         var shop = document.getElementById('shop_url').value.trim();
-        var note = document.getElementById('note').value.trim();
 
-        var emailOk = isEmail(email);
-        var shopOk = isShop(shop);
-        setGroupError('fg-email', !emailOk);
-        setGroupError('fg-shop', !shopOk);
+        setGroupError('fg-name', !name);
+        setGroupError('fg-email', !isEmail(email));
+        setGroupError('fg-shop', !isUrl(shop));
         showGlobalError('');
-        if (!emailOk || !shopOk) return;
+        if (!name || !isEmail(email) || !isUrl(shop)) return;
+
+        var shopUrl;
+        try {
+          shopUrl = normalizeShopUrl(shop);
+        } catch (err) {
+          setGroupError('fg-shop', true);
+          return;
+        }
 
         var turnstileToken = getTurnstileToken();
         if (!turnstileToken) {
@@ -959,13 +949,13 @@
         submitBtn.disabled = true;
         submitBtn.textContent = 'Odesílám…';
 
-        fetch(INQUIRY_API_URL, {
+        fetch(REPORT_API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            name: name,
             email: email,
-            shop_url: shop,
-            note: note,
+            shop_url: shopUrl,
             turnstile_token: turnstileToken
           })
         })
@@ -976,12 +966,19 @@
           })
           .then(function (result) {
             if (result.ok && result.data && result.data.ok) {
+              var mode = result.data.mode || '';
+              var defaultMsg = mode === 'scan'
+                ? 'Report bude odeslán do 10 minut.'
+                : 'Děkujeme, brzy se vám ozveme.';
+              if (successMessage) {
+                successMessage.textContent = result.data.message || defaultMsg;
+              }
               form.classList.add('hidden');
               success.classList.add('visible');
               return;
             }
-            if (result.status === 429) {
-              showGlobalError(result.data && result.data.message || 'Pro tento e-mail už dnes byla poptávka odeslána.');
+            if (result.status === 429 || (result.data && result.data.error === 'rate_limited')) {
+              showGlobalError(result.data && result.data.message || 'Pro tento e-mail už dnes byl formulář odeslán.');
               return;
             }
             if (result.data && (result.data.error || '').indexOf('turnstile') === 0) {
@@ -996,7 +993,7 @@
           .finally(function () {
             resetTurnstile();
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Odeslat poptávku';
+            submitBtn.textContent = 'Získat analýzu e-shopu';
           });
       });
     })();
