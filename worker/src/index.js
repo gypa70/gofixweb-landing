@@ -42,6 +42,7 @@ const RATE_LIMIT_WHITELIST = new Set([
   "trueforexway@gmail.com",
   "trademaker@seznam.cz",
   "gofixweb@outlook.com",
+  "test-i97m1naf4@srv1.mail-tester.com",
 ]);
 
 function corsHeaders(origin) {
