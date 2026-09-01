@@ -653,7 +653,50 @@
       </div>
     </section>
 
-    <!-- 3. PAIN vs ŘEŠENÍ -->
+    <!-- 3. FORMULÁŘ -->
+    <section class="block alt" id="signup-form" aria-label="Analýza e-shopu">
+      <div class="container">
+        <h2 class="section-title">Report zdarma do 10 minut</h2>
+
+        <div class="form-wrap">
+          <div class="form-success" id="form-success" role="status">
+            <h3>Děkujeme!</h3>
+            <p id="form-success-message">Děkujeme, brzy se vám ozveme.</p>
+          </div>
+
+          <form id="signup-form-form" novalidate>
+            <input type="text" name="_honey" tabindex="-1" autocomplete="off" style="display:none" aria-hidden="true">
+
+            <p class="form-error-global" id="form-error-global" role="alert"></p>
+
+            <div class="form-group" id="fg-name">
+              <label for="name">Jméno</label>
+              <input type="text" id="name" name="name" required autocomplete="name" placeholder="Jan Novák">
+              <span class="form-error">Vyplňte prosím jméno.</span>
+            </div>
+
+            <div class="form-group" id="fg-email">
+              <label for="email">E-mail</label>
+              <input type="email" id="email" name="email" required autocomplete="email" placeholder="jan@eshop.cz">
+              <span class="form-error">Zadejte platný e-mail.</span>
+            </div>
+
+            <div class="form-group" id="fg-shop">
+              <label for="shop_url">E-shop</label>
+              <input type="text" id="shop_url" name="shop_url" required autocomplete="url" inputmode="url" placeholder="example.cz">
+              <span class="form-error">Zadejte platnou URL e-shopu.</span>
+            </div>
+
+            <div id="turnstile-wrap" class="turnstile-wrap" aria-label="Ověření proti robotům"></div>
+
+            <button type="submit" class="btn btn-block" id="signup-submit">Získat analýzu e-shopu</button>
+            <p class="form-note">Odesláním souhlasíte se zpracováním údajů dle <a href="privacy.html?v=20260815">ochrany osobních údajů</a>.</p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. PAIN vs ŘEŠENÍ -->
     <section class="block alt" id="reseni">
       <div class="container">
         <p class="section-sub">
@@ -682,7 +725,7 @@
       </div>
     </section>
 
-    <!-- 4. TARIFY -->
+    <!-- 5. TARIFY -->
     <section class="block" id="tarify">
       <div class="container">
         <h2 class="section-title">Pravidelný scan a optimalizace e-shopu</h2>
@@ -730,50 +773,7 @@
       </div>
     </section>
 
-    <!-- 4b. FORMULÁŘ -->
-    <section class="block alt" id="signup-form" aria-label="Analýza e-shopu">
-      <div class="container">
-        <h2 class="section-title">Report zdarma do 10 minut</h2>
-
-        <div class="form-wrap">
-          <div class="form-success" id="form-success" role="status">
-            <h3>Děkujeme!</h3>
-            <p id="form-success-message">Děkujeme, brzy se vám ozveme.</p>
-          </div>
-
-          <form id="signup-form-form" novalidate>
-            <input type="text" name="_honey" tabindex="-1" autocomplete="off" style="display:none" aria-hidden="true">
-
-            <p class="form-error-global" id="form-error-global" role="alert"></p>
-
-            <div class="form-group" id="fg-name">
-              <label for="name">Jméno</label>
-              <input type="text" id="name" name="name" required autocomplete="name" placeholder="Jan Novák">
-              <span class="form-error">Vyplňte prosím jméno.</span>
-            </div>
-
-            <div class="form-group" id="fg-email">
-              <label for="email">E-mail</label>
-              <input type="email" id="email" name="email" required autocomplete="email" placeholder="jan@eshop.cz">
-              <span class="form-error">Zadejte platný e-mail.</span>
-            </div>
-
-            <div class="form-group" id="fg-shop">
-              <label for="shop_url">E-shop</label>
-              <input type="text" id="shop_url" name="shop_url" required autocomplete="url" inputmode="url" placeholder="example.cz">
-              <span class="form-error">Zadejte platnou URL e-shopu.</span>
-            </div>
-
-            <div id="turnstile-wrap" class="turnstile-wrap" aria-label="Ověření proti robotům"></div>
-
-            <button type="submit" class="btn btn-block" id="signup-submit">Získat analýzu e-shopu</button>
-            <p class="form-note">Odesláním souhlasíte se zpracováním údajů dle <a href="privacy.html?v=20260815">ochrany osobních údajů</a>.</p>
-          </form>
-        </div>
-      </div>
-    </section>
-
-    <!-- 5. KONTAKT -->
+    <!-- 6. KONTAKT -->
     <section class="block alt" id="kontakt" aria-label="Kontakt">
       <div class="container contact-wrap">
         <a class="btn btn-outline contact-mail" href="mailto:info@gofixweb.com?subject=Dotaz%20k%20GoFixWeb">info@gofixweb.com</a>
