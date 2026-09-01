@@ -241,23 +241,17 @@
       margin-bottom: 2.5rem;
     }
 
-    #tarify .section-title,
-    #kontakt .section-title {
+    #tarify .section-title {
       text-align: center;
     }
 
     #tarify .section-title,
-    #kontakt .section-title,
     #reseni .section-sub {
       text-align: center;
       color: var(--white);
       font-size: clamp(1.2rem, 2.3vw, 1.55rem);
       font-weight: 500;
       letter-spacing: -0.01em;
-    }
-
-    #kontakt .section-title {
-      margin-bottom: 1.5rem;
     }
 
     #tarify .section-title {
@@ -270,8 +264,7 @@
     }
 
     #reseni .section-sub,
-    #tarify .section-sub,
-    #kontakt .section-sub {
+    #tarify .section-sub {
       text-align: center;
       margin-left: auto;
       margin-right: auto;
@@ -428,21 +421,18 @@
     }
 
     /* ── CONTACT ── */
+    #kontakt {
+      padding: 2.75rem 0;
+    }
+
     .contact-wrap {
       max-width: 560px;
       margin: 0 auto;
       text-align: center;
     }
 
-    .contact-wrap h2 {
-      font-size: clamp(1.35rem, 3vw, 1.75rem);
-      font-weight: 800;
-      margin-bottom: 0.75rem;
-    }
-
-    .contact-wrap p {
-      color: var(--text-light);
-      margin-bottom: 1.25rem;
+    .contact-mail {
+      font-size: 1.25rem;
     }
 
     .contact-email {
@@ -488,6 +478,7 @@
         display: block;
       }
       section.block { padding: 3rem 0; }
+      #kontakt { padding: 2.25rem 0; }
       .compare { grid-template-columns: 1fr; }
       .trust-grid { flex-direction: column; align-items: stretch; }
       .trust-badge { max-width: none; }
@@ -621,12 +612,9 @@
     </section>
 
     <!-- 5. KONTAKT -->
-    <section class="block alt" id="kontakt">
+    <section class="block alt" id="kontakt" aria-label="Kontakt">
       <div class="container contact-wrap">
-        <h2 class="section-title">
-          Napište nám — poradíme s výběrem tarifu nebo připravíme individuální nabídku
-        </h2>
-        <a class="btn btn-outline" href="mailto:info@gofixweb.com?subject=Dotaz%20k%20GoFixWeb">info@gofixweb.com</a>
+        <a class="btn btn-outline contact-mail" href="mailto:info@gofixweb.com?subject=Dotaz%20k%20GoFixWeb">info@gofixweb.com</a>
       </div>
     </section>
   </main>
