@@ -315,28 +315,33 @@
 
     .compare-col li {
       position: relative;
-      padding: 0.45rem 0 0.45rem 1.35rem;
-      font-size: 0.92rem;
+      padding: 0.5rem 0 0.5rem 1.55rem;
+      font-size: 1rem;
       color: var(--text-light);
       border-bottom: 1px solid var(--border);
     }
 
     .compare-col li:last-child { border-bottom: none; }
 
-    .compare-col.pain li::before {
-      content: "✕";
+    .compare-col.pain li::before,
+    .compare-col.solve li::before {
       position: absolute;
       left: 0;
-      color: var(--red-soft);
+      top: 0.5rem;
+      width: 1.1em;
+      line-height: inherit;
       font-weight: 700;
+      text-align: center;
+    }
+
+    .compare-col.pain li::before {
+      content: "✕";
+      color: var(--red-soft);
     }
 
     .compare-col.solve li::before {
       content: "✓";
-      position: absolute;
-      left: 0;
       color: var(--green);
-      font-weight: 700;
     }
 
     /* ── PRICING ── */
