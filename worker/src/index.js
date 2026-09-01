@@ -902,6 +902,7 @@ const ADMIN_LINKS = {
   bounce: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-bounce-monitor.yml",
   resume: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-campaign-resume.yml",
   outreach: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/outreach-batch.yml",
+  auto: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/outreach-auto.yml",
   actions: "https://github.com/gypa70/gofixweb-scanner/actions",
 };
 
@@ -912,6 +913,8 @@ const OUTREACH_SERIES = [
 ];
 const MAX_BATCH = 20;
 const DEFAULT_BATCH = 5;
+const AUTO_BATCH = 5;
+const AUTO_INTERVAL_MIN = 30;
 const COOLDOWN_MS = 5 * 60 * 1000;
 const HALT_BLOCK_TEXT = "Kampaň je zastavená (bounce rate). Nejdřív odemkni halt výše.";
 const RUNNING_BLOCK_TEXT = "Právě běží jiná dávka, počkej na dokončení.";
@@ -1085,6 +1088,8 @@ function seriesView(snapshot, runState, seriesDef) {
     cooldown_active: cooldownActive,
     locked: waveLocked || Boolean(fromSnap.locked),
     halt_during: Boolean(fromSnap.halt_during),
+    auto_enabled: Boolean(fromSnap.auto_enabled),
+    auto_available: !waveLocked && !Boolean(fromSnap.locked),
     halted,
   };
 }
@@ -1151,6 +1156,7 @@ function renderAdminHtml(snapshot, {
   error = "",
   queued = false,
   launched = false,
+  autoQueued = false,
   launchError = "",
   runState = {},
 } = {}) {
@@ -1172,6 +1178,9 @@ function renderAdminHtml(snapshot, {
   const launchedNote = launched
     ? `<p class="banner-ok">Dávka je ve frontě GitHub Actions. Stav se obnoví po persistu DB (obvykle do minuty).</p>`
     : "";
+  const autoNote = autoQueued
+    ? `<p class="banner-ok">Přepínač automatiky je ve frontě. Stav na kartě série se obnoví po persistu DB (obvykle do minuty).</p>`
+    : "";
   const launchErr = launchError
     ? `<p class="banner-err">${escapeHtml(launchError)}</p>`
     : "";
@@ -1188,6 +1197,26 @@ function renderAdminHtml(snapshot, {
     const cooldown = view.cooldown_active && view.cooldown_until
       ? `<p class="hint">Další dávka této série až po ${formatWhen(view.cooldown_until)}</p>`
       : "";
+    const autoOn = Boolean(view.auto_enabled);
+    const autoLabel = autoOn ? "ZAPNUTO" : "VYPNUTO";
+    const autoClass = autoOn ? "auto-on" : "auto-off";
+    let autoBlock = "";
+    if (!view.auto_available) {
+      autoBlock = `<p class="hint">Automatické odesílání: nedostupné, dokud je série zamčená.</p>`;
+    } else if (view.remaining <= 0 && view.total > 0) {
+      autoBlock = `<p class="hint">Automatické odesílání: VYPNUTO — v sérii už není koho kontaktovat.</p>`;
+    } else {
+      const nextEnabled = autoOn ? "0" : "1";
+      const btnLabel = autoOn ? "Vypnout automatiku" : "Zapnout automatiku";
+      const btnClass = autoOn ? "auto-off-btn" : "auto-on-btn";
+      autoBlock = `<form class="auto-form" method="post" action="/admin/auto" data-series-name="${escapeHtml(view.name)}" data-enable="${nextEnabled}">
+        <input type="hidden" name="series" value="${escapeHtml(view.id)}">
+        <input type="hidden" name="enabled" value="${nextEnabled}">
+        <p class="hint">Automatické odesílání: <strong class="${autoClass}">${autoLabel}</strong>
+        — ${AUTO_BATCH} e-mailů každých ${AUTO_INTERVAL_MIN} min, Po–Pá 8:00–18:00 (Praha).</p>
+        <button class="${btnClass}" type="submit">${btnLabel}</button>
+      </form>`;
+    }
     return `<div class="series-card">
       <h3>${escapeHtml(view.name)}</h3>
       <p class="hint">${escapeHtml(progress)}</p>
@@ -1201,6 +1230,7 @@ function renderAdminHtml(snapshot, {
       </form>
       ${block ? `<p class="block-reason">${escapeHtml(block)}</p>` : ""}
       ${cooldown}
+      ${autoBlock}
     </div>`;
   }).join("");
   const haltBox = halted
@@ -1268,6 +1298,10 @@ function renderAdminHtml(snapshot, {
     .banner-ok { background: rgba(22,163,74,0.12); border: 1px solid rgba(22,163,74,0.35); border-radius: 10px; padding: 0.85rem 1rem; }
     button { margin-top: 0.75rem; border: 0; border-radius: 8px; padding: 0.8rem 1.1rem; font-weight: 700; background: var(--red); color: #fff; cursor: pointer; }
     button.launch { background: var(--green); margin-top: 0; }
+    button.auto-on-btn { background: var(--green); margin-top: 0.45rem; }
+    button.auto-off-btn { background: #64748b; margin-top: 0.45rem; }
+    .auto-on { color: var(--green); }
+    .auto-off { color: var(--text-muted); }
     button:disabled { opacity: 0.45; cursor: not-allowed; background: #64748b; }
     .series-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem; }
     .series-card { background: var(--navy-light); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; }
@@ -1289,7 +1323,7 @@ function renderAdminHtml(snapshot, {
   <div class="wrap">
     <h1>GoFix<span>Web</span> — stav kampaně</h1>
     <p class="sub">Interní přehled. Snapshot z DB: ${generated}. Obnova každých 60 s.</p>
-    ${err}${queuedNote}${launchedNote}${launchErr}
+    ${err}${queuedNote}${launchedNote}${autoNote}${launchErr}
     <div class="cards">
       <div class="card"><div class="k">Odesláno</div><div class="v">${escapeHtml(stats.sent ?? 0)}</div></div>
       <div class="card"><div class="k">Accepted</div><div class="v ok">${escapeHtml(stats.accepted ?? 0)}</div></div>
@@ -1307,6 +1341,7 @@ function renderAdminHtml(snapshot, {
       <a href="${ADMIN_LINKS.bounce}" target="_blank" rel="noopener">GHA bounce monitor</a>
       <a href="${ADMIN_LINKS.resume}" target="_blank" rel="noopener">GHA resume halt</a>
       <a href="${ADMIN_LINKS.outreach}" target="_blank" rel="noopener">GHA outreach dávky</a>
+      <a href="${ADMIN_LINKS.auto}" target="_blank" rel="noopener">GHA automatika</a>
       <a href="${ADMIN_LINKS.actions}" target="_blank" rel="noopener">Všechny Actions</a>
       <a href="${GMAIL_BOUNCE_SEARCH_URL}" target="_blank" rel="noopener">Gmail bounce search</a>
     </div>
@@ -1329,6 +1364,14 @@ function renderAdminHtml(snapshot, {
         if (n > 10 && !window.confirm("Opravdu odeslat " + n + " e-mailů ze série " + name + "?")) {
           event.preventDefault();
         }
+      });
+    });
+    document.querySelectorAll("form.auto-form").forEach(function (form) {
+      form.addEventListener("submit", function (event) {
+        if (form.getAttribute("data-enable") !== "1") return;
+        var name = form.getAttribute("data-series-name") || "";
+        var msg = "Zapnout automatické odesílání série " + name + "? Dávky po 5 e-mailech každých 30 min, pracovní dny 8:00–18:00 (Praha).";
+        if (!window.confirm(msg)) event.preventDefault();
       });
     });
     setTimeout(function () { location.reload(); }, 60000);
@@ -1357,6 +1400,7 @@ async function handleAdminPage(request, env) {
   const url = new URL(request.url);
   const queued = url.searchParams.get("queued") === "1";
   const launched = url.searchParams.get("launched") === "1";
+  const autoQueued = url.searchParams.get("auto") === "1";
   let snapshot = null;
   let error = "";
   let runState = { running: false, runningCount: 0, lastBySeries: {} };
@@ -1371,7 +1415,7 @@ async function handleAdminPage(request, env) {
   } catch (err) {
     console.error("admin_run_state_failed", err);
   }
-  return adminHtmlResponse(renderAdminHtml(snapshot, { error, queued, launched, runState }));
+  return adminHtmlResponse(renderAdminHtml(snapshot, { error, queued, launched, autoQueued, runState }));
 }
 
 async function handleAdminResume(request, env) {
@@ -1456,6 +1500,84 @@ async function handleAdminLaunch(request, env) {
     return fail("Outreach GHA se nepodařilo spustit. Zkuste workflow ručně.", 502);
   }
   return Response.redirect(new URL("/admin?launched=1", request.url).toString(), 303);
+}
+
+function truthyEnabled(raw) {
+  return ["1", "true", "yes", "on"].includes(String(raw || "").trim().toLowerCase());
+}
+
+async function handleAdminAuto(request, env) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const denied = await requireAdminAuth(request, env);
+  if (denied) return denied;
+
+  const fail = async (message, status = 400) => {
+    let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
+    let runState = { running: false, runningCount: 0, lastBySeries: {} };
+    try {
+      snapshot = await fetchCampaignSnapshot(env);
+    } catch {}
+    try {
+      runState = await fetchOutreachRunState(env);
+    } catch {}
+    return adminHtmlResponse(
+      renderAdminHtml(snapshot, { launchError: message, runState }),
+      status,
+    );
+  };
+
+  let series = "";
+  let enabled = false;
+  try {
+    const form = await request.formData();
+    series = String(form.get("series") || "").trim();
+    enabled = truthyEnabled(form.get("enabled"));
+  } catch {
+    return fail("Neplatný formulář.");
+  }
+
+  if (!OUTREACH_SERIES.some((item) => item.id === series)) {
+    return fail("Neznámá série.");
+  }
+
+  let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
+  let runState = { running: false, runningCount: 0, lastBySeries: {} };
+  try {
+    snapshot = await fetchCampaignSnapshot(env);
+  } catch (err) {
+    return fail("Snapshot z DB se nepodařilo načíst: " + String(err && err.message ? err.message : err), 502);
+  }
+  try {
+    runState = await fetchOutreachRunState(env);
+  } catch (err) {
+    console.error("admin_run_state_failed", err);
+  }
+
+  const def = OUTREACH_SERIES.find((item) => item.id === series);
+  const view = seriesView(snapshot, runState, def);
+  if (enabled) {
+    if (!view.auto_available || view.locked) {
+      return fail(WAVE_LOCK_TEXT);
+    }
+    if (view.remaining <= 0 && view.total > 0) {
+      return fail("V této sérii už není koho kontaktovat.");
+    }
+  }
+
+  try {
+    await dispatchGithubEvent(env, "outreach-auto-toggle", {
+      source: "admin",
+      series,
+      enabled: enabled ? "true" : "false",
+      at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("admin_auto_dispatch_failed", err);
+    return fail("Přepnutí automatiky se nepodařilo spustit. Zkuste workflow ručně.", 502);
+  }
+  return Response.redirect(new URL("/admin?auto=1", request.url).toString(), 303);
 }
 
 const UNSUB_CACHE_TTL = 31536000;
@@ -1580,6 +1702,10 @@ export default {
 
     if (url.pathname === "/admin/launch") {
       return handleAdminLaunch(request, env);
+    }
+
+    if (url.pathname === "/admin/auto") {
+      return handleAdminAuto(request, env);
     }
 
     if (url.pathname === "/unsubscribe") {
