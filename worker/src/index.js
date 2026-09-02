@@ -1124,6 +1124,7 @@ const ADMIN_LINKS = {
   outreach: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/outreach-batch.yml",
   auto: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/outreach-auto.yml",
   unsub: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-unsubscribe.yml",
+  engagement: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-engagement.yml",
   actions: "https://github.com/gypa70/gofixweb-scanner/actions",
 };
 
@@ -1587,6 +1588,11 @@ function renderAdminHtml(snapshot, {
       <div class="card"><div class="k">Uncertain</div><div class="v warn">${escapeHtml(stats.uncertain ?? 0)}</div></div>
       <div class="card"><div class="k">Pending</div><div class="v">${escapeHtml(stats.pending ?? 0)}</div></div>
       <div class="card"><div class="k">Bounce rate</div><div class="v">${escapeHtml(Number(stats.bounce_rate ?? 0).toFixed(2))} %</div></div>
+      <div class="card"><div class="k">Otevřeno</div><div class="v">${escapeHtml(stats.opened ?? 0)} / ${escapeHtml(stats.sent ?? 0)}</div></div>
+      <div class="card"><div class="k">Open rate</div><div class="v">${escapeHtml(Number(stats.open_rate ?? 0).toFixed(2))} %</div></div>
+      <div class="card"><div class="k">Kliknutí</div><div class="v">${escapeHtml(stats.clicked ?? 0)} / ${escapeHtml(stats.sent ?? 0)}</div></div>
+      <div class="card"><div class="k">Click rate</div><div class="v">${escapeHtml(Number(stats.click_rate ?? 0).toFixed(2))} %</div></div>
+      <div class="card"><div class="k">Odpovědi</div><div class="v">${escapeHtml(stats.replied ?? 0)} / ${escapeHtml(stats.sent ?? 0)}</div></div>
       <div class="card"><div class="k">Halt</div><div class="v ${haltClass}">${haltLabel}</div></div>
     </div>
     ${haltBox}
@@ -1601,6 +1607,7 @@ function renderAdminHtml(snapshot, {
       <a href="${ADMIN_LINKS.outreach}" target="_blank" rel="noopener">GHA outreach dávky</a>
       <a href="${ADMIN_LINKS.auto}" target="_blank" rel="noopener">GHA automatika</a>
       <a href="${ADMIN_LINKS.unsub}" target="_blank" rel="noopener">GHA unsubscribe</a>
+      <a href="${ADMIN_LINKS.engagement}" target="_blank" rel="noopener">GHA engagement</a>
       <a href="${ADMIN_LINKS.actions}" target="_blank" rel="noopener">Všechny Actions</a>
       <a href="${GMAIL_BOUNCE_SEARCH_URL}" target="_blank" rel="noopener">Gmail bounce search</a>
     </div>
@@ -2010,6 +2017,94 @@ async function cacheHasUnsub(email) {
   return Boolean(hit);
 }
 
+const ENG_CACHE_TTL = 31536000;
+const TRACKING_ID_RE = /^[A-Za-z0-9]{8,64}$/;
+const CLICK_PRODUCTS = new Set(["manual_fix", "wp_autofix"]);
+const PIXEL_GIF = Uint8Array.from([
+  71, 73, 70, 56, 57, 97, 1, 0, 1, 0, 128, 0, 0, 0, 0, 0, 255, 255, 255,
+  33, 249, 4, 1, 0, 0, 0, 0, 44, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 2, 68, 1, 0, 59,
+]);
+
+function trackingCacheKey(kind, trackingId) {
+  return `https://eng.gofixweb/${kind}/${String(trackingId || "").trim()}`;
+}
+
+async function tokenMatchesTracking(env, payload, token) {
+  const secret = String(env.UNSUBSCRIBE_SECRET || "").trim();
+  if (!secret) return false;
+  const expected = await hmacSha256Hex(secret, payload);
+  return timingSafeEqualHex(expected, String(token || "").trim().toLowerCase());
+}
+
+async function recordEngagementOnce(env, kind, trackingId) {
+  const cache = caches.default;
+  const key = trackingCacheKey(kind, trackingId);
+  const hit = await cache.match(key);
+  if (hit) return false;
+  await cache.put(key, new Response("1"), { expirationTtl: ENG_CACHE_TTL });
+  try {
+    await dispatchGithubEvent(env, "email-engagement", {
+      message_id: `${trackingId}@gofixweb.com`,
+      kind,
+      at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("engagement_dispatch_failed", err);
+  }
+  return true;
+}
+
+function pixelGifResponse() {
+  return new Response(PIXEL_GIF, {
+    status: 200,
+    headers: {
+      "Content-Type": "image/gif",
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      Pragma: "no-cache",
+      Expires: "0",
+      "X-Robots-Tag": "noindex, nofollow",
+    },
+  });
+}
+
+async function handleTrackOpen(request, env) {
+  const url = new URL(request.url);
+  const match = url.pathname.match(/^\/o\/([A-Za-z0-9]{8,64})$/);
+  if (!match) return new Response("Not Found", { status: 404 });
+  const id = match[1];
+  if (!TRACKING_ID_RE.test(id)) return pixelGifResponse();
+  const token = String(url.searchParams.get("t") || "").trim();
+  if (!(await tokenMatchesTracking(env, `open\n${id}`, token))) {
+    return pixelGifResponse();
+  }
+  await recordEngagementOnce(env, "open", id);
+  return pixelGifResponse();
+}
+
+async function handleTrackClick(request, env) {
+  const url = new URL(request.url);
+  const match = url.pathname.match(/^\/r\/([A-Za-z0-9]{8,64})$/);
+  if (!match) return new Response("Not Found", { status: 404 });
+  const id = match[1];
+  const product = String(url.searchParams.get("p") || "").trim();
+  const domain = String(url.searchParams.get("d") || "").trim();
+  const email = String(url.searchParams.get("e") || "").trim().toLowerCase();
+  const token = String(url.searchParams.get("t") || "").trim();
+  if (!CLICK_PRODUCTS.has(product) || !TRACKING_ID_RE.test(id)) {
+    return new Response("Invalid link", { status: 400 });
+  }
+  const payload = `click\n${id}\n${product}\n${domain}\n${email}`;
+  if (!(await tokenMatchesTracking(env, payload, token))) {
+    return new Response("Invalid link", { status: 400 });
+  }
+  await recordEngagementOnce(env, "click", id);
+  const dest = new URL("/checkout", url.origin);
+  dest.searchParams.set("product", product);
+  if (domain) dest.searchParams.set("domain", domain);
+  if (email) dest.searchParams.set("email", email);
+  return Response.redirect(dest.toString(), 302);
+}
+
 async function handleUnsubscribe(request, env) {
   const url = new URL(request.url);
   const email = String(url.searchParams.get("email") || "").trim().toLowerCase();
@@ -2061,6 +2156,20 @@ export default {
 
     if (url.pathname === "/checkout") {
       return handleCheckout(request, env);
+    }
+
+    if (/^\/o\/[A-Za-z0-9]{8,64}$/.test(url.pathname)) {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return handleTrackOpen(request, env);
+    }
+
+    if (/^\/r\/[A-Za-z0-9]{8,64}$/.test(url.pathname)) {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return handleTrackClick(request, env);
     }
 
     if (url.pathname === "/wp-onboarding") {
