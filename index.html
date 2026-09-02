@@ -87,9 +87,17 @@
       transition: background 0.2s, transform 0.15s;
     }
 
-    .btn:hover {
+    .btn:hover:not(:disabled) {
       background: var(--green-light);
       transform: translateY(-1px);
+    }
+
+    button.btn {
+      font-family: inherit;
+    }
+
+    button.btn:disabled {
+      cursor: not-allowed;
     }
 
     .btn-block { width: 100%; text-align: center; }
@@ -111,8 +119,26 @@
       font-size: 1.25rem;
     }
 
-    .btn-pricing:hover {
+    .btn-pricing:hover:not(:disabled) {
       color: #000;
+    }
+
+    .btn-pricing-soon {
+      color: #e2e8f0;
+      background: rgba(148, 163, 184, 0.16);
+      border: 1px solid rgba(148, 163, 184, 0.38);
+      font-size: 0.95rem;
+      font-weight: 650;
+      letter-spacing: 0.04em;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn-pricing-soon:hover,
+    .btn-pricing-soon:disabled {
+      background: rgba(148, 163, 184, 0.16);
+      color: #e2e8f0;
+      transform: none;
     }
 
     /* ── HERO ── */
@@ -381,6 +407,16 @@
       border-color: rgba(22, 163, 74, 0.55);
       box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.25), 0 12px 40px rgba(0, 0, 0, 0.25);
       position: relative;
+      padding-top: 2.15rem;
+    }
+
+    .pricing-name {
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--green);
+      margin-bottom: 0.45rem;
     }
 
     .pricing-badge {
@@ -434,6 +470,14 @@
       left: 0;
       color: var(--green);
       font-weight: 700;
+    }
+
+    .pricing-lead {
+      text-align: center;
+      color: var(--text-light);
+      font-size: 0.95rem;
+      max-width: 42rem;
+      margin: 0 auto 1.75rem;
     }
 
     .pricing-note {
@@ -747,9 +791,11 @@
     <section class="block" id="tarify">
       <div class="container">
         <h2 class="section-title">Pravidelný scan a optimalizace e-shopu</h2>
+        <p class="pricing-lead">Měsíční předplatné se aktuálně nepřijímá — je ve fázi přípravy.</p>
 
         <div class="pricing-grid">
           <article class="pricing-card" aria-label="Basic">
+            <h3 class="pricing-name">Basic</h3>
             <p class="pricing-price">1&nbsp;490&nbsp;Kč <span>/ měsíc</span></p>
             <ul class="pricing-features">
               <li>Měsíční sken e-shopu</li>
@@ -757,12 +803,12 @@
               <li>1x za měsíc výpis nalezených chyb</li>
               <li>1x za měsíc výpis provedených oprav</li>
             </ul>
-            <!-- TODO: Nahradit skutečným Stripe Payment Link URL (dashboard.stripe.com → Payment Links) -->
-            <a class="btn btn-block btn-pricing" href="https://buy.stripe.com/8x2bJ13Sl0Hgcru6rp4Vy00" rel="noopener">BASIC</a>
+            <button type="button" class="btn btn-block btn-pricing-soon" disabled>Připravujeme</button>
           </article>
 
           <article class="pricing-card featured" aria-label="Pro">
             <span class="pricing-badge">Nejoblíbenější</span>
+            <h3 class="pricing-name">Pro</h3>
             <p class="pricing-price">3&nbsp;990&nbsp;Kč <span>/ měsíc</span></p>
             <ul class="pricing-features">
               <li>Týdenní sken e-shopu</li>
@@ -770,11 +816,11 @@
               <li>1x týdně výpis nalezených chyb</li>
               <li>1x týdně výpis provedených oprav</li>
             </ul>
-            <!-- TODO: Nahradit skutečným Stripe Payment Link URL -->
-            <a class="btn btn-block btn-pricing" href="https://buy.stripe.com/7sYeVdagJ4Xwcru9DB4Vy04" rel="noopener">PRO</a>
+            <button type="button" class="btn btn-block btn-pricing-soon" disabled>Připravujeme</button>
           </article>
 
           <article class="pricing-card" aria-label="Premium">
+            <h3 class="pricing-name">Premium</h3>
             <p class="pricing-price">6&nbsp;990&nbsp;Kč <span>/ měsíc</span></p>
             <ul class="pricing-features">
               <li>Denní sken e-shopu</li>
@@ -782,12 +828,11 @@
               <li>1x denně výpis nalezených chyb</li>
               <li>1x denně výpis provedených oprav</li>
             </ul>
-            <!-- TODO: Nahradit skutečným Stripe Payment Link URL -->
-            <a class="btn btn-block btn-pricing" href="https://buy.stripe.com/eVq4gz88Bdu2ajm6rp4Vy07" rel="noopener">PREMIUM</a>
+            <button type="button" class="btn btn-block btn-pricing-soon" disabled>Připravujeme</button>
           </article>
         </div>
 
-        <p class="pricing-note">Ceny včetně DPH. Po zaplacení vás kontaktujeme s dalším postupem.</p>
+        <p class="pricing-note">Ceny včetně DPH. Jednorázovou opravu e-shopu lze objednat z teaser reportu.</p>
       </div>
     </section>
 
@@ -807,7 +852,7 @@
         <span aria-hidden="true">|</span>
         <a href="mailto:info@gofixweb.com">info@gofixweb.com</a>
         <span aria-hidden="true">|</span>
-        <a href="terms.html?v=20260901">Obchodní podmínky</a>
+        <a href="terms.html?v=20260902">Obchodní podmínky</a>
         <span aria-hidden="true">|</span>
         <a href="privacy.html?v=20260815">Ochrana osobních údajů</a>
       </div>

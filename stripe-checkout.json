@@ -1,5 +1,7 @@
 {
-  "basic": "https://buy.stripe.com/8x2bJ13Sl0Hgcru6rp4Vy00",
-  "pro": "https://buy.stripe.com/7sYeVdagJ4Xwcru9DB4Vy04",
-  "premium": "https://buy.stripe.com/eVq4gz88Bdu2ajm6rp4Vy07"
+  "status": "coming_soon",
+  "note": "Měsíční předplatné se aktuálně nepřijímá. Stripe Products/Prices se nemění.",
+  "basic": "",
+  "pro": "",
+  "premium": ""
 }
