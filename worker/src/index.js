@@ -87,6 +87,44 @@ function isRateLimitWhitelisted(email) {
   return RATE_LIMIT_WHITELIST.has(String(email || "").trim().toLowerCase());
 }
 
+/** Interní / QC platby — mimo Objednávky a Tržby na /admin. */
+const QC_ORDER_EMAILS = new Set([
+  "trueforexway@gmail.com",
+  "trademaker@seznam.cz",
+  "gofixweb@outlook.com",
+  "audit@gofixweb.com",
+  "info@gofixweb.com",
+]);
+
+function isQcOrderEmail(email) {
+  return QC_ORDER_EMAILS.has(String(email || "").trim().toLowerCase());
+}
+
+function stripeExpandedObject(value) {
+  return value && typeof value === "object" ? value : null;
+}
+
+function isRefundedOrReversedSession(session) {
+  const sessionStatus = String(session?.status || "").toLowerCase();
+  if (sessionStatus === "expired" || sessionStatus === "open") return true;
+  const paymentStatus = String(session?.payment_status || "").toLowerCase();
+  if (paymentStatus && paymentStatus !== "paid") return true;
+  const pi = stripeExpandedObject(session?.payment_intent);
+  if (pi) {
+    const piStatus = String(pi.status || "").toLowerCase();
+    if (piStatus && piStatus !== "succeeded") return true;
+    const charge = stripeExpandedObject(pi.latest_charge);
+    if (charge) {
+      if (charge.refunded) return true;
+      if (Number(charge.amount_refunded || 0) > 0) return true;
+      if (charge.disputed) return true;
+      const chargeStatus = String(charge.status || "").toLowerCase();
+      if (chargeStatus && chargeStatus !== "succeeded") return true;
+    }
+  }
+  return false;
+}
+
 async function isRateLimited(email, cache) {
   const key = `https://rate.gofixweb/r/${todayKey()}/${email.toLowerCase()}`;
   const hit = await cache.match(key);
@@ -379,6 +417,8 @@ function emptyStripeOrders() {
     matchedNoSeries: 0,
     liveMode: null,
     fetched: 0,
+    qc: { count: 0, amount: 0 },
+    excluded: 0,
   };
 }
 
@@ -427,7 +467,16 @@ function summarizeStripeOrders(sessions, snapshot) {
     if (out.liveMode === null && typeof session.livemode === "boolean") {
       out.liveMode = session.livemode;
     }
+    if (isRefundedOrReversedSession(session)) {
+      out.excluded += 1;
+      continue;
+    }
     const amount = Number(classified.amount) || 0;
+    if (isQcOrderEmail(sessionCustomerEmail(session))) {
+      out.qc.count += 1;
+      out.qc.amount += amount;
+      continue;
+    }
     const bucket = out.byProduct[classified.product];
     if (!bucket) continue;
     bucket.count += 1;
@@ -462,6 +511,8 @@ async function fetchStripeCheckoutSessions(env) {
     const params = new URLSearchParams();
     params.set("limit", "100");
     params.set("status", "complete");
+    params.append("expand[]", "data.payment_intent");
+    params.append("expand[]", "data.payment_intent.latest_charge");
     if (startingAfter) params.set("starting_after", startingAfter);
     const res = await fetch(`https://api.stripe.com/v1/checkout/sessions?${params}`, {
       method: "GET",
@@ -491,6 +542,8 @@ function formatCzkFromHalere(halere) {
 
 function renderOrdersBox(orders, ordersError) {
   const data = orders || emptyStripeOrders();
+  const qc = data.qc || { count: 0, amount: 0 };
+  const excluded = Number(data.excluded || 0);
   const err = ordersError
     ? `<p class="banner-err">${escapeHtml(ordersError)}</p>`
     : "";
@@ -511,6 +564,7 @@ function renderOrdersBox(orders, ordersError) {
   return `<div class="orders-box">
     <h2>Objednávky</h2>
     <p class="hint">${escapeHtml(modeLabel)}. Načteno při otevření stránky (obnova 60 s), ne ze staré cache.
+    Objednávky a tržby jsou jen succeeded platby bez refundu od zákazníků.
     Párování na kampaň je jen podle e-mailu nebo domény — Stripe neukládá vlnu/sérii.</p>
     ${err}
     <div class="cards">
@@ -522,6 +576,10 @@ function renderOrdersBox(orders, ordersError) {
       <div class="card"><div class="k">Spárováno s kampaní</div><div class="v ok">${escapeHtml(data.matched)}</div></div>
       <div class="card"><div class="k">Nespárované</div><div class="v warn">${escapeHtml(data.unmatched)}</div></div>
     </div>
+    <p class="hint">QC transakce (mimo statistiku): ${escapeHtml(qc.count)} · ${escapeHtml(formatCzkFromHalere(qc.amount))} — interní testy (trueforexway@, trademaker@, gofixweb@, audit@).</p>
+    ${excluded
+      ? `<p class="hint">Vyřazeno (refund / reverse / storno): ${escapeHtml(excluded)}.</p>`
+      : ""}
     ${seriesLines}
     ${data.matchedNoSeries
       ? `<p class="hint">Spárováno s kontaktem, ale bez vlny: ${escapeHtml(data.matchedNoSeries)}.</p>`
