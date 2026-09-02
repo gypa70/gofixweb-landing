@@ -903,6 +903,7 @@ const ADMIN_LINKS = {
   resume: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-campaign-resume.yml",
   outreach: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/outreach-batch.yml",
   auto: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/outreach-auto.yml",
+  unsub: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-unsubscribe.yml",
   actions: "https://github.com/gypa70/gofixweb-scanner/actions",
 };
 
@@ -1157,6 +1158,9 @@ function renderAdminHtml(snapshot, {
   queued = false,
   launched = false,
   autoQueued = false,
+  suppressed = false,
+  suppressedAlready = false,
+  suppressedEmail = "",
   launchError = "",
   runState = {},
 } = {}) {
@@ -1180,6 +1184,13 @@ function renderAdminHtml(snapshot, {
     : "";
   const autoNote = autoQueued
     ? `<p class="banner-ok">Přepínač automatiky je ve frontě. Stav na kartě série se obnoví po persistu DB (obvykle do minuty).</p>`
+    : "";
+  const suppressedNote = suppressed
+    ? `<p class="banner-ok">${
+        suppressedAlready
+          ? `E-mail ${escapeHtml(suppressedEmail || "")} už v suppression listu je. Další kampaňové dávky ho přeskočí.`
+          : `E-mail ${escapeHtml(suppressedEmail || "")} je odhlášený. Zápis do DB je ve frontě GitHub Actions (obvykle do minuty). Další kampaňové dávky ho přeskočí.`
+      }</p>`
     : "";
   const launchErr = launchError
     ? `<p class="banner-err">${escapeHtml(launchError)}</p>`
@@ -1244,6 +1255,19 @@ function renderAdminHtml(snapshot, {
         Pokud bounce rate pořád &gt; 3 % a je odesláno ≥ 10 mailů, další send halt znovu zapne.</p>
       </div>`
     : `<p class="hint">Halt je vypnutý. Další outreach dávka se může odeslat.</p>`;
+  const suppressBox = `<div class="suppress-box">
+        <h2>Přidat e-mail do suppression listu</h2>
+        <p class="hint">Ruční odhlášení, když zákazník odpoví na e-mail nebo napíše přímo (ne přes odkaz v patičce). Použije stejný seznam jako odhlašovací odkaz.</p>
+        <form class="suppress-form" method="post" action="/admin/suppress">
+          <label>E-mail
+            <input type="email" name="email" required placeholder="zakaznik@eshop.cz" autocomplete="off">
+          </label>
+          <label>Poznámka / důvod (volitelné)
+            <input type="text" name="note" maxlength="500" placeholder="odpověděl na e-mail, telefonicky…">
+          </label>
+          <button class="launch" type="submit">Přidat do suppression listu</button>
+        </form>
+      </div>`;
 
   const tableRows = rows.length
     ? rows
@@ -1309,6 +1333,12 @@ function renderAdminHtml(snapshot, {
     .launch-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.55rem; margin-top: 0.7rem; }
     .launch-form label { color: var(--text-muted); font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.25rem; }
     .launch-form input[type=number] { width: 5.5rem; padding: 0.45rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: #0f172a; color: #fff; }
+    .suppress-box { background: var(--navy-light); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 1.15rem; }
+    .suppress-box h2 { font-size: 1.05rem; margin-bottom: 0.35rem; }
+    .suppress-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.55rem; margin-top: 0.7rem; }
+    .suppress-form label { color: var(--text-muted); font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.25rem; flex: 1 1 180px; }
+    .suppress-form input[type=email],
+    .suppress-form input[type=text] { width: 100%; min-width: 12rem; padding: 0.45rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: #0f172a; color: #fff; }
     .block-reason { color: var(--red); font-size: 0.85rem; margin-top: 0.55rem; }
     .hint { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.6rem; }
     a { color: var(--green); }
@@ -1323,7 +1353,7 @@ function renderAdminHtml(snapshot, {
   <div class="wrap">
     <h1>GoFix<span>Web</span> — stav kampaně</h1>
     <p class="sub">Interní přehled. Snapshot z DB: ${generated}. Obnova každých 60 s.</p>
-    ${err}${queuedNote}${launchedNote}${autoNote}${launchErr}
+    ${err}${queuedNote}${launchedNote}${autoNote}${suppressedNote}${launchErr}
     <div class="cards">
       <div class="card"><div class="k">Odesláno</div><div class="v">${escapeHtml(stats.sent ?? 0)}</div></div>
       <div class="card"><div class="k">Accepted</div><div class="v ok">${escapeHtml(stats.accepted ?? 0)}</div></div>
@@ -1334,6 +1364,7 @@ function renderAdminHtml(snapshot, {
       <div class="card"><div class="k">Halt</div><div class="v ${haltClass}">${haltLabel}</div></div>
     </div>
     ${haltBox}
+    ${suppressBox}
     <h2 style="font-size:1.05rem;margin:0 0 0.65rem;">E-mailové série</h2>
     <div class="series-grid">${seriesCards}</div>
     <div class="links">
@@ -1342,6 +1373,7 @@ function renderAdminHtml(snapshot, {
       <a href="${ADMIN_LINKS.resume}" target="_blank" rel="noopener">GHA resume halt</a>
       <a href="${ADMIN_LINKS.outreach}" target="_blank" rel="noopener">GHA outreach dávky</a>
       <a href="${ADMIN_LINKS.auto}" target="_blank" rel="noopener">GHA automatika</a>
+      <a href="${ADMIN_LINKS.unsub}" target="_blank" rel="noopener">GHA unsubscribe</a>
       <a href="${ADMIN_LINKS.actions}" target="_blank" rel="noopener">Všechny Actions</a>
       <a href="${GMAIL_BOUNCE_SEARCH_URL}" target="_blank" rel="noopener">Gmail bounce search</a>
     </div>
@@ -1401,6 +1433,9 @@ async function handleAdminPage(request, env) {
   const queued = url.searchParams.get("queued") === "1";
   const launched = url.searchParams.get("launched") === "1";
   const autoQueued = url.searchParams.get("auto") === "1";
+  const suppressed = url.searchParams.get("suppressed") === "1";
+  const suppressedAlready = url.searchParams.get("already") === "1";
+  const suppressedEmail = String(url.searchParams.get("email") || "").trim().toLowerCase();
   let snapshot = null;
   let error = "";
   let runState = { running: false, runningCount: 0, lastBySeries: {} };
@@ -1415,7 +1450,9 @@ async function handleAdminPage(request, env) {
   } catch (err) {
     console.error("admin_run_state_failed", err);
   }
-  return adminHtmlResponse(renderAdminHtml(snapshot, { error, queued, launched, autoQueued, runState }));
+  return adminHtmlResponse(renderAdminHtml(snapshot, {
+    error, queued, launched, autoQueued, suppressed, suppressedAlready, suppressedEmail, runState,
+  }));
 }
 
 async function handleAdminResume(request, env) {
@@ -1580,6 +1617,111 @@ async function handleAdminAuto(request, env) {
   return Response.redirect(new URL("/admin?auto=1", request.url).toString(), 303);
 }
 
+function parseAdminUser(request) {
+  const header = request.headers.get("Authorization") || "";
+  const match = /^Basic\s+(\S+)/i.exec(header);
+  if (!match) return "";
+  try {
+    const decoded = atob(match[1]);
+    const idx = decoded.indexOf(":");
+    return (idx >= 0 ? decoded.slice(0, idx) : decoded).trim();
+  } catch {
+    return "";
+  }
+}
+
+async function fetchSuppressedEmails(env) {
+  const repo = env.GITHUB_REPO || "gypa70/gofixweb-scanner";
+  const token = env.GITHUB_TOKEN;
+  if (!token) return new Set();
+  const res = await fetch(
+    `https://api.github.com/repos/${repo}/contents/data/email_suppression.json?ref=main`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github.raw",
+        "User-Agent": "gofixweb-report-worker",
+        "Cache-Control": "no-cache",
+      },
+      cf: { cacheTtl: 0, cacheEverything: false },
+    },
+  );
+  if (!res.ok) return new Set();
+  const payload = await res.json();
+  const emails = payload && typeof payload === "object" ? payload.emails : null;
+  if (!emails || typeof emails !== "object") return new Set();
+  return new Set(
+    Object.keys(emails)
+      .map((item) => String(item || "").trim().toLowerCase())
+      .filter((item) => EMAIL_RE.test(item)),
+  );
+}
+
+async function handleAdminSuppress(request, env) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const denied = await requireAdminAuth(request, env);
+  if (denied) return denied;
+
+  const fail = async (message, status = 400) => {
+    let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
+    let runState = { running: false, runningCount: 0, lastBySeries: {} };
+    try {
+      snapshot = await fetchCampaignSnapshot(env);
+    } catch {}
+    try {
+      runState = await fetchOutreachRunState(env);
+    } catch {}
+    return adminHtmlResponse(
+      renderAdminHtml(snapshot, { launchError: message, runState }),
+      status,
+    );
+  };
+
+  let email = "";
+  let note = "";
+  try {
+    const form = await request.formData();
+    email = String(form.get("email") || "").trim().toLowerCase();
+    note = String(form.get("note") || "").trim().slice(0, 500);
+  } catch {
+    return fail("Neplatný formulář.");
+  }
+  if (!EMAIL_RE.test(email)) {
+    return fail("Zadejte platnou e-mailovou adresu.");
+  }
+
+  const addedBy = parseAdminUser(request) || String(env.ADMIN_BASIC_USER || "gofixweb").trim() || "admin";
+  let already = await cacheHasUnsub(email);
+  try {
+    const listed = await fetchSuppressedEmails(env);
+    already = already || listed.has(email);
+  } catch (err) {
+    console.error("admin_suppress_list_failed", err);
+  }
+
+  await caches.default.put(unsubCacheKey(email), new Response("1"), { expirationTtl: UNSUB_CACHE_TTL });
+  try {
+    await dispatchGithubEvent(env, "email-unsubscribe", {
+      source: "admin",
+      email,
+      note,
+      added_by: addedBy,
+      at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("admin_suppress_dispatch_failed", err);
+    return fail("Odhlášení se nepodařilo zapsat do GHA. Zkuste workflow ručně.", 502);
+  }
+  const next = new URL("/admin", request.url);
+  next.searchParams.set("suppressed", "1");
+  next.searchParams.set("email", email);
+  if (already) next.searchParams.set("already", "1");
+  return Response.redirect(next.toString(), 303);
+}
+
 const UNSUB_CACHE_TTL = 31536000;
 
 function unsubCacheKey(email) {
@@ -1706,6 +1848,10 @@ export default {
 
     if (url.pathname === "/admin/auto") {
       return handleAdminAuto(request, env);
+    }
+
+    if (url.pathname === "/admin/suppress") {
+      return handleAdminSuppress(request, env);
     }
 
     if (url.pathname === "/unsubscribe") {
