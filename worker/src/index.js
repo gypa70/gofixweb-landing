@@ -1291,9 +1291,12 @@ async function githubApi(env, path) {
 
 function parseSeriesFromRunName(name) {
   const raw = String(name || "");
-  if (/\bdry-run\b/i.test(raw)) return "";
   const match = raw.match(/\b(nulte-kolo|vlna-1|vlna-2)\b/i);
   return match ? match[1].toLowerCase() : "";
+}
+
+function isDryRunRun(run) {
+  return /\bdry-run\b/i.test(String(run?.name || run?.display_title || ""));
 }
 
 function isActiveRun(run) {
@@ -1301,30 +1304,148 @@ function isActiveRun(run) {
   return status === "in_progress" || status === "queued" || status === "waiting" || status === "pending" || status === "requested";
 }
 
-async function fetchOutreachRunState(env) {
+function isFailedConclusion(value) {
+  const conclusion = String(value || "").toLowerCase();
+  return (
+    conclusion === "failure"
+    || conclusion === "timed_out"
+    || conclusion === "cancelled"
+    || conclusion === "startup_failure"
+  );
+}
+
+function emptyOutreachRunState() {
+  return {
+    running: false,
+    runningCount: 0,
+    lastBySeries: {},
+    active: [],
+    recent: [],
+    lastSuccessBySeries: {},
+    lastFailedBySeries: {},
+    lastSuccess: null,
+    lastFailed: null,
+  };
+}
+
+function newerStamp(left, right) {
+  return String(left || "") > String(right || "");
+}
+
+function seriesDisplayName(id) {
+  const found = OUTREACH_SERIES.find((item) => item.id === id);
+  return found ? found.name : (id || "");
+}
+
+function normalizeOutreachRun(run, repo) {
+  const name = run?.name || run?.display_title || "";
+  const id = run?.id;
+  return {
+    id,
+    series: parseSeriesFromRunName(name),
+    dry_run: isDryRunRun(run),
+    name,
+    status: String(run?.status || "").toLowerCase(),
+    conclusion: String(run?.conclusion || "").toLowerCase(),
+    html_url: run?.html_url || (id ? `https://github.com/${repo}/actions/runs/${id}` : ADMIN_LINKS.outreach),
+    created_at: run?.created_at || "",
+    completed_at: run?.updated_at || run?.created_at || "",
+  };
+}
+
+function summarizeOutreachRuns(runs, repo) {
+  const list = Array.isArray(runs) ? runs : [];
+  const normalized = list.map((run) => normalizeOutreachRun(run, repo));
+  const active = normalized.filter((run) => isActiveRun(run));
+  const lastBySeries = {};
+  const lastSuccessBySeries = {};
+  const lastFailedBySeries = {};
+  for (const run of normalized) {
+    if (run.dry_run || !run.series) continue;
+    if (run.created_at && (!lastBySeries[run.series] || newerStamp(run.created_at, lastBySeries[run.series]))) {
+      lastBySeries[run.series] = run.created_at;
+    }
+    if (isActiveRun(run)) continue;
+    if (run.conclusion === "success") {
+      const prev = lastSuccessBySeries[run.series];
+      if (!prev || newerStamp(run.completed_at, prev.completed_at)) {
+        lastSuccessBySeries[run.series] = run;
+      }
+    } else if (isFailedConclusion(run.conclusion)) {
+      const prev = lastFailedBySeries[run.series];
+      if (!prev || newerStamp(run.completed_at, prev.completed_at)) {
+        lastFailedBySeries[run.series] = run;
+      }
+    }
+  }
+  const byCompleted = (left, right) => String(right.completed_at || "").localeCompare(String(left.completed_at || ""));
+  return {
+    running: active.length > 0,
+    runningCount: active.length,
+    active,
+    recent: normalized,
+    lastBySeries,
+    lastSuccessBySeries,
+    lastFailedBySeries,
+    lastSuccess: Object.values(lastSuccessBySeries).sort(byCompleted)[0] || null,
+    lastFailed: Object.values(lastFailedBySeries).sort(byCompleted)[0] || null,
+  };
+}
+
+function findRunById(runState, runId) {
+  const id = String(runId || "");
+  if (!id) return null;
+  return (runState?.recent || []).find((run) => String(run.id) === id) || null;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchOutreachRunState(env, extraRunId = "") {
   const repo = env.GITHUB_REPO || "gypa70/gofixweb-scanner";
   const data = await githubApi(
     env,
     `/repos/${repo}/actions/workflows/outreach-batch.yml/runs?per_page=20`,
   );
-  const runs = Array.isArray(data.workflow_runs) ? data.workflow_runs : [];
-  const active = runs.filter(isActiveRun);
-  const lastBySeries = {};
-  for (const run of runs) {
-    if (String(run.event || "") === "workflow_dispatch") continue;
-    const series = parseSeriesFromRunName(run.name || run.display_title || "");
-    if (!series) continue;
-    const created = run.created_at;
-    if (!created) continue;
-    if (!lastBySeries[series] || String(created) > String(lastBySeries[series])) {
-      lastBySeries[series] = created;
+  let runs = Array.isArray(data.workflow_runs) ? data.workflow_runs : [];
+  const wanted = String(extraRunId || "");
+  if (wanted && !runs.some((run) => String(run.id) === wanted)) {
+    try {
+      const one = await githubApi(env, `/repos/${repo}/actions/runs/${wanted}`);
+      if (one && one.id) runs = [one, ...runs];
+    } catch (err) {
+      console.error("admin_extra_run_failed", err);
     }
   }
-  return {
-    running: active.length > 0,
-    runningCount: active.length,
-    lastBySeries,
-  };
+  return summarizeOutreachRuns(runs, repo);
+}
+
+async function findRecentOutreachRun(env, { series, sinceIso, timeoutMs = 8000 } = {}) {
+  const repo = env.GITHUB_REPO || "gypa70/gofixweb-scanner";
+  const sinceMs = Date.parse(sinceIso || "") - 15000;
+  const deadline = Date.now() + Math.max(1000, Number(timeoutMs) || 8000);
+  while (Date.now() < deadline) {
+    try {
+      const data = await githubApi(
+        env,
+        `/repos/${repo}/actions/workflows/outreach-batch.yml/runs?per_page=15`,
+      );
+      const runs = Array.isArray(data.workflow_runs) ? data.workflow_runs : [];
+      const match = runs.find((run) => {
+        if (isDryRunRun(run)) return false;
+        const runSeries = parseSeriesFromRunName(run.name || run.display_title || "");
+        if (series && runSeries !== series) return false;
+        const created = Date.parse(run.created_at || 0);
+        return Number.isFinite(created) && Number.isFinite(sinceMs) && created >= sinceMs;
+      });
+      if (match) return match;
+    } catch (err) {
+      console.error("find_outreach_run_failed", err);
+    }
+    await sleep(1000);
+  }
+  return null;
 }
 
 function clampBatchSize(raw) {
@@ -1356,6 +1477,8 @@ function seriesView(snapshot, runState, seriesDef) {
     !nulte.halt_during &&
     !halted;
   const waveLocked = seriesDef.id !== "nulte-kolo" && !nulteDone;
+  const lastSuccess = runState?.lastSuccessBySeries?.[seriesDef.id] || null;
+  const lastFailed = runState?.lastFailedBySeries?.[seriesDef.id] || null;
   return {
     id: seriesDef.id,
     name: fromSnap.name || seriesDef.name,
@@ -1364,6 +1487,11 @@ function seriesView(snapshot, runState, seriesDef) {
     contacted: Number(fromSnap.contacted ?? 0),
     remaining: Number(fromSnap.remaining ?? 0),
     last_launched_at: last || "",
+    last_success_at: lastSuccess?.completed_at || "",
+    last_success_url: lastSuccess?.html_url || "",
+    last_failed_at: lastFailed?.completed_at || "",
+    last_failed_url: lastFailed?.html_url || "",
+    last_failed_conclusion: lastFailed?.conclusion || "",
     cooldown_until: until,
     cooldown_active: cooldownActive,
     locked: waveLocked || Boolean(fromSnap.locked),
@@ -1447,10 +1575,77 @@ function engagementRowClass(row) {
   return "";
 }
 
+function renderBatchFailedBanner(run) {
+  const series = seriesDisplayName(run?.series);
+  const conclusion = run?.conclusion || "failure";
+  const url = run?.html_url || ADMIN_LINKS.outreach;
+  return `<div class="banner-err" role="alert">
+    <strong>Poslední dávka selhala, zkontroluj GitHub Actions.</strong>
+    ${series ? ` Série: ${escapeHtml(series)}.` : ""}
+    Stav: ${escapeHtml(conclusion)}.
+    <a href="${escapeHtml(url)}" target="_blank" rel="noopener">Otevřít běh</a>
+  </div>`;
+}
+
+function renderBatchStatusBanner({ runState, launched, launchedSeries, launchedRunId }) {
+  const selected = findRunById(runState, launchedRunId);
+  const live = (runState?.active || []).filter((run) => !run.dry_run);
+  const liveDry = (runState?.active || []).filter((run) => run.dry_run);
+  const sending = selected && isActiveRun(selected)
+    ? selected
+    : (live[0] || liveDry[0] || null);
+
+  if (sending) {
+    const title = sending.dry_run ? "Testovací dávka (dry-run) běží…" : "Dávka odesílána…";
+    const series = seriesDisplayName(sending.series || launchedSeries);
+    return `<div class="banner-wait" role="status">
+      <span class="pulse-dot" aria-hidden="true"></span>
+      <div>
+        <strong>${escapeHtml(title)}</strong>
+        ${series ? ` Série: ${escapeHtml(series)}.` : ""}
+        Stav se v DB projeví po persistu.
+        <a href="${escapeHtml(sending.html_url)}" target="_blank" rel="noopener">Otevřít běh v GitHub Actions</a>
+      </div>
+    </div>`;
+  }
+
+  if (selected && selected.status === "completed" && isFailedConclusion(selected.conclusion)) {
+    return renderBatchFailedBanner(selected);
+  }
+  if (selected && selected.status === "completed" && selected.conclusion === "success" && !selected.dry_run) {
+    return `<div class="banner-ok" role="status">
+      Dávka doběhla úspěšně (${formatWhen(selected.completed_at)}).
+      <a href="${escapeHtml(selected.html_url)}" target="_blank" rel="noopener">GitHub Actions</a>
+    </div>`;
+  }
+
+  if (launched && !selected) {
+    const series = seriesDisplayName(launchedSeries);
+    return `<div class="banner-wait" role="status">
+      <span class="pulse-dot" aria-hidden="true"></span>
+      <div>
+        <strong>Dávka se spouští…</strong>
+        ${series ? ` Série: ${escapeHtml(series)}.` : ""}
+        Čekám, až GitHub Actions založí běh.
+        <a href="${ADMIN_LINKS.outreach}" target="_blank" rel="noopener">Otevřít workflow outreach-batch</a>
+      </div>
+    </div>`;
+  }
+
+  const failed = runState?.lastFailed;
+  const success = runState?.lastSuccess;
+  if (failed && (!success || newerStamp(failed.completed_at, success.completed_at))) {
+    return renderBatchFailedBanner(failed);
+  }
+  return "";
+}
+
 function renderAdminHtml(snapshot, {
   error = "",
   queued = false,
   launched = false,
+  launchedSeries = "",
+  launchedRunId = "",
   autoQueued = false,
   suppressed = false,
   suppressedAlready = false,
@@ -1466,6 +1661,11 @@ function renderAdminHtml(snapshot, {
   const halted = Boolean(halt.halted || stats.halted);
   const haltClass = halted ? "halt-on" : "halt-off";
   const haltLabel = halted ? "ZAPNUTO" : "VYPNUTO";
+  const lastSuccess = runState?.lastSuccess;
+  const launchedRun = findRunById(runState, launchedRunId);
+  const batchBusy = Boolean((runState?.active || []).length)
+    || (launched && (!launchedRun || isActiveRun(launchedRun)));
+  const refreshSec = batchBusy ? 8 : 60;
   const generated = snapshot?.generated_at
     ? formatWhen(snapshot.generated_at)
     : "—";
@@ -1475,9 +1675,12 @@ function renderAdminHtml(snapshot, {
   const queuedNote = queued
     ? `<p class="banner-ok">Požadavek na vypnutí halt je ve frontě. Obnovení DB trvá obvykle do minuty — stránka se sama obnoví.</p>`
     : "";
-  const launchedNote = launched
-    ? `<p class="banner-ok">Dávka je ve frontě GitHub Actions. Stav se obnoví po persistu DB (obvykle do minuty).</p>`
-    : "";
+  const launchedNote = renderBatchStatusBanner({
+    runState,
+    launched,
+    launchedSeries,
+    launchedRunId,
+  });
   const autoNote = autoQueued
     ? `<p class="banner-ok">Přepínač automatiky je ve frontě. Stav na kartě série se obnoví po persistu DB (obvykle do minuty).</p>`
     : "";
@@ -1524,6 +1727,24 @@ function renderAdminHtml(snapshot, {
         <button class="${btnClass}" type="submit">${btnLabel}</button>
       </form>`;
     }
+    const lastSuccessNote = view.last_success_at
+      ? `<p class="hint">Poslední úspěšná dávka: ${formatWhen(view.last_success_at)}${
+          view.last_success_url
+            ? ` · <a href="${escapeHtml(view.last_success_url)}" target="_blank" rel="noopener">GHA</a>`
+            : ""
+        }</p>`
+      : `<p class="hint">Poslední úspěšná dávka: zatím žádná</p>`;
+    const seriesFailed = Boolean(
+      view.last_failed_at
+      && (!view.last_success_at || newerStamp(view.last_failed_at, view.last_success_at)),
+    );
+    const failNote = seriesFailed
+      ? `<p class="block-reason">Poslední dávka této série selhala${
+          view.last_failed_url
+            ? ` — <a href="${escapeHtml(view.last_failed_url)}" target="_blank" rel="noopener">otevřít běh</a>`
+            : ""
+        }.</p>`
+      : "";
     return `<div class="series-card">
       <h3>${escapeHtml(view.name)}</h3>
       <p class="hint">${escapeHtml(progress)}</p>
@@ -1537,6 +1758,8 @@ function renderAdminHtml(snapshot, {
       </form>
       ${block ? `<p class="block-reason">${escapeHtml(block)}</p>` : ""}
       ${cooldown}
+      ${lastSuccessNote}
+      ${failNote}
       ${autoBlock}
     </div>`;
   }).join("");
@@ -1591,7 +1814,7 @@ function renderAdminHtml(snapshot, {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex,nofollow">
-  <meta http-equiv="refresh" content="60">
+  <meta http-equiv="refresh" content="${refreshSec}">
   <title>Kampan — GoFixWeb admin</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1615,9 +1838,12 @@ function renderAdminHtml(snapshot, {
     .bad { color: var(--red); }
     .warn { color: var(--warn); }
     .muted { color: var(--text-muted); }
-    .halt-box, .banner-err, .banner-ok, .links, table { margin-bottom: 1.15rem; }
+    .halt-box, .banner-err, .banner-ok, .banner-wait, .links, table { margin-bottom: 1.15rem; }
     .halt-box, .banner-err { background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.35); border-radius: 10px; padding: 1rem; }
     .banner-ok { background: rgba(22,163,74,0.12); border: 1px solid rgba(22,163,74,0.35); border-radius: 10px; padding: 0.85rem 1rem; }
+    .banner-wait { background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.4); border-radius: 10px; padding: 0.85rem 1rem; display: flex; gap: 0.75rem; align-items: flex-start; }
+    .pulse-dot { width: 0.7rem; height: 0.7rem; border-radius: 50%; background: var(--warn); margin-top: 0.35rem; flex: 0 0 auto; animation: gfw-pulse 1.1s ease-in-out infinite; }
+    @keyframes gfw-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.82); } }
     button { margin-top: 0.75rem; border: 0; border-radius: 8px; padding: 0.8rem 1.1rem; font-weight: 700; background: var(--red); color: #fff; cursor: pointer; }
     button.launch { background: var(--green); margin-top: 0; }
     button.auto-on-btn { background: var(--green); margin-top: 0.45rem; }
@@ -1666,7 +1892,7 @@ function renderAdminHtml(snapshot, {
 <body>
   <div class="wrap">
     <h1>GoFix<span>Web</span> — stav kampaně</h1>
-    <p class="sub">Interní přehled. Snapshot z DB: ${generated}. Obnova každých 60 s.</p>
+    <p class="sub">Interní přehled. Snapshot z DB: ${generated}. Obnova každých ${refreshSec} s.</p>
     ${err}${queuedNote}${launchedNote}${autoNote}${suppressedNote}${launchErr}
     <div class="cards">
       <div class="card"><div class="k">Odesláno</div><div class="v">${escapeHtml(stats.sent ?? 0)}</div></div>
@@ -1683,6 +1909,7 @@ function renderAdminHtml(snapshot, {
       <div class="card"><div class="k">Click rate</div><div class="v">${escapeHtml(Number(stats.click_rate ?? 0).toFixed(2))} %</div></div>
       <div class="card"><div class="k">Odpovědi</div><div class="v">${escapeHtml(stats.replied ?? 0)} / ${escapeHtml(stats.sent ?? 0)}</div></div>
       <div class="card"><div class="k">Halt</div><div class="v ${haltClass}">${haltLabel}</div></div>
+      <div class="card"><div class="k">Poslední úspěšná dávka</div><div class="v" style="font-size:1.05rem;font-weight:700">${lastSuccess ? formatWhen(lastSuccess.completed_at) : "—"}</div></div>
     </div>
     ${haltBox}
     ${suppressBox}
@@ -1723,6 +1950,12 @@ function renderAdminHtml(snapshot, {
         var name = form.getAttribute("data-series-name") || "";
         if (n > 10 && !window.confirm("Opravdu odeslat " + n + " e-mailů ze série " + name + "?")) {
           event.preventDefault();
+          return;
+        }
+        var btn = form.querySelector("button.launch");
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Odesílám…";
         }
       });
     });
@@ -1734,7 +1967,7 @@ function renderAdminHtml(snapshot, {
         if (!window.confirm(msg)) event.preventDefault();
       });
     });
-    setTimeout(function () { location.reload(); }, 60000);
+    setTimeout(function () { location.reload(); }, ${refreshSec}000);
   </script>
 </body>
 </html>`;
@@ -1760,13 +1993,15 @@ async function handleAdminPage(request, env) {
   const url = new URL(request.url);
   const queued = url.searchParams.get("queued") === "1";
   const launched = url.searchParams.get("launched") === "1";
+  const launchedSeries = String(url.searchParams.get("series") || "").trim();
+  const launchedRunId = String(url.searchParams.get("run") || "").trim();
   const autoQueued = url.searchParams.get("auto") === "1";
   const suppressed = url.searchParams.get("suppressed") === "1";
   const suppressedAlready = url.searchParams.get("already") === "1";
   const suppressedEmail = String(url.searchParams.get("email") || "").trim().toLowerCase();
   let snapshot = null;
   let error = "";
-  let runState = { running: false, runningCount: 0, lastBySeries: {} };
+  let runState = emptyOutreachRunState();
   try {
     snapshot = await fetchCampaignSnapshot(env);
   } catch (err) {
@@ -1774,7 +2009,7 @@ async function handleAdminPage(request, env) {
     snapshot = { stats: {}, halt: {}, rows: [], series: {} };
   }
   try {
-    runState = await fetchOutreachRunState(env);
+    runState = await fetchOutreachRunState(env, launchedRunId);
   } catch (err) {
     console.error("admin_run_state_failed", err);
   }
@@ -1788,7 +2023,7 @@ async function handleAdminPage(request, env) {
     ordersError = "Stripe objednávky se nepodařilo načíst: " + String(err && err.message ? err.message : err);
   }
   return adminHtmlResponse(renderAdminHtml(snapshot, {
-    error, queued, launched, autoQueued, suppressed, suppressedAlready, suppressedEmail, runState,
+    error, queued, launched, launchedSeries, launchedRunId, autoQueued, suppressed, suppressedAlready, suppressedEmail, runState,
     orders, ordersError,
   }));
 }
@@ -1824,7 +2059,7 @@ async function handleAdminLaunch(request, env) {
 
   const fail = async (message, status = 400) => {
     let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
-    let runState = { running: false, runningCount: 0, lastBySeries: {} };
+    let runState = emptyOutreachRunState();
     try {
       snapshot = await fetchCampaignSnapshot(env);
     } catch {}
@@ -1848,7 +2083,7 @@ async function handleAdminLaunch(request, env) {
   }
 
   let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
-  let runState = { running: false, runningCount: 0, lastBySeries: {} };
+  let runState = emptyOutreachRunState();
   try {
     snapshot = await fetchCampaignSnapshot(env);
   } catch (err) {
@@ -1863,18 +2098,30 @@ async function handleAdminLaunch(request, env) {
   const verdict = validateLaunchServer(snapshot, runState, series, limit);
   if (!verdict.ok) return fail(verdict.error);
 
+  const dispatchedAt = new Date().toISOString();
   try {
     await dispatchGithubEvent(env, "outreach-batch", {
       source: "admin",
       series,
       limit: String(limit),
-      at: new Date().toISOString(),
+      at: dispatchedAt,
     });
   } catch (err) {
     console.error("admin_launch_dispatch_failed", err);
     return fail("Outreach GHA se nepodařilo spustit. Zkuste workflow ručně.", 502);
   }
-  return Response.redirect(new URL("/admin?launched=1", request.url).toString(), 303);
+  let runId = "";
+  try {
+    const found = await findRecentOutreachRun(env, { series, sinceIso: dispatchedAt });
+    if (found && found.id) runId = String(found.id);
+  } catch (err) {
+    console.error("admin_launch_find_run_failed", err);
+  }
+  const next = new URL("/admin", request.url);
+  next.searchParams.set("launched", "1");
+  next.searchParams.set("series", series);
+  if (runId) next.searchParams.set("run", runId);
+  return Response.redirect(next.toString(), 303);
 }
 
 function truthyEnabled(raw) {
@@ -1890,7 +2137,7 @@ async function handleAdminAuto(request, env) {
 
   const fail = async (message, status = 400) => {
     let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
-    let runState = { running: false, runningCount: 0, lastBySeries: {} };
+    let runState = emptyOutreachRunState();
     try {
       snapshot = await fetchCampaignSnapshot(env);
     } catch {}
@@ -1918,7 +2165,7 @@ async function handleAdminAuto(request, env) {
   }
 
   let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
-  let runState = { running: false, runningCount: 0, lastBySeries: {} };
+  let runState = emptyOutreachRunState();
   try {
     snapshot = await fetchCampaignSnapshot(env);
   } catch (err) {
@@ -2005,7 +2252,7 @@ async function handleAdminSuppress(request, env) {
 
   const fail = async (message, status = 400) => {
     let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
-    let runState = { running: false, runningCount: 0, lastBySeries: {} };
+    let runState = emptyOutreachRunState();
     try {
       snapshot = await fetchCampaignSnapshot(env);
     } catch {}
