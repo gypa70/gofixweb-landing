@@ -1432,6 +1432,17 @@ function statusClass(kind, value) {
   return "";
 }
 
+function hasEngagementTs(value) {
+  return Boolean(value && String(value).trim());
+}
+
+function engagementRowClass(row) {
+  if (hasEngagementTs(row?.replied_at)) return "eng-replied";
+  if (hasEngagementTs(row?.clicked_at)) return "eng-clicked";
+  if (hasEngagementTs(row?.opened_at)) return "eng-opened";
+  return "";
+}
+
 function renderAdminHtml(snapshot, {
   error = "",
   queued = false,
@@ -1556,7 +1567,9 @@ function renderAdminHtml(snapshot, {
           const reason = row.bounce_reason
             ? escapeHtml(String(row.bounce_reason).slice(0, 280))
             : "—";
-          return `<tr>
+          const engClass = engagementRowClass(row);
+          const trClass = engClass ? ` class="${engClass}"` : "";
+          return `<tr${trClass}>
             <td>${escapeHtml(row.email)}</td>
             <td>${escapeHtml(row.domain || "—")}</td>
             <td>${formatWhen(row.sent_at)}</td>
@@ -1632,6 +1645,18 @@ function renderAdminHtml(snapshot, {
     th, td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
     th { color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
     td.reason { color: var(--text-light); max-width: 280px; word-break: break-word; }
+    tr.eng-opened td { background: rgba(56, 189, 248, 0.10); }
+    tr.eng-clicked td { background: rgba(34, 197, 94, 0.12); }
+    tr.eng-replied td { background: rgba(251, 191, 36, 0.16); }
+    tr.eng-opened td:first-child { box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.55); }
+    tr.eng-clicked td:first-child { box-shadow: inset 3px 0 0 rgba(34, 197, 94, 0.65); }
+    tr.eng-replied td:first-child { box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.75); }
+    .eng-legend { color: var(--text-muted); font-size: 0.8rem; margin: 0 0 0.55rem; display: flex; flex-wrap: wrap; gap: 0.75rem 1.1rem; }
+    .eng-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+    .eng-swatch { width: 0.7rem; height: 0.7rem; border-radius: 2px; display: inline-block; }
+    .eng-swatch.opened { background: rgba(56, 189, 248, 0.45); }
+    .eng-swatch.clicked { background: rgba(34, 197, 94, 0.5); }
+    .eng-swatch.replied { background: rgba(251, 191, 36, 0.55); }
   </style>
 </head>
 <body>
@@ -1669,6 +1694,11 @@ function renderAdminHtml(snapshot, {
       <a href="${ADMIN_LINKS.actions}" target="_blank" rel="noopener">Všechny Actions</a>
       <a href="${GMAIL_BOUNCE_SEARCH_URL}" target="_blank" rel="noopener">Gmail bounce search</a>
     </div>
+    <p class="eng-legend">
+      <span><i class="eng-swatch opened"></i> otevřeno</span>
+      <span><i class="eng-swatch clicked"></i> klik na CTA</span>
+      <span><i class="eng-swatch replied"></i> odpověď — zkontrolovat v Gmailu</span>
+    </p>
     <table>
       <thead>
         <tr>
