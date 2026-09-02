@@ -292,14 +292,23 @@
     .compare {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 1.25rem;
+      column-gap: 1.25rem;
+      row-gap: 0;
     }
 
     .compare-col {
+      display: grid;
+      grid-template-rows: subgrid;
+      grid-row: span 5;
       background: var(--navy-card);
       border: 1px solid var(--border);
       border-radius: 14px;
       padding: 1.75rem 1.5rem;
+    }
+
+    .compare-col ul {
+      display: contents;
+      list-style: none;
     }
 
     .compare-col h3 {
@@ -319,10 +328,6 @@
     }
 
     .compare-col.solve h3 { color: var(--green); }
-
-    .compare-col ul {
-      list-style: none;
-    }
 
     .compare-col li {
       position: relative;
@@ -601,7 +606,17 @@
       }
       section.block { padding: 3rem 0; }
       #kontakt { padding: 2.25rem 0; }
-      .compare { grid-template-columns: 1fr; }
+      .compare {
+        grid-template-columns: 1fr;
+        row-gap: 1.25rem;
+      }
+      .compare-col {
+        display: block;
+        grid-row: auto;
+      }
+      .compare-col ul {
+        display: block;
+      }
       .trust-grid { flex-direction: column; align-items: stretch; }
       .trust-badge { max-width: none; }
       .pricing-grid { grid-template-columns: 1fr; }
@@ -711,9 +726,8 @@
             <ul>
               <li>Nedostatek času na hledání chyb a oprav</li>
               <li>Nevíte, kolik vás stojí neopravený e-shop měsíčně</li>
-              <li>Drahé a pomalé manuální opravy</li>
+              <li>Drahé a pomalé manuální opravy a instalace</li>
               <li>Neoptimalizovaný e-shop</li>
-              <li>Sám řeším instalaci a nastavení dalších nástrojů</li>
             </ul>
           </div>
           <div class="compare-col solve">
@@ -721,9 +735,8 @@
             <ul>
               <li>Automatické hledání chyb a oprav</li>
               <li>Zašleme měsíční náklady na neopravený e-shop</li>
-              <li>Automatická AI oprava e-shopu</li>
+              <li>Automatické AI opravy a instalace</li>
               <li>Rychlá optimalizace e-shopu</li>
-              <li>Bez složité administrace a instalace</li>
             </ul>
           </div>
         </div>
