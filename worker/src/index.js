@@ -1425,10 +1425,14 @@ function formatWhen(value) {
 
 function statusClass(kind, value) {
   const v = String(value || "").toLowerCase();
-  if (kind === "smtp") return v === "accepted" ? "ok" : "bad";
+  if (kind === "smtp") {
+    if (v === "accepted") return "ok";
+    if (v === "scan_failed" || v === "already_customer") return "warn";
+    return "bad";
+  }
   if (v === "bounced" || v === "rejected") return "bad";
   if (v === "uncertain") return "warn";
-  if (v === "pending") return "muted";
+  if (v === "pending" || v === "skipped") return "muted";
   return "";
 }
 
@@ -1667,6 +1671,8 @@ function renderAdminHtml(snapshot, {
     <div class="cards">
       <div class="card"><div class="k">Odesláno</div><div class="v">${escapeHtml(stats.sent ?? 0)}</div></div>
       <div class="card"><div class="k">Accepted</div><div class="v ok">${escapeHtml(stats.accepted ?? 0)}</div></div>
+      <div class="card"><div class="k">Scan selhal</div><div class="v warn">${escapeHtml(stats.scan_failed ?? 0)}</div></div>
+      <div class="card"><div class="k">Už zákazník</div><div class="v warn">${escapeHtml(stats.already_customer ?? 0)}</div></div>
       <div class="card"><div class="k">Bounced</div><div class="v bad">${escapeHtml(stats.bounced ?? 0)}</div></div>
       <div class="card"><div class="k">Uncertain</div><div class="v warn">${escapeHtml(stats.uncertain ?? 0)}</div></div>
       <div class="card"><div class="k">Pending</div><div class="v">${escapeHtml(stats.pending ?? 0)}</div></div>
