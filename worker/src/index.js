@@ -25,6 +25,7 @@ const ALLOWED_ORIGINS = new Set([
 const COMPLETE_AUDIT_AMOUNT = 499000;
 const MANUAL_FIX_AMOUNT = 399000;
 const COMPLETE_AUDIT_CURRENCY = "czk";
+const STRIPE_COMPLETE_AUDIT_PAYMENT_LINK = "plink_1RUHIXFNuCwT88vQ2QjVj3Dz";
 const MANUAL_FIX_NAME = "Manuální oprava e-shopu";
 const AUTO_FIX_NAME = "Automatická oprava e-shopu";
 const MANUAL_FIX_DESCRIPTION =
@@ -309,6 +310,224 @@ function paidAuditProduct(session) {
 
 function isCompleteAuditCheckout(session) {
   return paidAuditProduct(session) != null;
+}
+
+function sessionCustomerEmail(session) {
+  return String(
+    session?.customer_email || session?.customer_details?.email || "",
+  ).trim().toLowerCase();
+}
+
+function sessionDomain(session) {
+  const meta = session?.metadata && typeof session.metadata === "object"
+    ? session.metadata
+    : {};
+  const fromMeta = String(meta.domain || "").trim().toLowerCase().replace(/^www\./i, "");
+  if (fromMeta) return fromMeta;
+  const email = sessionCustomerEmail(session);
+  const at = email.lastIndexOf("@");
+  return at > 0 ? email.slice(at + 1).replace(/^www\./i, "") : "";
+}
+
+function sessionPaymentLinkId(session) {
+  const raw = session?.payment_link;
+  if (!raw) return "";
+  if (typeof raw === "string") return raw;
+  return String(raw.id || "");
+}
+
+function classifyCheckoutProduct(session) {
+  const currency = String(session?.currency || "").trim().toLowerCase();
+  if (currency && currency !== COMPLETE_AUDIT_CURRENCY) return null;
+  const paymentStatus = String(session?.payment_status || "").toLowerCase();
+  if (paymentStatus && paymentStatus !== "paid") return null;
+  const amountTotal = Number(session?.amount_total ?? NaN);
+  const meta = session?.metadata && typeof session.metadata === "object"
+    ? session.metadata
+    : {};
+  const ref = String(session?.client_reference_id || meta.product || "").trim();
+  const paymentLink = sessionPaymentLinkId(session);
+
+  if (ref === "manual_fix" || amountTotal === MANUAL_FIX_AMOUNT) {
+    return { product: "manual_fix", ambiguous: false, amount: Number.isFinite(amountTotal) ? amountTotal : MANUAL_FIX_AMOUNT };
+  }
+  if (ref === "wp_autofix") {
+    return { product: "wp_autofix", ambiguous: false, amount: Number.isFinite(amountTotal) ? amountTotal : COMPLETE_AUDIT_AMOUNT };
+  }
+  if (ref === "complete_audit" || paymentLink === STRIPE_COMPLETE_AUDIT_PAYMENT_LINK) {
+    return { product: "complete_audit", ambiguous: false, amount: Number.isFinite(amountTotal) ? amountTotal : COMPLETE_AUDIT_AMOUNT };
+  }
+  if (amountTotal === COMPLETE_AUDIT_AMOUNT) {
+    return { product: "ambiguous_4990", ambiguous: true, amount: amountTotal };
+  }
+  return null;
+}
+
+function emptyStripeOrders() {
+  return {
+    count: 0,
+    amount: 0,
+    byProduct: {
+      manual_fix: { count: 0, amount: 0 },
+      wp_autofix: { count: 0, amount: 0 },
+      complete_audit: { count: 0, amount: 0 },
+      ambiguous_4990: { count: 0, amount: 0 },
+    },
+    bySeries: {},
+    matched: 0,
+    unmatched: 0,
+    matchedNoSeries: 0,
+    liveMode: null,
+    fetched: 0,
+  };
+}
+
+function buildContactIndex(snapshot) {
+  const byEmail = new Map();
+  const byDomain = new Map();
+  const add = (raw) => {
+    const email = String(raw?.email || "").trim().toLowerCase();
+    const domain = String(raw?.domain || "").trim().toLowerCase().replace(/^www\./i, "");
+    const seriesId = raw?.series_id || null;
+    if (email && !byEmail.has(email)) {
+      byEmail.set(email, { email, domain, series_id: seriesId });
+    } else if (email && seriesId && !byEmail.get(email).series_id) {
+      byEmail.get(email).series_id = seriesId;
+    }
+    if (domain && !byDomain.has(domain)) {
+      byDomain.set(domain, { email, domain, series_id: seriesId });
+    }
+  };
+  for (const row of Array.isArray(snapshot?.contacts) ? snapshot.contacts : []) add(row);
+  for (const row of Array.isArray(snapshot?.rows) ? snapshot.rows : []) add(row);
+  return { byEmail, byDomain };
+}
+
+function matchOrderToCampaign(session, index) {
+  const email = sessionCustomerEmail(session);
+  const domain = sessionDomain(session);
+  if (email && index.byEmail.has(email)) {
+    const hit = index.byEmail.get(email);
+    return { matched: true, how: "email", series_id: hit.series_id || null };
+  }
+  if (domain && index.byDomain.has(domain)) {
+    const hit = index.byDomain.get(domain);
+    return { matched: true, how: "domain", series_id: hit.series_id || null };
+  }
+  return { matched: false, how: null, series_id: null };
+}
+
+function summarizeStripeOrders(sessions, snapshot) {
+  const index = buildContactIndex(snapshot);
+  const out = emptyStripeOrders();
+  out.fetched = Array.isArray(sessions) ? sessions.length : 0;
+  for (const session of Array.isArray(sessions) ? sessions : []) {
+    const classified = classifyCheckoutProduct(session);
+    if (!classified) continue;
+    if (out.liveMode === null && typeof session.livemode === "boolean") {
+      out.liveMode = session.livemode;
+    }
+    const amount = Number(classified.amount) || 0;
+    const bucket = out.byProduct[classified.product];
+    if (!bucket) continue;
+    bucket.count += 1;
+    bucket.amount += amount;
+    out.count += 1;
+    out.amount += amount;
+    const match = matchOrderToCampaign(session, index);
+    if (match.matched) {
+      out.matched += 1;
+      if (match.series_id) {
+        if (!out.bySeries[match.series_id]) {
+          out.bySeries[match.series_id] = { count: 0, amount: 0 };
+        }
+        out.bySeries[match.series_id].count += 1;
+        out.bySeries[match.series_id].amount += amount;
+      } else {
+        out.matchedNoSeries += 1;
+      }
+    } else {
+      out.unmatched += 1;
+    }
+  }
+  return out;
+}
+
+async function fetchStripeCheckoutSessions(env) {
+  const secret = String(env.STRIPE_SECRET_KEY || "").trim();
+  if (!secret) throw new Error("missing_stripe_secret");
+  const sessions = [];
+  let startingAfter = "";
+  for (let page = 0; page < 10; page += 1) {
+    const params = new URLSearchParams();
+    params.set("limit", "100");
+    params.set("status", "complete");
+    if (startingAfter) params.set("starting_after", startingAfter);
+    const res = await fetch(`https://api.stripe.com/v1/checkout/sessions?${params}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${secret}`,
+      },
+      cf: { cacheTtl: 0, cacheEverything: false },
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`stripe_sessions_${res.status}:${text.slice(0, 300)}`);
+    }
+    const payload = await res.json();
+    const batch = Array.isArray(payload.data) ? payload.data : [];
+    sessions.push(...batch);
+    if (!payload.has_more || batch.length === 0) break;
+    startingAfter = String(batch[batch.length - 1].id || "");
+    if (!startingAfter) break;
+  }
+  return sessions;
+}
+
+function formatCzkFromHalere(halere) {
+  const czk = Math.round(Number(halere || 0) / 100);
+  return `${czk.toLocaleString("cs-CZ")} Kč`;
+}
+
+function renderOrdersBox(orders, ordersError) {
+  const data = orders || emptyStripeOrders();
+  const err = ordersError
+    ? `<p class="banner-err">${escapeHtml(ordersError)}</p>`
+    : "";
+  const modeLabel = data.liveMode === false
+    ? "Stripe test mode"
+    : data.liveMode === true
+      ? "Stripe live"
+      : "Stripe";
+  const seriesLines = OUTREACH_SERIES.map((def) => {
+    const row = data.bySeries[def.id];
+    if (!row) return "";
+    return `<p class="hint">${escapeHtml(def.name)}: ${row.count} obj. · ${escapeHtml(formatCzkFromHalere(row.amount))}</p>`;
+  }).join("");
+  const ambiguous = data.byProduct.ambiguous_4990.count;
+  const ambiguousNote = ambiguous
+    ? `<p class="hint">Nerozlišené 4 990 Kč: ${ambiguous} — stejná cena Auto i Kompletní audit; bez metadata.product / client_reference_id je nejde spolehlivě oddělit.</p>`
+    : "";
+  return `<div class="orders-box">
+    <h2>Objednávky</h2>
+    <p class="hint">${escapeHtml(modeLabel)}. Načteno při otevření stránky (obnova 60 s), ne ze staré cache.
+    Párování na kampaň je jen podle e-mailu nebo domény — Stripe neukládá vlnu/sérii.</p>
+    ${err}
+    <div class="cards">
+      <div class="card"><div class="k">Objednávky</div><div class="v">${escapeHtml(data.count)}</div></div>
+      <div class="card"><div class="k">Tržby</div><div class="v">${escapeHtml(formatCzkFromHalere(data.amount))}</div></div>
+      <div class="card"><div class="k">Manuál</div><div class="v">${escapeHtml(data.byProduct.manual_fix.count)} · ${escapeHtml(formatCzkFromHalere(data.byProduct.manual_fix.amount))}</div></div>
+      <div class="card"><div class="k">Auto</div><div class="v">${escapeHtml(data.byProduct.wp_autofix.count)} · ${escapeHtml(formatCzkFromHalere(data.byProduct.wp_autofix.amount))}</div></div>
+      <div class="card"><div class="k">Kompletní audit</div><div class="v">${escapeHtml(data.byProduct.complete_audit.count)} · ${escapeHtml(formatCzkFromHalere(data.byProduct.complete_audit.amount))}</div></div>
+      <div class="card"><div class="k">Spárováno s kampaní</div><div class="v ok">${escapeHtml(data.matched)}</div></div>
+      <div class="card"><div class="k">Nespárované</div><div class="v warn">${escapeHtml(data.unmatched)}</div></div>
+    </div>
+    ${seriesLines}
+    ${data.matchedNoSeries
+      ? `<p class="hint">Spárováno s kontaktem, ale bez vlny: ${escapeHtml(data.matchedNoSeries)}.</p>`
+      : ""}
+    ${ambiguousNote}
+  </div>`;
 }
 
 async function verifyStripeWebhookSignature(rawBody, signatureHeader, secret) {
@@ -1164,6 +1383,8 @@ function renderAdminHtml(snapshot, {
   suppressedEmail = "",
   launchError = "",
   runState = {},
+  orders = null,
+  ordersError = "",
 } = {}) {
   const stats = snapshot?.stats || {};
   const halt = snapshot?.halt || {};
@@ -1336,6 +1557,10 @@ function renderAdminHtml(snapshot, {
     .launch-form input[type=number] { width: 5.5rem; padding: 0.45rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: #0f172a; color: #fff; }
     .suppress-box { background: var(--navy-light); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 1.15rem; }
     .suppress-box h2 { font-size: 1.05rem; margin-bottom: 0.35rem; }
+    .orders-box { background: var(--navy-light); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 1.15rem; }
+    .orders-box h2 { font-size: 1.05rem; margin-bottom: 0.35rem; }
+    .orders-box .cards { margin-top: 0.75rem; }
+    .orders-box .card .v { font-size: 1.05rem; font-weight: 700; }
     .suppress-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.55rem; margin-top: 0.7rem; }
     .suppress-form label { color: var(--text-muted); font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.25rem; flex: 1 1 180px; }
     .suppress-form input[type=email],
@@ -1368,6 +1593,7 @@ function renderAdminHtml(snapshot, {
     ${suppressBox}
     <h2 style="font-size:1.05rem;margin:0 0 0.65rem;">E-mailové série</h2>
     <div class="series-grid">${seriesCards}</div>
+    ${renderOrdersBox(orders, ordersError)}
     <div class="links">
       <a href="${ADMIN_LINKS.scans}" target="_blank" rel="noopener">GHA scan jobs</a>
       <a href="${ADMIN_LINKS.bounce}" target="_blank" rel="noopener">GHA bounce monitor</a>
@@ -1451,8 +1677,18 @@ async function handleAdminPage(request, env) {
   } catch (err) {
     console.error("admin_run_state_failed", err);
   }
+  let orders = emptyStripeOrders();
+  let ordersError = "";
+  try {
+    const sessions = await fetchStripeCheckoutSessions(env);
+    orders = summarizeStripeOrders(sessions, snapshot);
+  } catch (err) {
+    console.error("admin_stripe_orders_failed", err);
+    ordersError = "Stripe objednávky se nepodařilo načíst: " + String(err && err.message ? err.message : err);
+  }
   return adminHtmlResponse(renderAdminHtml(snapshot, {
     error, queued, launched, autoQueued, suppressed, suppressedAlready, suppressedEmail, runState,
+    orders, ordersError,
   }));
 }
 
