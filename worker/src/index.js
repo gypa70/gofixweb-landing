@@ -43,6 +43,7 @@ const TURNSTILE_HOSTNAMES = new Set(["gofixweb.com", "www.gofixweb.com"]);
 
 /** E-maily, které obcházejí rate limit a spouští plný scan — jen interní QC. */
 const RATE_LIMIT_WHITELIST = new Set([
+  "audit@gofixweb.com",
   "trueforexway@gmail.com",
   "trademaker@seznam.cz",
   "gofixweb@outlook.com",
