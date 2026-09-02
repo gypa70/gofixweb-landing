@@ -1193,7 +1193,6 @@ const OUTREACH_SERIES = [
 ];
 const MAX_BATCH = 20;
 const DEFAULT_BATCH = 5;
-const AUTO_BATCH = 5;
 const AUTO_INTERVAL_MIN = 30;
 const COOLDOWN_MS = 5 * 60 * 1000;
 const HALT_BLOCK_TEXT = "Kampaň je zastavená (bounce rate). Nejdřív odemkni halt výše.";
@@ -1497,9 +1496,16 @@ function seriesView(snapshot, runState, seriesDef) {
     locked: waveLocked || Boolean(fromSnap.locked),
     halt_during: Boolean(fromSnap.halt_during),
     auto_enabled: Boolean(fromSnap.auto_enabled),
+    auto_batch_size: clampAutoBatch(fromSnap.auto_batch_size),
     auto_available: !waveLocked && !Boolean(fromSnap.locked),
     halted,
   };
+}
+
+function clampAutoBatch(raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return DEFAULT_BATCH;
+  return Math.max(1, Math.min(MAX_BATCH, Math.round(n)));
 }
 
 function launchBlockReason(view, runState) {
@@ -1647,6 +1653,7 @@ function renderAdminHtml(snapshot, {
   launchedSeries = "",
   launchedRunId = "",
   autoQueued = false,
+  autoSizeQueued = false,
   suppressed = false,
   suppressedAlready = false,
   suppressedEmail = "",
@@ -1683,6 +1690,8 @@ function renderAdminHtml(snapshot, {
   });
   const autoNote = autoQueued
     ? `<p class="banner-ok">Přepínač automatiky je ve frontě. Stav na kartě série se obnoví po persistu DB (obvykle do minuty).</p>`
+    : autoSizeQueued
+    ? `<p class="banner-ok">Velikost automatické dávky je ve frontě. Platí od další naplánované dávky této série (obvykle do minuty po persistu).</p>`
     : "";
   const suppressedNote = suppressed
     ? `<p class="banner-ok">${
@@ -1719,12 +1728,19 @@ function renderAdminHtml(snapshot, {
       const nextEnabled = autoOn ? "0" : "1";
       const btnLabel = autoOn ? "Vypnout automatiku" : "Zapnout automatiku";
       const btnClass = autoOn ? "auto-off-btn" : "auto-on-btn";
+      const batchVal = clampAutoBatch(view.auto_batch_size);
       autoBlock = `<form class="auto-form" method="post" action="/admin/auto" data-series-name="${escapeHtml(view.name)}" data-enable="${nextEnabled}">
         <input type="hidden" name="series" value="${escapeHtml(view.id)}">
         <input type="hidden" name="enabled" value="${nextEnabled}">
         <p class="hint">Automatické odesílání: <strong class="${autoClass}">${autoLabel}</strong>
-        — ${AUTO_BATCH} e-mailů každých ${AUTO_INTERVAL_MIN} min, Po–Pá 8:00–18:00 (Praha).</p>
-        <button class="${btnClass}" type="submit">${btnLabel}</button>
+        — každých ${AUTO_INTERVAL_MIN} min, Po–Pá 8:00–18:00 (Praha). Změna velikosti platí od další naplánované dávky.</p>
+        <div class="auto-form-row">
+          <label>E-mailů na automatickou dávku
+            <input type="number" name="auto_batch" min="1" max="${MAX_BATCH}" value="${batchVal}">
+          </label>
+          <button class="auto-save-btn" type="submit" name="intent" value="save">Uložit velikost</button>
+          <button class="${btnClass}" type="submit" name="intent" value="toggle">${btnLabel}</button>
+        </div>
       </form>`;
     }
     const lastSuccessNote = view.last_success_at
@@ -1846,8 +1862,9 @@ function renderAdminHtml(snapshot, {
     @keyframes gfw-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.82); } }
     button { margin-top: 0.75rem; border: 0; border-radius: 8px; padding: 0.8rem 1.1rem; font-weight: 700; background: var(--red); color: #fff; cursor: pointer; }
     button.launch { background: var(--green); margin-top: 0; }
-    button.auto-on-btn { background: var(--green); margin-top: 0.45rem; }
-    button.auto-off-btn { background: #64748b; margin-top: 0.45rem; }
+    button.auto-on-btn { background: var(--green); margin-top: 0; }
+    button.auto-off-btn { background: #64748b; margin-top: 0; }
+    button.auto-save-btn { background: #334155; margin-top: 0; }
     .auto-on { color: var(--green); }
     .auto-off { color: var(--text-muted); }
     button:disabled { opacity: 0.45; cursor: not-allowed; background: #64748b; }
@@ -1857,6 +1874,9 @@ function renderAdminHtml(snapshot, {
     .launch-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.55rem; margin-top: 0.7rem; }
     .launch-form label { color: var(--text-muted); font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.25rem; }
     .launch-form input[type=number] { width: 5.5rem; padding: 0.45rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: #0f172a; color: #fff; }
+    .auto-form-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.55rem; margin-top: 0.55rem; }
+    .auto-form-row label { color: var(--text-muted); font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.25rem; }
+    .auto-form-row input[type=number] { width: 5.5rem; padding: 0.45rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: #0f172a; color: #fff; }
     .suppress-box { background: var(--navy-light); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 1.15rem; }
     .suppress-box h2 { font-size: 1.05rem; margin-bottom: 0.35rem; }
     .orders-box { background: var(--navy-light); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 1.15rem; }
@@ -1961,9 +1981,15 @@ function renderAdminHtml(snapshot, {
     });
     document.querySelectorAll("form.auto-form").forEach(function (form) {
       form.addEventListener("submit", function (event) {
+        var submitter = event.submitter;
+        var intent = (submitter && submitter.getAttribute("value")) || "toggle";
+        if (intent === "save") return;
         if (form.getAttribute("data-enable") !== "1") return;
         var name = form.getAttribute("data-series-name") || "";
-        var msg = "Zapnout automatické odesílání série " + name + "? Dávky po 5 e-mailech každých 30 min, pracovní dny 8:00–18:00 (Praha).";
+        var input = form.querySelector('input[name="auto_batch"]');
+        var n = Number(input && input.value);
+        if (!Number.isFinite(n) || n < 1) n = ${DEFAULT_BATCH};
+        var msg = "Zapnout automatické odesílání série " + name + "? Dávky po " + n + " e-mailech každých 30 min, pracovní dny 8:00–18:00 (Praha).";
         if (!window.confirm(msg)) event.preventDefault();
       });
     });
@@ -1996,6 +2022,7 @@ async function handleAdminPage(request, env) {
   const launchedSeries = String(url.searchParams.get("series") || "").trim();
   const launchedRunId = String(url.searchParams.get("run") || "").trim();
   const autoQueued = url.searchParams.get("auto") === "1";
+  const autoSizeQueued = url.searchParams.get("auto_size") === "1";
   const suppressed = url.searchParams.get("suppressed") === "1";
   const suppressedAlready = url.searchParams.get("already") === "1";
   const suppressedEmail = String(url.searchParams.get("email") || "").trim().toLowerCase();
@@ -2023,7 +2050,7 @@ async function handleAdminPage(request, env) {
     ordersError = "Stripe objednávky se nepodařilo načíst: " + String(err && err.message ? err.message : err);
   }
   return adminHtmlResponse(renderAdminHtml(snapshot, {
-    error, queued, launched, launchedSeries, launchedRunId, autoQueued, suppressed, suppressedAlready, suppressedEmail, runState,
+    error, queued, launched, launchedSeries, launchedRunId, autoQueued, autoSizeQueued, suppressed, suppressedAlready, suppressedEmail, runState,
     orders, ordersError,
   }));
 }
@@ -2152,9 +2179,13 @@ async function handleAdminAuto(request, env) {
 
   let series = "";
   let enabled = false;
+  let intent = "toggle";
+  let autoBatch = DEFAULT_BATCH;
   try {
     const form = await request.formData();
     series = String(form.get("series") || "").trim();
+    intent = String(form.get("intent") || "toggle").trim().toLowerCase() || "toggle";
+    autoBatch = clampAutoBatch(form.get("auto_batch"));
     enabled = truthyEnabled(form.get("enabled"));
   } catch {
     return fail("Neplatný formulář.");
@@ -2162,6 +2193,9 @@ async function handleAdminAuto(request, env) {
 
   if (!OUTREACH_SERIES.some((item) => item.id === series)) {
     return fail("Neznámá série.");
+  }
+  if (autoBatch < 1 || autoBatch > MAX_BATCH) {
+    return fail(`Velikost automatické dávky musí být 1–${MAX_BATCH}.`);
   }
 
   let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
@@ -2179,6 +2213,9 @@ async function handleAdminAuto(request, env) {
 
   const def = OUTREACH_SERIES.find((item) => item.id === series);
   const view = seriesView(snapshot, runState, def);
+  if (intent === "save") {
+    enabled = Boolean(view.auto_enabled);
+  }
   if (enabled) {
     if (!view.auto_available || view.locked) {
       return fail(WAVE_LOCK_TEXT);
@@ -2193,11 +2230,15 @@ async function handleAdminAuto(request, env) {
       source: "admin",
       series,
       enabled: enabled ? "true" : "false",
+      auto_batch: String(autoBatch),
       at: new Date().toISOString(),
     });
   } catch (err) {
     console.error("admin_auto_dispatch_failed", err);
     return fail("Přepnutí automatiky se nepodařilo spustit. Zkuste workflow ručně.", 502);
+  }
+  if (intent === "save") {
+    return Response.redirect(new URL("/admin?auto_size=1", request.url).toString(), 303);
   }
   return Response.redirect(new URL("/admin?auto=1", request.url).toString(), 303);
 }
