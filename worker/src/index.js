@@ -1719,26 +1719,34 @@ function renderAdminHtml(snapshot, {
     const autoOn = Boolean(view.auto_enabled);
     const autoLabel = autoOn ? "ZAPNUTO" : "VYPNUTO";
     const autoClass = autoOn ? "auto-on" : "auto-off";
-    let autoBlock = "";
-    if (!view.auto_available) {
-      autoBlock = `<p class="hint">Automatické odesílání: nedostupné, dokud je série zamčená.</p>`;
-    } else if (view.remaining <= 0 && view.total > 0) {
-      autoBlock = `<p class="hint">Automatické odesílání: VYPNUTO — v sérii už není koho kontaktovat.</p>`;
-    } else {
-      const nextEnabled = autoOn ? "0" : "1";
-      const btnLabel = autoOn ? "Vypnout automatiku" : "Zapnout automatiku";
-      const btnClass = autoOn ? "auto-off-btn" : "auto-on-btn";
-      const batchVal = clampAutoBatch(view.auto_batch_size);
-      autoBlock = `<form class="auto-form" method="post" action="/admin/auto" data-series-name="${escapeHtml(view.name)}" data-enable="${nextEnabled}">
-        <input type="hidden" name="series" value="${escapeHtml(view.id)}">
-        <input type="hidden" name="enabled" value="${nextEnabled}">
-        <p class="hint">Automatické odesílání: <strong class="${autoClass}">${autoLabel}</strong>
-        — každých ${AUTO_INTERVAL_MIN} min, Po–Pá 8:00–18:00 (Praha). Změna velikosti platí od další naplánované dávky.</p>
-        <div class="auto-form-row">
+    const nextEnabled = autoOn ? "0" : "1";
+    const batchVal = clampAutoBatch(view.auto_batch_size);
+    const sizeRow = `<div class="auto-form-row">
           <label>E-mailů na automatickou dávku
             <input type="number" name="auto_batch" min="1" max="${MAX_BATCH}" value="${batchVal}">
           </label>
-          <button class="auto-save-btn" type="submit" name="intent" value="save">Uložit velikost</button>
+          <button class="auto-save-btn" type="submit" name="intent" value="save">Uložit velikost</button>`;
+    const formOpen = `<form class="auto-form" method="post" action="/admin/auto" data-series-name="${escapeHtml(view.name)}" data-enable="${nextEnabled}">
+        <input type="hidden" name="series" value="${escapeHtml(view.id)}">
+        <input type="hidden" name="enabled" value="${nextEnabled}">`;
+    let autoBlock = "";
+    if (!view.auto_available) {
+      autoBlock = `${formOpen}
+        <p class="hint">Automatické odesílání: nedostupné, dokud je série zamčená.</p>
+        ${sizeRow}
+        </div></form>`;
+    } else if (view.remaining <= 0 && view.total > 0) {
+      autoBlock = `${formOpen}
+        <p class="hint">Automatické odesílání: <strong class="auto-off">VYPNUTO</strong> — v sérii už není koho kontaktovat. Velikost dávky platí, až se objeví noví adresáti.</p>
+        ${sizeRow}
+        </div></form>`;
+    } else {
+      const btnLabel = autoOn ? "Vypnout automatiku" : "Zapnout automatiku";
+      const btnClass = autoOn ? "auto-off-btn" : "auto-on-btn";
+      autoBlock = `${formOpen}
+        <p class="hint">Automatické odesílání: <strong class="${autoClass}">${autoLabel}</strong>
+        — každých ${AUTO_INTERVAL_MIN} min, Po–Pá 8:00–18:00 (Praha). Změna velikosti platí od další naplánované dávky.</p>
+        ${sizeRow}
           <button class="${btnClass}" type="submit" name="intent" value="toggle">${btnLabel}</button>
         </div>
       </form>`;
