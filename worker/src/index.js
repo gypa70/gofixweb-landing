@@ -13,6 +13,7 @@
  *
  * GET /checkout — Stripe Checkout Session (manual_fix 3 990 Kč ihned;
  *   wp_autofix 4 990 Kč až po povinném souhlasu s VOP).
+ * GET /survey/{id} — follow-up dotazník (price|trust|other) po CTA kliku bez platby.
  * POST /submit — formulář: whitelist e-mail spustí free scan, ostatní jen poptávku.
  * POST /wp-onboarding — handshake WordPress REST; uložení credentials běží v GHA.
  */
@@ -834,6 +835,25 @@ function renderOrdersBox(orders, ordersError) {
   </div>`;
 }
 
+function emptySurveyStats() {
+  return { sent: 0, price: 0, trust: 0, other: 0, pending: 0 };
+}
+
+function renderSurveyBox(survey) {
+  const data = survey && typeof survey === "object" ? survey : emptySurveyStats();
+  return `<div class="orders-box">
+    <h2>Proč nekoupili</h2>
+    <p class="hint">Follow-up 48 hodin po kliku na CTA, bez spárované Stripe platby (stejná logika jako Objednávky). Max. jeden e-mail na kontakt, suppression list platí.</p>
+    <div class="cards">
+      <div class="card"><div class="k">Cena</div><div class="v">${escapeHtml(data.price ?? 0)}</div></div>
+      <div class="card"><div class="k">Důvěra</div><div class="v">${escapeHtml(data.trust ?? 0)}</div></div>
+      <div class="card"><div class="k">Jiné</div><div class="v">${escapeHtml(data.other ?? 0)}</div></div>
+      <div class="card"><div class="k">Zatím bez odpovědi</div><div class="v warn">${escapeHtml(data.pending ?? 0)}</div></div>
+    </div>
+    <p class="hint">Odesláno dotazníků: ${escapeHtml(data.sent ?? 0)}.</p>
+  </div>`;
+}
+
 async function verifyStripeWebhookSignature(rawBody, signatureHeader, secret) {
   if (!secret) {
     return { ok: false, error: "stripe_not_configured" };
@@ -1429,6 +1449,7 @@ const ADMIN_LINKS = {
   auto: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/outreach-auto.yml",
   unsub: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-unsubscribe.yml",
   engagement: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-engagement.yml",
+  survey: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-click-survey.yml",
   actions: "https://github.com/gypa70/gofixweb-scanner/actions",
 };
 
@@ -2211,6 +2232,7 @@ function renderAdminHtml(snapshot, {
     <h2 style="font-size:1.05rem;margin:0 0 0.65rem;">E-mailové série</h2>
     <div class="series-grid">${seriesCards}</div>
     ${renderOrdersBox(orders, ordersError)}
+    ${renderSurveyBox(snapshot?.survey)}
     <div class="links">
       <a href="${ADMIN_LINKS.scans}" target="_blank" rel="noopener">GHA scan jobs</a>
       <a href="${ADMIN_LINKS.bounce}" target="_blank" rel="noopener">GHA bounce monitor</a>
@@ -2219,6 +2241,7 @@ function renderAdminHtml(snapshot, {
       <a href="${ADMIN_LINKS.auto}" target="_blank" rel="noopener">GHA automatika</a>
       <a href="${ADMIN_LINKS.unsub}" target="_blank" rel="noopener">GHA unsubscribe</a>
       <a href="${ADMIN_LINKS.engagement}" target="_blank" rel="noopener">GHA engagement</a>
+      <a href="${ADMIN_LINKS.survey}" target="_blank" rel="noopener">GHA click survey</a>
       <a href="${ADMIN_LINKS.actions}" target="_blank" rel="noopener">Všechny Actions</a>
       <a href="${GMAIL_BOUNCE_SEARCH_URL}" target="_blank" rel="noopener">Gmail bounce search</a>
     </div>
@@ -2677,6 +2700,7 @@ async function cacheHasUnsub(email) {
 const ENG_CACHE_TTL = 31536000;
 const TRACKING_ID_RE = /^[A-Za-z0-9]{8,64}$/;
 const CLICK_PRODUCTS = new Set(["manual_fix", "wp_autofix"]);
+const SURVEY_REASONS = new Set(["price", "trust", "other"]);
 const PIXEL_GIF = Uint8Array.from([
   71, 73, 70, 56, 57, 97, 1, 0, 1, 0, 128, 0, 0, 0, 0, 0, 255, 255, 255,
   33, 249, 4, 1, 0, 0, 0, 0, 44, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 2, 68, 1, 0, 59,
@@ -2762,6 +2786,114 @@ async function handleTrackClick(request, env) {
   return Response.redirect(dest.toString(), 302);
 }
 
+function surveyThanksHtml() {
+  return unsubscribeHtml(
+    "Díky za zpětnou vazbu",
+    "Odpověď jsme zaznamenali. Už vás tímto dotazníkem znovu obtěžovat nebudeme.",
+  );
+}
+
+function surveyOtherFormHtml(actionUrl) {
+  const safeAction = escapeHtml(actionUrl);
+  return `<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jiný důvod — GoFixWeb</title>
+</head>
+<body style="margin:0;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;background:#ffffff;color:#1a2332;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;margin:0 auto;">
+    <tr><td style="padding:0 0 16px 0;font-size:22px;font-weight:700;">GoFix<span style="color:#16a34a;">Web</span></td></tr>
+    <tr><td style="padding:0 0 12px 0;font-size:20px;font-weight:700;">Jiný důvod</td></tr>
+    <tr><td style="padding:0 0 16px 0;font-size:16px;line-height:1.5;">Napište nám krátce, co rozhodlo. Pole je volitelné — můžete odeslat i prázdné.</td></tr>
+    <tr><td>
+      <form method="post" action="${safeAction}">
+        <textarea name="note" maxlength="500" rows="4" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-family:inherit;font-size:15px;"></textarea>
+        <p style="margin:12px 0 0 0;">
+          <button type="submit" style="border:0;border-radius:8px;padding:10px 16px;background:#16a34a;color:#fff;font-weight:700;cursor:pointer;">Odeslat</button>
+        </p>
+      </form>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+function surveyCacheKey(trackingId) {
+  return `https://survey.gofixweb/${String(trackingId || "").trim()}`;
+}
+
+async function recordSurveyOnce(env, trackingId, reason, freeText) {
+  const cache = caches.default;
+  const key = surveyCacheKey(trackingId);
+  const hit = await cache.match(key);
+  if (hit) return false;
+  await cache.put(key, new Response("1"), { expirationTtl: ENG_CACHE_TTL });
+  try {
+    await dispatchGithubEvent(env, "email-click-survey", {
+      tracking_id: trackingId,
+      reason,
+      text: String(freeText || "").slice(0, 500),
+      at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("survey_dispatch_failed", err);
+  }
+  return true;
+}
+
+async function handleSurvey(request, env) {
+  const url = new URL(request.url);
+  const match = url.pathname.match(/^\/survey\/([A-Za-z0-9]{8,64})$/);
+  if (!match) return new Response("Not Found", { status: 404 });
+  const id = match[1];
+  const reason = String(url.searchParams.get("reason") || "").trim().toLowerCase();
+  const token = String(url.searchParams.get("t") || "").trim();
+  const invalid = unsubscribeHtml(
+    "Odkaz je neplatný",
+    "Tento odkaz na dotazník je neplatný nebo poškozený.",
+  );
+  if (!TRACKING_ID_RE.test(id) || !SURVEY_REASONS.has(reason)) {
+    return new Response(invalid, { status: 400, headers: { "Content-Type": "text/html; charset=UTF-8" } });
+  }
+  if (!(await tokenMatchesTracking(env, `survey\n${id}\n${reason}`, token))) {
+    return new Response(invalid, { status: 400, headers: { "Content-Type": "text/html; charset=UTF-8" } });
+  }
+  const thanks = new Response(surveyThanksHtml(), {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=UTF-8",
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex, nofollow",
+    },
+  });
+  if (reason === "other" && request.method === "GET") {
+    return new Response(surveyOtherFormHtml(url.toString()), {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=UTF-8",
+        "Cache-Control": "no-store",
+        "X-Robots-Tag": "noindex, nofollow",
+      },
+    });
+  }
+  let note = "";
+  if (reason === "other" && request.method === "POST") {
+    try {
+      const form = await request.formData();
+      note = String(form.get("note") || "").trim().slice(0, 500);
+    } catch {
+      note = "";
+    }
+  }
+  if (request.method === "HEAD") {
+    return new Response(null, { status: 200, headers: { "X-Robots-Tag": "noindex, nofollow" } });
+  }
+  await recordSurveyOnce(env, id, reason, note);
+  return thanks;
+}
+
 async function handleUnsubscribe(request, env) {
   const url = new URL(request.url);
   const email = String(url.searchParams.get("email") || "").trim().toLowerCase();
@@ -2830,6 +2962,13 @@ export default {
         return new Response("Method Not Allowed", { status: 405 });
       }
       return handleTrackClick(request, env);
+    }
+
+    if (/^\/survey\/[A-Za-z0-9]{8,64}$/.test(url.pathname)) {
+      if (request.method !== "GET" && request.method !== "HEAD" && request.method !== "POST") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return handleSurvey(request, env);
     }
 
     if (url.pathname === "/wp-onboarding") {
