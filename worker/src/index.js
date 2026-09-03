@@ -2170,18 +2170,18 @@ function renderAdminHtml(snapshot, {
     th, td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
     th { color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
     td.reason { color: var(--text-light); max-width: 280px; word-break: break-word; }
-    tr.eng-opened td { background: rgba(56, 189, 248, 0.10); }
-    tr.eng-clicked td { background: rgba(34, 197, 94, 0.12); }
-    tr.eng-replied td { background: rgba(251, 191, 36, 0.16); }
-    tr.eng-opened td:first-child { box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.55); }
-    tr.eng-clicked td:first-child { box-shadow: inset 3px 0 0 rgba(34, 197, 94, 0.65); }
-    tr.eng-replied td:first-child { box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.75); }
+    tr.eng-opened td { background: rgba(14, 165, 233, 0.42); }
+    tr.eng-clicked td { background: rgba(34, 197, 94, 0.45); }
+    tr.eng-replied td { background: rgba(249, 115, 22, 0.46); }
+    tr.eng-opened td:first-child { box-shadow: inset 4px 0 0 #38bdf8; }
+    tr.eng-clicked td:first-child { box-shadow: inset 4px 0 0 #4ade80; }
+    tr.eng-replied td:first-child { box-shadow: inset 4px 0 0 #fb923c; }
     .eng-legend { color: var(--text-muted); font-size: 0.8rem; margin: 0 0 0.55rem; display: flex; flex-wrap: wrap; gap: 0.75rem 1.1rem; }
     .eng-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
     .eng-swatch { width: 0.7rem; height: 0.7rem; border-radius: 2px; display: inline-block; }
-    .eng-swatch.opened { background: rgba(56, 189, 248, 0.45); }
-    .eng-swatch.clicked { background: rgba(34, 197, 94, 0.5); }
-    .eng-swatch.replied { background: rgba(251, 191, 36, 0.55); }
+    .eng-swatch.opened { background: #38bdf8; }
+    .eng-swatch.clicked { background: #4ade80; }
+    .eng-swatch.replied { background: #fb923c; }
   </style>
 </head>
 <body>
