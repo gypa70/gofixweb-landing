@@ -1298,15 +1298,21 @@ function isVopConsented(value) {
   return raw === "1" || raw === "on" || raw === "true" || raw === "yes";
 }
 
-function exitIntentScript(trackingId) {
+function exitIntentScript(trackingId, product) {
   const tidJson = JSON.stringify(String(trackingId || "").trim());
+  const productJson = JSON.stringify(String(product || "manual_fix").trim() || "manual_fix");
   return `<script>
 (function () {
   var tid = ${tidJson};
-  var KEY = "gfw-exit-intent";
-  var PAY_KEY = "gfw-paying";
+  var product = ${productJson};
+  var KEY = "gfw-exit-intent:" + product;
+  var PAY_KEY = "gfw-paying:" + product;
   var TIMER_MS = 35000;
+  var ARM_MS = 1500;
+  var LEAVE_MS = 400;
   var shown = false;
+  var armed = false;
+  var leaveTimer = 0;
   var modal = document.getElementById("gfw-exit-modal");
   if (!modal) return;
   function paying() {
@@ -1351,22 +1357,32 @@ function exitIntentScript(trackingId) {
     send("dismiss");
     hide();
   }
-  var ARM_MS = 1500;
-  var armed = false;
-  window.setTimeout(function () { armed = true; }, ARM_MS);
-  function onViewportLeave(e) {
-    if (!armed) return;
-    if (e.relatedTarget) return;
-    if (typeof e.clientY !== "number" || e.clientY > 0) return;
-    show();
+  function cancelLeave() {
+    if (leaveTimer) {
+      window.clearTimeout(leaveTimer);
+      leaveTimer = 0;
+    }
   }
-  document.addEventListener("mouseleave", onViewportLeave);
+  function isTopExit(e) {
+    if (!e || e.relatedTarget) return false;
+    return typeof e.clientY === "number" && e.clientY < 0;
+  }
+  function onViewportLeave(e) {
+    if (!armed || shown) return;
+    if (!isTopExit(e)) return;
+    cancelLeave();
+    leaveTimer = window.setTimeout(function () {
+      leaveTimer = 0;
+      show();
+    }, LEAVE_MS);
+  }
+  window.setTimeout(function () { armed = true; }, ARM_MS);
   document.documentElement.addEventListener("mouseleave", onViewportLeave);
+  document.documentElement.addEventListener("mouseenter", cancelLeave);
   var coarse = false;
   try {
     coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
   } catch (e) {}
-  if (!coarse && navigator.maxTouchPoints > 0) coarse = true;
   if (coarse) {
     window.setTimeout(function () { show(); }, TIMER_MS);
     var lastY = window.scrollY || 0;
@@ -1500,7 +1516,7 @@ function checkoutOfferPage({
     </div>
   </div>
   ${payScript}
-  ${exitIntentScript(trackingId)}
+  ${exitIntentScript(trackingId, product)}
 </body>
 </html>`;
   return new Response(html, {
