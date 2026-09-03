@@ -339,6 +339,7 @@
 
     #tarify .section-title,
     #signup-form .section-title,
+    #faq .section-title,
     #reseni .section-sub {
       text-align: center;
       color: var(--white);
@@ -352,6 +353,10 @@
     }
 
     #signup-form .section-title {
+      margin-bottom: 1.75rem;
+    }
+
+    #faq .section-title {
       margin-bottom: 1.75rem;
     }
 
@@ -640,6 +645,68 @@
       min-height: 65px;
     }
 
+    /* ── FAQ ── */
+    .faq-list {
+      max-width: 760px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
+    .faq-item {
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .faq-item summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.05rem 1.2rem;
+      cursor: pointer;
+      font-weight: 650;
+      font-size: 1.02rem;
+      line-height: 1.35;
+      list-style: none;
+      color: var(--white);
+    }
+
+    .faq-item summary::-webkit-details-marker { display: none; }
+
+    .faq-item summary:focus { outline: none; }
+
+    .faq-item summary:focus-visible {
+      outline: 2px solid var(--green);
+      outline-offset: -2px;
+      border-radius: 10px;
+    }
+
+    .faq-item summary::after {
+      content: "+";
+      flex-shrink: 0;
+      color: var(--green);
+      font-size: 1.35rem;
+      font-weight: 600;
+      line-height: 1;
+    }
+
+    .faq-item[open] summary::after { content: "–"; }
+
+    .faq-item[open] summary {
+      color: var(--green-light);
+    }
+
+    .faq-a {
+      padding: 0 1.2rem 1.15rem;
+      color: var(--text-light);
+      font-size: 0.98rem;
+    }
+
+    .faq-a p + p { margin-top: 0.75rem; }
+
     /* ── CONTACT ── */
     #kontakt {
       padding: 2.75rem 0;
@@ -724,6 +791,11 @@
       .trust-badge { max-width: none; }
       .pricing-grid { grid-template-columns: 1fr; }
       .form-wrap { padding: 1.5rem 1.15rem; }
+      .faq-item summary {
+        font-size: 0.95rem;
+        padding: 0.95rem 1rem;
+      }
+      .faq-a { padding: 0 1rem 1rem; }
     }
   </style>
 </head>
@@ -738,6 +810,7 @@
         <a href="#signup-form">Report zdarma</a>
         <a href="#reseni">Jak to funguje</a>
         <a href="#tarify">Ceník</a>
+        <a href="#faq">FAQ</a>
         <a href="#kontakt">Kontakt</a>
       </nav>
     </div>
@@ -901,8 +974,74 @@
       </div>
     </section>
 
-    <!-- 6. KONTAKT -->
-    <section class="block alt" id="kontakt" aria-label="Kontakt">
+    <!-- 6. FAQ -->
+    <section class="block alt" id="faq">
+      <div class="container">
+        <h2 class="section-title">Časté dotazy</h2>
+        <div class="faq-list">
+          <details class="faq-item">
+            <summary>Jak GoFixWeb funguje?</summary>
+            <div class="faq-a">
+              <p>Automaticky zkontrolujeme váš e-shop (rychlost, SEO) a pošleme vám bezplatný report s konkrétními nálezy. Pokud budete chtít problémy vyřešit, nabízíme buď návod, co a kam vložit (Manuál), nebo provedeme opravu za vás automaticky (Auto, jen pro WooCommerce).</p>
+            </div>
+          </details>
+          <details class="faq-item">
+            <summary>Jaká data používáte pro kontrolu e-shopu?</summary>
+            <div class="faq-a">
+              <p>Kontrolujeme jen veřejně dostupné informace vaší webové stránky — stejné, jaké vidí kterýkoliv návštěvník nebo Google (rychlost načítání, velikost obrázků, SEO nastavení jako title a meta popisky). Nepotřebujeme k tomu žádný přístup do vaší administrace ani žádné citlivé údaje.</p>
+              <p>Přístup do administrace (Application Password) používáme až u placené AUTO opravy, a to jen v omezeném rozsahu, který si kdykoliv můžete zrušit.</p>
+            </div>
+          </details>
+          <details class="faq-item">
+            <summary>Je bezplatná kontrola opravdu zdarma?</summary>
+            <div class="faq-a">
+              <p>Ano, úvodní scan a report jsou zdarma, bez závazků. Platíte až za samotnou opravu, pokud se rozhodnete ji objednat.</p>
+            </div>
+          </details>
+          <details class="faq-item">
+            <summary>Jaký je rozdíl mezi Manuál a Auto opravou?</summary>
+            <div class="faq-a">
+              <p>Manuál (3&nbsp;990&nbsp;Kč) — dostanete PDF návod s přesnými kroky, co a kam v administraci vložit. Funguje pro jakýkoliv e-shop/CMS, provádíte si úpravy sami vlastním tempem.</p>
+              <p>Auto (4&nbsp;990&nbsp;Kč, pouze WooCommerce) — úpravy provedeme za vás automaticky: opravíme SEO nastavení (title, meta popisky, nadpisy), zkomprimujeme obrázky a nainstalujeme doporučené SEO pluginy. Nevyžaduje žádný zásah z vaší strany, jen bezpečný omezený přístup (Application Password), který můžete kdykoliv zrušit.</p>
+              <p>Pokud váš e-shop neběží na WooCommerce, automaticky je k dispozici jen varianta Manuál.</p>
+            </div>
+          </details>
+          <details class="faq-item">
+            <summary>Je bezpečné dát vám přístup do administrace?</summary>
+            <div class="faq-a">
+              <p>Pro AUTO opravu použijeme Application Password — bezpečný, omezený přístup, který kdykoliv můžete v administraci sami zrušit. Neukládáme vaše hlavní přihlašovací údaje.</p>
+            </div>
+          </details>
+          <details class="faq-item">
+            <summary>Co když se mi oprava nebude líbit?</summary>
+            <div class="faq-a">
+              <p>Před každou automatickou úpravou si ukládáme původní stav, takže je možné se v případě potřeby vrátit zpět.</p>
+            </div>
+          </details>
+          <details class="faq-item">
+            <summary>Kolikrát se e-shop kontroluje?</summary>
+            <div class="faq-a">
+              <p>Aktuálně nabízíme jednorázovou kontrolu a opravu. Průběžné sledování e-shopu (Premium) připravujeme.</p>
+            </div>
+          </details>
+          <details class="faq-item">
+            <summary>Jak se odhlásím z e-mailů?</summary>
+            <div class="faq-a">
+              <p>Každý e-mail obsahuje odhlašovací odkaz v patičce — po kliknutí vás okamžitě vyřadíme z dalších zpráv.</p>
+            </div>
+          </details>
+          <details class="faq-item">
+            <summary>Vystavujete fakturu?</summary>
+            <div class="faq-a">
+              <p>Ano, FinalEdge s.r.o. (neplátce DPH), IČO 19181761.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. KONTAKT -->
+    <section class="block" id="kontakt" aria-label="Kontakt">
       <div class="container contact-wrap">
         <a class="btn btn-outline contact-mail" href="mailto:info@gofixweb.com?subject=Dotaz%20k%20GoFixWeb">info@gofixweb.com</a>
       </div>
@@ -1022,6 +1161,18 @@
         else location.hash = id;
         window.setTimeout(updateSpy, 950);
       });
+    })();
+
+    (function () {
+      var list = document.querySelector('#faq .faq-list');
+      if (!list) return;
+      list.addEventListener('toggle', function (event) {
+        var item = event.target;
+        if (!item || item.tagName !== 'DETAILS' || !item.open) return;
+        list.querySelectorAll('details[open]').forEach(function (other) {
+          if (other !== item) other.open = false;
+        });
+      }, true);
     })();
 
     (function () {
