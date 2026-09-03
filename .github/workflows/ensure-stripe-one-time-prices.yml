@@ -1,0 +1,16 @@
+name: Ensure Stripe 1990 Kč prices
+
+on:
+  workflow_dispatch:
+
+jobs:
+  prices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create or reuse 1990 CZK Prices
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+        run: python scripts/ensure_stripe_one_time_prices.py
