@@ -11,8 +11,9 @@
  *   ADMIN_BASIC_USER     — volitelně (default gofixweb)
  *   UNSUBSCRIBE_SECRET   — HMAC pro /unsubscribe a /unsub-status
  *
- * GET /checkout — Stripe Checkout Session (manual_fix 3 990 Kč ihned;
- *   wp_autofix 4 990 Kč až po povinném souhlasu s VOP).
+ * GET /checkout — nabídka (manual_fix 3 990 Kč / wp_autofix 4 990 Kč + VOP);
+ *   POST /checkout spustí Stripe Checkout Session.
+ * POST /exit-intent — důvod odchodu z nabídky (price|trust|dismiss).
  * GET /survey/{id} — follow-up dotazník (price|trust|other) po CTA kliku bez platby.
  * POST /submit — formulář: whitelist e-mail spustí free scan, ostatní jen poptávku.
  * POST /wp-onboarding — handshake WordPress REST; uložení credentials běží v GHA.
@@ -839,6 +840,10 @@ function emptySurveyStats() {
   return { sent: 0, price: 0, trust: 0, other: 0, pending: 0 };
 }
 
+function emptyExitIntentStats() {
+  return { price: 0, trust: 0, dismiss: 0, total: 0 };
+}
+
 function renderSurveyBox(survey) {
   const data = survey && typeof survey === "object" ? survey : emptySurveyStats();
   return `<div class="orders-box">
@@ -851,6 +856,20 @@ function renderSurveyBox(survey) {
       <div class="card"><div class="k">Zatím bez odpovědi</div><div class="v warn">${escapeHtml(data.pending ?? 0)}</div></div>
     </div>
     <p class="hint">Odesláno dotazníků: ${escapeHtml(data.sent ?? 0)}.</p>
+  </div>`;
+}
+
+function renderExitIntentBox(exitIntent) {
+  const data = exitIntent && typeof exitIntent === "object" ? exitIntent : emptyExitIntentStats();
+  return `<div class="orders-box">
+    <h2>Proč odcházejí</h2>
+    <p class="hint">Exit-intent popup na stránce s nabídkou (/checkout), než návštěvník odejde bez objednávky. Jednou za návštěvu. Přímé návštěvy bez tracking_id se počítají taky.</p>
+    <div class="cards">
+      <div class="card"><div class="k">Cena</div><div class="v">${escapeHtml(data.price ?? 0)}</div></div>
+      <div class="card"><div class="k">Důvěra</div><div class="v">${escapeHtml(data.trust ?? 0)}</div></div>
+      <div class="card"><div class="k">Zavřeno bez odpovědi</div><div class="v warn">${escapeHtml(data.dismiss ?? 0)}</div></div>
+    </div>
+    <p class="hint">Celkem záznamů: ${escapeHtml(data.total ?? 0)}.</p>
   </div>`;
 }
 
@@ -1254,41 +1273,126 @@ function isVopConsented(value) {
   return raw === "1" || raw === "on" || raw === "true" || raw === "yes";
 }
 
-function autofixConsentPage({ domain = "", email = "", errorMessage = "" } = {}) {
+function exitIntentScript(trackingId) {
+  const tidJson = JSON.stringify(String(trackingId || "").trim());
+  return `<script>
+(function () {
+  var tid = ${tidJson};
+  var KEY = "gfw-exit-intent";
+  var PAY_KEY = "gfw-paying";
+  var TIMER_MS = 35000;
+  var shown = false;
+  var modal = document.getElementById("gfw-exit-modal");
+  if (!modal) return;
+  function paying() {
+    try { return sessionStorage.getItem(PAY_KEY) === "1"; } catch (e) { return false; }
+  }
+  function already() {
+    try { return sessionStorage.getItem(KEY) === "1"; } catch (e) { return false; }
+  }
+  if (already() || paying()) return;
+  function markShown() {
+    shown = true;
+    try { sessionStorage.setItem(KEY, "1"); } catch (e) {}
+  }
+  function hide() {
+    modal.setAttribute("hidden", "");
+    modal.setAttribute("aria-hidden", "true");
+  }
+  var sent = false;
+  function send(reason) {
+    if (sent) return;
+    sent = true;
+    try {
+      fetch("/exit-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tid: tid, reason: reason }),
+        keepalive: true
+      });
+    } catch (e) {}
+  }
+  function show() {
+    if (shown || paying() || already()) return;
+    markShown();
+    modal.removeAttribute("hidden");
+    modal.setAttribute("aria-hidden", "false");
+  }
+  function answer(reason) {
+    send(reason);
+    hide();
+  }
+  function dismissNow() {
+    send("dismiss");
+    hide();
+  }
+  document.addEventListener("mouseout", function (e) {
+    if (e.relatedTarget) return;
+    if (typeof e.clientY === "number" && e.clientY > 8) return;
+    show();
+  });
+  document.documentElement.addEventListener("mouseleave", function (e) {
+    if (typeof e.clientY === "number" && e.clientY > 8) return;
+    show();
+  });
+  var coarse = false;
+  try {
+    coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+  } catch (e) {}
+  if (!coarse && navigator.maxTouchPoints > 0) coarse = true;
+  if (coarse) {
+    window.setTimeout(function () { show(); }, TIMER_MS);
+    var lastY = window.scrollY || 0;
+    var lastT = Date.now();
+    window.addEventListener("scroll", function () {
+      var y = window.scrollY || 0;
+      var t = Date.now();
+      var dt = t - lastT;
+      var dy = lastY - y;
+      if (lastY > 80 && y < 24 && dy > 60 && dt < 900) show();
+      lastY = y;
+      lastT = t;
+    }, { passive: true });
+  }
+  var form = document.getElementById("gfw-pay-form") || document.getElementById("vop-consent-form");
+  function markPaying() {
+    try { sessionStorage.setItem(PAY_KEY, "1"); } catch (e) {}
+    hide();
+  }
+  if (form) form.addEventListener("submit", markPaying);
+  var payBtn = document.getElementById("pay-btn");
+  if (payBtn) payBtn.addEventListener("click", markPaying);
+  var price = document.getElementById("gfw-exit-price");
+  var trust = document.getElementById("gfw-exit-trust");
+  var dismiss = document.getElementById("gfw-exit-dismiss");
+  var closeX = document.getElementById("gfw-exit-close");
+  if (price) price.addEventListener("click", function () { answer("price"); });
+  if (trust) trust.addEventListener("click", function () { answer("trust"); });
+  if (dismiss) dismiss.addEventListener("click", dismissNow);
+  if (closeX) closeX.addEventListener("click", dismissNow);
+})();
+</script>`;
+}
+
+function checkoutOfferPage({
+  product = "manual_fix",
+  domain = "",
+  email = "",
+  trackingId = "",
+  errorMessage = "",
+} = {}) {
+  const isAuto = product === "wp_autofix";
+  const title = isAuto ? AUTO_FIX_NAME : MANUAL_FIX_NAME;
+  const priceLabel = isAuto ? "4 990 Kč" : "3 990 Kč";
+  const blurb = isAuto ? AUTO_FIX_DESCRIPTION : MANUAL_FIX_DESCRIPTION;
+  const intro = isAuto
+    ? "Před platbou je potřeba souhlas s obchodními podmínkami a se zásahem do webu."
+    : "Jednorázová platba. Po zaplacení dostanete přesný návod k opravě nálezů.";
   const err = errorMessage
     ? `<p class="err" id="vop-error">${escapeHtml(errorMessage)}</p>`
     : "";
-  const html = `<!DOCTYPE html>
-<html lang="cs">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Souhlas s VOP — automatická oprava — GoFixWeb</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Inter, system-ui, sans-serif; background: #1a2332; color: #fff; line-height: 1.6; min-height: 100vh; }
-    .wrap { width: min(560px, 92vw); margin: 0 auto; padding: 3rem 0 4rem; }
-    h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 0.75rem; }
-    p { color: #cbd5e1; margin-bottom: 1rem; }
-    a { color: #16a34a; }
-    .card { border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.25rem; background: #243044; }
-    label { display: flex; gap: 0.7rem; align-items: flex-start; color: #e2e8f0; font-size: 0.95rem; cursor: pointer; }
-    input[type="checkbox"] { margin-top: 0.3rem; width: 1.1rem; height: 1.1rem; flex-shrink: 0; }
-    button { margin-top: 1.25rem; width: 100%; border: 0; border-radius: 8px; padding: 0.85rem 1rem; font-weight: 700; font-size: 1rem; background: #16a34a; color: #fff; cursor: pointer; }
-    button:disabled { background: #475569; color: #cbd5e1; cursor: not-allowed; }
-    .err { color: #fca5a5; margin-bottom: 1rem; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <h1>Automatická oprava WordPress</h1>
-    <p>Před platbou je potřeba souhlas s obchodními podmínkami a se zásahem do webu.</p>
-    ${err}
-    <form id="vop-consent-form" method="post" action="/checkout" class="card">
-      <input type="hidden" name="product" value="wp_autofix">
-      <input type="hidden" name="domain" value="${escapeHtml(domain)}">
-      <input type="hidden" name="email" value="${escapeHtml(email)}">
-      <label for="vop-consent">
+  const vopBlock = isAuto
+    ? `<label for="vop-consent">
         <input type="checkbox" id="vop-consent" name="vop_consent" value="1" required>
         <span>
           Souhlasím s
@@ -1296,11 +1400,11 @@ function autofixConsentPage({ domain = "", email = "", errorMessage = "" } = {})
           a s tím, že GoFixWeb provede automatické úpravy mého webu popsané v
           <a href="${VOP_AUTOFIX_SECTION_URL}" target="_blank" rel="noopener">čl. 8 VOP</a>
         </span>
-      </label>
-      <button type="submit" id="pay-btn" disabled>Pokračovat k platbě</button>
-    </form>
-  </div>
-  <script>
+      </label>`
+    : "";
+  const payDisabled = isAuto ? " disabled" : "";
+  const payScript = isAuto
+    ? `<script>
     (function () {
       var cb = document.getElementById("vop-consent");
       var btn = document.getElementById("pay-btn");
@@ -1309,7 +1413,67 @@ function autofixConsentPage({ domain = "", email = "", errorMessage = "" } = {})
       cb.addEventListener("change", sync);
       sync();
     })();
-  </script>
+  </script>`
+    : "";
+  const html = `<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(title)} — GoFixWeb</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, system-ui, sans-serif; background: #1a2332; color: #fff; line-height: 1.6; min-height: calc(100vh + 140px); }
+    .wrap { width: min(560px, 92vw); margin: 0 auto; padding: 3rem 0 4rem; }
+    h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 0.75rem; }
+    p { color: #cbd5e1; margin-bottom: 1rem; }
+    a { color: #16a34a; }
+    .price { font-size: 1.35rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem; }
+    .card { border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.25rem; background: #243044; }
+    label { display: flex; gap: 0.7rem; align-items: flex-start; color: #e2e8f0; font-size: 0.95rem; cursor: pointer; }
+    input[type="checkbox"] { margin-top: 0.3rem; width: 1.1rem; height: 1.1rem; flex-shrink: 0; }
+    button { margin-top: 1.25rem; width: 100%; border: 0; border-radius: 8px; padding: 0.85rem 1rem; font-weight: 700; font-size: 1rem; background: #16a34a; color: #fff; cursor: pointer; }
+    button:disabled { background: #475569; color: #cbd5e1; cursor: not-allowed; }
+    .err { color: #fca5a5; margin-bottom: 1rem; }
+    .gfw-exit { position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .gfw-exit[hidden] { display: none !important; }
+    .gfw-exit-card { position: relative; width: min(420px, 100%); background: #243044; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 1.5rem 1.25rem 1.15rem; }
+    .gfw-exit-card p { color: #fff; font-weight: 700; font-size: 1.05rem; margin-bottom: 1rem; }
+    .gfw-exit-actions { display: flex; flex-direction: column; gap: 0.55rem; }
+    .gfw-exit-actions button { margin-top: 0; }
+    .gfw-exit-x { position: absolute; top: 0.45rem; right: 0.45rem; width: 2rem; height: 2rem; margin: 0; padding: 0; background: transparent; color: #cbd5e1; font-size: 1.4rem; line-height: 1; font-weight: 500; }
+    .gfw-exit-skip { margin-top: 0.85rem; background: transparent; color: #94a3b8; font-weight: 600; font-size: 0.9rem; padding: 0.4rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>${escapeHtml(title)}</h1>
+    <p class="price">${priceLabel}</p>
+    <p>${escapeHtml(blurb)}</p>
+    <p>${escapeHtml(intro)}</p>
+    ${err}
+    <form id="gfw-pay-form" method="post" action="/checkout" class="card">
+      <input type="hidden" name="product" value="${escapeHtml(product)}">
+      <input type="hidden" name="domain" value="${escapeHtml(domain)}">
+      <input type="hidden" name="email" value="${escapeHtml(email)}">
+      <input type="hidden" name="tid" value="${escapeHtml(trackingId)}">
+      ${vopBlock}
+      <button type="submit" id="pay-btn"${payDisabled}>Pokračovat k platbě</button>
+    </form>
+  </div>
+  <div id="gfw-exit-modal" class="gfw-exit" hidden aria-hidden="true" role="dialog" aria-labelledby="gfw-exit-title" aria-modal="true">
+    <div class="gfw-exit-card">
+      <button type="button" id="gfw-exit-close" class="gfw-exit-x" aria-label="Zavřít bez odpovědi">&times;</button>
+      <p id="gfw-exit-title">Než odejdete — můžete nám prosím říct proč?</p>
+      <div class="gfw-exit-actions">
+        <button type="button" id="gfw-exit-price">Cena mi nesedí</button>
+        <button type="button" id="gfw-exit-trust">Nevím, jestli vám můžu důvěřovat</button>
+      </div>
+      <button type="button" id="gfw-exit-dismiss" class="gfw-exit-skip">Zavřít bez odpovědi</button>
+    </div>
+  </div>
+  ${payScript}
+  ${exitIntentScript(trackingId)}
 </body>
 </html>`;
   return new Response(html, {
@@ -1321,12 +1485,23 @@ function autofixConsentPage({ domain = "", email = "", errorMessage = "" } = {})
   });
 }
 
+function autofixConsentPage({ domain = "", email = "", trackingId = "", errorMessage = "" } = {}) {
+  return checkoutOfferPage({
+    product: "wp_autofix",
+    domain,
+    email,
+    trackingId,
+    errorMessage,
+  });
+}
+
 async function handleCheckout(request, env) {
   const url = new URL(request.url);
   let product = String(url.searchParams.get("product") || "").trim();
   let domain = String(url.searchParams.get("domain") || "").trim();
   let email = String(url.searchParams.get("email") || "").trim().toLowerCase();
   let consent = "";
+  let tid = String(url.searchParams.get("tid") || "").trim();
 
   if (request.method === "POST") {
     const form = await request.formData();
@@ -1334,7 +1509,9 @@ async function handleCheckout(request, env) {
     domain = String(form.get("domain") || domain).trim();
     email = String(form.get("email") || email).trim().toLowerCase();
     consent = String(form.get("vop_consent") || "").trim();
+    tid = String(form.get("tid") || tid).trim();
   }
+  if (tid && !TRACKING_ID_RE.test(tid)) tid = "";
 
   if (product !== "manual_fix" && product !== "wp_autofix") {
     return new Response("Neznámý produkt.", { status: 400 });
@@ -1343,15 +1520,24 @@ async function handleCheckout(request, env) {
   if (product === "wp_autofix") {
     const consented = isVopConsented(consent);
     if (request.method !== "POST" || !consented) {
-      return autofixConsentPage({
+      return checkoutOfferPage({
+        product,
         domain,
         email,
+        trackingId: tid,
         errorMessage:
           request.method === "POST" && !consented
             ? "Bez souhlasu s VOP nelze pokračovat k platbě."
             : "",
       });
     }
+  } else if (request.method !== "POST") {
+    return checkoutOfferPage({
+      product,
+      domain,
+      email,
+      trackingId: tid,
+    });
   }
 
   const secret = String(env.STRIPE_SECRET_KEY || "").trim();
@@ -1450,6 +1636,7 @@ const ADMIN_LINKS = {
   unsub: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-unsubscribe.yml",
   engagement: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-engagement.yml",
   survey: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-click-survey.yml",
+  exitIntent: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-exit-intent.yml",
   actions: "https://github.com/gypa70/gofixweb-scanner/actions",
 };
 
@@ -2233,6 +2420,7 @@ function renderAdminHtml(snapshot, {
     <div class="series-grid">${seriesCards}</div>
     ${renderOrdersBox(orders, ordersError)}
     ${renderSurveyBox(snapshot?.survey)}
+    ${renderExitIntentBox(snapshot?.exit_intent)}
     <div class="links">
       <a href="${ADMIN_LINKS.scans}" target="_blank" rel="noopener">GHA scan jobs</a>
       <a href="${ADMIN_LINKS.bounce}" target="_blank" rel="noopener">GHA bounce monitor</a>
@@ -2242,6 +2430,7 @@ function renderAdminHtml(snapshot, {
       <a href="${ADMIN_LINKS.unsub}" target="_blank" rel="noopener">GHA unsubscribe</a>
       <a href="${ADMIN_LINKS.engagement}" target="_blank" rel="noopener">GHA engagement</a>
       <a href="${ADMIN_LINKS.survey}" target="_blank" rel="noopener">GHA click survey</a>
+      <a href="${ADMIN_LINKS.exitIntent}" target="_blank" rel="noopener">GHA exit-intent</a>
       <a href="${ADMIN_LINKS.actions}" target="_blank" rel="noopener">Všechny Actions</a>
       <a href="${GMAIL_BOUNCE_SEARCH_URL}" target="_blank" rel="noopener">Gmail bounce search</a>
     </div>
@@ -2701,6 +2890,7 @@ const ENG_CACHE_TTL = 31536000;
 const TRACKING_ID_RE = /^[A-Za-z0-9]{8,64}$/;
 const CLICK_PRODUCTS = new Set(["manual_fix", "wp_autofix"]);
 const SURVEY_REASONS = new Set(["price", "trust", "other"]);
+const EXIT_INTENT_REASONS = new Set(["price", "trust", "dismiss"]);
 const PIXEL_GIF = Uint8Array.from([
   71, 73, 70, 56, 57, 97, 1, 0, 1, 0, 128, 0, 0, 0, 0, 0, 255, 255, 255,
   33, 249, 4, 1, 0, 0, 0, 0, 44, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 2, 68, 1, 0, 59,
@@ -2781,6 +2971,7 @@ async function handleTrackClick(request, env) {
   await recordEngagementOnce(env, "click", id);
   const dest = new URL("/checkout", url.origin);
   dest.searchParams.set("product", product);
+  dest.searchParams.set("tid", id);
   if (domain) dest.searchParams.set("domain", domain);
   if (email) dest.searchParams.set("email", email);
   return Response.redirect(dest.toString(), 302);
@@ -2894,6 +3085,41 @@ async function handleSurvey(request, env) {
   return thanks;
 }
 
+async function handleExitIntent(request, env) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  let body = {};
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+  const reason = String(body.reason || "").trim().toLowerCase();
+  if (!EXIT_INTENT_REASONS.has(reason)) {
+    return jsonResponse({ ok: false, error: "invalid_reason" }, 400);
+  }
+  let tid = String(body.tid || body.tracking_id || "").trim();
+  if (tid && !TRACKING_ID_RE.test(tid)) tid = "";
+  const cache = caches.default;
+  const ip = clientIp(request) || "unknown";
+  const debounceKey = new Request(`https://exit.gofixweb/${ip}`);
+  if (await cache.match(debounceKey)) {
+    return jsonResponse({ ok: true, duplicate: true });
+  }
+  await cache.put(debounceKey, new Response("1"), { expirationTtl: 2 });
+  try {
+    await dispatchGithubEvent(env, "email-exit-intent", {
+      tracking_id: tid,
+      reason,
+      at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("exit_intent_dispatch_failed", err);
+  }
+  return jsonResponse({ ok: true });
+}
+
 async function handleUnsubscribe(request, env) {
   const url = new URL(request.url);
   const email = String(url.searchParams.get("email") || "").trim().toLowerCase();
@@ -2948,6 +3174,10 @@ export default {
 
     if (url.pathname === "/checkout") {
       return handleCheckout(request, env);
+    }
+
+    if (url.pathname === "/exit-intent") {
+      return handleExitIntent(request, env);
     }
 
     if (/^\/o\/[A-Za-z0-9]{8,64}$/.test(url.pathname)) {
