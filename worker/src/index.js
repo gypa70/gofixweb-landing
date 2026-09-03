@@ -671,7 +671,33 @@ function summarizeStripeOrders(sessions, snapshot) {
   return out;
 }
 
+function ordersFromSnapshot(snapshot) {
+  const empty = emptyStripeOrders();
+  const raw = snapshot && typeof snapshot.orders === "object" && snapshot.orders
+    ? snapshot.orders
+    : {};
+  const byProduct = { ...empty.byProduct, ...(raw.byProduct || {}) };
+  for (const key of Object.keys(empty.byProduct)) {
+    byProduct[key] = {
+      count: Number(byProduct[key]?.count || 0),
+      amount: Number(byProduct[key]?.amount || 0),
+    };
+  }
+  return {
+    ...empty,
+    ...raw,
+    byProduct,
+    bySeries: raw.bySeries && typeof raw.bySeries === "object" ? raw.bySeries : {},
+    matches: Array.isArray(raw.matches) ? raw.matches : [],
+    qc: {
+      count: Number(raw.qc?.count || 0),
+      amount: Number(raw.qc?.amount || 0),
+    },
+  };
+}
+
 async function fetchStripeCheckoutSessions(env) {
+  /* Párování běží v GHA (refresh-admin-snapshot / persist), ne na /admin. */
   const secret = String(env.STRIPE_SECRET_KEY || "").trim();
   if (!secret) throw new Error("missing_stripe_secret");
   const sessions = [];
@@ -814,7 +840,7 @@ function renderOrdersBox(orders, ordersError) {
     : "";
   return `<div class="orders-box">
     <h2>Objednávky</h2>
-    <p class="hint">${escapeHtml(modeLabel)}. Načteno při otevření stránky (obnova 60 s), ne ze staré cache.
+    <p class="hint">${escapeHtml(modeLabel)}. Ze snapshotu DB (GHA každých 5 min), ne živý Stripe při načtení stránky.
     Objednávky a tržby jsou jen succeeded platby bez refundu od zákazníků.
     Jistá shoda kampaně = stejný e-mail. Pravděpodobná = stejná e-shopová doména, jiný e-mail. Stripe vlnu/sérii neukládá.</p>
     ${err}
@@ -2616,29 +2642,27 @@ async function handleAdminPage(request, env) {
   const suppressed = url.searchParams.get("suppressed") === "1";
   const suppressedAlready = url.searchParams.get("already") === "1";
   const suppressedEmail = String(url.searchParams.get("email") || "").trim().toLowerCase();
-  let snapshot = null;
+  let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
   let error = "";
   let runState = emptyOutreachRunState();
-  try {
-    snapshot = await fetchCampaignSnapshot(env);
-  } catch (err) {
+  const [snapResult, runResult] = await Promise.allSettled([
+    fetchCampaignSnapshot(env),
+    fetchOutreachRunState(env, launchedRunId),
+  ]);
+  if (snapResult.status === "fulfilled") {
+    snapshot = snapResult.value;
+  } else {
+    const err = snapResult.reason;
     error = "Snapshot z DB se nepodařilo načíst: " + String(err && err.message ? err.message : err);
     snapshot = { stats: {}, halt: {}, rows: [], series: {} };
   }
-  try {
-    runState = await fetchOutreachRunState(env, launchedRunId);
-  } catch (err) {
-    console.error("admin_run_state_failed", err);
+  if (runResult.status === "fulfilled") {
+    runState = runResult.value;
+  } else {
+    console.error("admin_run_state_failed", runResult.reason);
   }
-  let orders = emptyStripeOrders();
-  let ordersError = "";
-  try {
-    const sessions = await fetchStripeCheckoutSessions(env);
-    orders = summarizeStripeOrders(sessions, snapshot);
-  } catch (err) {
-    console.error("admin_stripe_orders_failed", err);
-    ordersError = "Stripe objednávky se nepodařilo načíst: " + String(err && err.message ? err.message : err);
-  }
+  const orders = ordersFromSnapshot(snapshot);
+  const ordersError = String(snapshot?.orders?.error || snapshot?.orders_error || "");
   return adminHtmlResponse(renderAdminHtml(snapshot, {
     error, queued, launched, launchedSeries, launchedRunId, autoQueued, autoSizeQueued, suppressed, suppressedAlready, suppressedEmail, runState,
     orders, ordersError,
