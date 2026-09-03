@@ -5,6 +5,8 @@ on:
     branches: ["main"]
     paths:
       - "worker/**"
+      - "blog/posts/**"
+      - "scripts/build_blog.py"
       - ".github/workflows/deploy-worker.yml"
   workflow_dispatch:
 
@@ -13,6 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Build blog from markdown
+        run: python scripts/build_blog.py
 
       - name: Check Cloudflare token
         id: cf

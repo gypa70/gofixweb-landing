@@ -17,6 +17,8 @@
  * POST /wp-onboarding — handshake WordPress REST; uložení credentials běží v GHA.
  */
 
+import { handleBlogRequest } from "./blog.js";
+
 const ALLOWED_ORIGINS = new Set([
   "https://gofixweb.com",
   "https://www.gofixweb.com",
@@ -2610,6 +2612,11 @@ export default {
       }
       await caches.default.delete(unsubCacheKey(email));
       return jsonResponse({ ok: true, email, cleared: true }, 200);
+    }
+
+    if (url.pathname === "/blog" || url.pathname.startsWith("/blog/")) {
+      const blog = handleBlogRequest(request);
+      if (blog) return blog;
     }
 
     if (url.pathname === "/submit") {
