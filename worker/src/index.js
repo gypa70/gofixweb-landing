@@ -1705,6 +1705,7 @@ const COOLDOWN_MS = 5 * 60 * 1000;
 const HALT_BLOCK_TEXT = "Kampaň je zastavená (bounce rate). Nejdřív odemkni halt výše.";
 const RUNNING_BLOCK_TEXT = "Právě běží jiná dávka, počkej na dokončení.";
 const WAVE_LOCK_TEXT = "Odemkne se po úspěšném dokončení nultého kola.";
+const ADMIN_TZ = "Europe/Prague";
 
 async function sha256Hex(value) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value)));
@@ -2020,7 +2021,7 @@ function launchBlockReason(view, runState) {
   if (runState?.running) return RUNNING_BLOCK_TEXT;
   if (view.locked) return WAVE_LOCK_TEXT;
   if (view.cooldown_active && view.cooldown_until) {
-    return `Další dávka této série až po ${view.cooldown_until}.`;
+    return `Další dávka této série až po ${formatWhenPlain(view.cooldown_until)}.`;
   }
   if (view.remaining <= 0 && view.total > 0) {
     return "V této sérii už není koho kontaktovat.";
@@ -2041,7 +2042,7 @@ function validateLaunchServer(snapshot, runState, seriesId, limit) {
   if (runState?.running) return { ok: false, error: RUNNING_BLOCK_TEXT };
   if (view.locked) return { ok: false, error: WAVE_LOCK_TEXT };
   if (view.cooldown_active) {
-    return { ok: false, error: `Další dávka této série až po ${view.cooldown_until}.` };
+    return { ok: false, error: `Další dávka této série až po ${formatWhenPlain(view.cooldown_until)}.` };
   }
   if (view.remaining <= 0 && view.total > 0) {
     return { ok: false, error: "V této sérii už není koho kontaktovat." };
@@ -2052,16 +2053,65 @@ function validateLaunchServer(snapshot, runState, seriesId, limit) {
   return { ok: true, view };
 }
 
-function formatWhen(value) {
-  if (!value) return "—";
-  const raw = String(value);
-  try {
-    const d = new Date(raw);
-    if (Number.isNaN(d.getTime())) return escapeHtml(raw);
-    return escapeHtml(d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC"));
-  } catch {
-    return escapeHtml(raw);
+function parseAdminDate(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  let iso = raw;
+  if (
+    /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(raw)
+    && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)
+  ) {
+    iso = `${raw.replace(" ", "T")}Z`;
   }
+  const parsed = new Date(iso);
+  if (!Number.isNaN(parsed.getTime())) return parsed;
+  const fallback = new Date(raw);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+}
+
+function pragueZoneAbbr(date) {
+  try {
+    const longName = new Intl.DateTimeFormat("en-US", {
+      timeZone: ADMIN_TZ,
+      timeZoneName: "long",
+    }).formatToParts(date).find((part) => part.type === "timeZoneName")?.value || "";
+    if (/summer/i.test(longName) || /CEST/i.test(longName)) return "CEST";
+    if (/standard/i.test(longName) || /\bCET\b/.test(longName)) return "CET";
+    if (/Central European/i.test(longName)) {
+      return /summer/i.test(longName) ? "CEST" : "CET";
+    }
+    const offset = new Intl.DateTimeFormat("en-US", {
+      timeZone: ADMIN_TZ,
+      timeZoneName: "shortOffset",
+    }).formatToParts(date).find((part) => part.type === "timeZoneName")?.value || "";
+    if (/\+0?2/.test(offset)) return "CEST";
+    if (/\+0?1/.test(offset)) return "CET";
+  } catch {
+    /* Intl offset labels se liší podle runtime — CET je zimní fallback. */
+  }
+  return "CET";
+}
+
+function formatWhenPlain(value) {
+  if (!value) return "—";
+  const date = parseAdminDate(value);
+  if (!date) return String(value);
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: ADMIN_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (type) => parts.find((part) => part.type === type)?.value || "";
+  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")} ${pragueZoneAbbr(date)}`;
+}
+
+function formatWhen(value) {
+  return escapeHtml(formatWhenPlain(value));
 }
 
 function statusClass(kind, value) {
