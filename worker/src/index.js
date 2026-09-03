@@ -696,6 +696,50 @@ function ordersFromSnapshot(snapshot) {
   };
 }
 
+const ADMIN_ORDERS_CACHE = "https://admin.gofixweb/orders-v1";
+const ADMIN_ORDERS_TTL_SEC = 600;
+
+async function putAdminOrdersCache(orders) {
+  await caches.default.put(
+    ADMIN_ORDERS_CACHE,
+    new Response(JSON.stringify(orders), {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": `max-age=${ADMIN_ORDERS_TTL_SEC}`,
+      },
+    }),
+    { expirationTtl: ADMIN_ORDERS_TTL_SEC },
+  );
+}
+
+async function readAdminOrdersCache() {
+  const hit = await caches.default.match(ADMIN_ORDERS_CACHE);
+  if (!hit) return null;
+  try {
+    const raw = await hit.json();
+    if (!raw || typeof raw !== "object") return null;
+    return ordersFromSnapshot({ orders: raw });
+  } catch {
+    return null;
+  }
+}
+
+async function refreshAdminOrdersCache(env) {
+  const snapshot = await fetchCampaignSnapshot(env);
+  const sessions = await fetchStripeCheckoutSessions(env);
+  const orders = summarizeStripeOrders(sessions, snapshot);
+  orders.source = "worker-cron";
+  orders.computed_at = new Date().toISOString();
+  await putAdminOrdersCache(orders);
+  return orders;
+}
+
+async function resolveAdminOrders(snapshot) {
+  const cached = await readAdminOrdersCache();
+  if (cached && Number(cached.fetched || 0) > 0) return cached;
+  return ordersFromSnapshot(snapshot);
+}
+
 async function fetchStripeCheckoutSessions(env) {
   /* Párování běží v GHA (refresh-admin-snapshot / persist), ne na /admin. */
   const secret = String(env.STRIPE_SECRET_KEY || "").trim();
@@ -2661,7 +2705,7 @@ async function handleAdminPage(request, env) {
   } else {
     console.error("admin_run_state_failed", runResult.reason);
   }
-  const orders = ordersFromSnapshot(snapshot);
+  const orders = await resolveAdminOrders(snapshot);
   const ordersError = String(snapshot?.orders?.error || snapshot?.orders_error || "");
   return adminHtmlResponse(renderAdminHtml(snapshot, {
     error, queued, launched, launchedSeries, launchedRunId, autoQueued, autoSizeQueued, suppressed, suppressedAlready, suppressedEmail, runState,
@@ -3303,6 +3347,13 @@ async function handleUnsubStatus(request, env) {
 }
 
 export default {
+  async scheduled(_controller, env, ctx) {
+    ctx.waitUntil(
+      refreshAdminOrdersCache(env).catch((err) => {
+        console.error("admin_orders_cron_failed", err);
+      }),
+    );
+  },
   async fetch(request, env, ctx) {
     const aliasRedirect = aliasTldRedirect(request);
     if (aliasRedirect) return aliasRedirect;
