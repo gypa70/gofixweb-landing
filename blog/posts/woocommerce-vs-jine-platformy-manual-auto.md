@@ -21,13 +21,13 @@ WooCommerce běží na WordPressu. WordPress má Application Password — token 
 - zkomprimovat obrázky,
 - nainstalovat doporučené SEO pluginy.
 
-To je varianta **Auto (4 990 Kč)**. Neděláme to na Shoptetu ani Shopify, protože tam stejný, zákazníkem kdykoliv odvolatelný kanál nemáme — a nechceme si nechat posílat hlavní hesla.
+To je varianta **Auto (1 990 Kč)**. Neděláme to na Shoptetu ani Shopify, protože tam stejný, zákazníkem kdykoliv odvolatelný kanál nemáme — a nechceme si nechat posílat hlavní hesla.
 
 Před úpravou si ukládáme původní stav, aby šlo jít zpět. Podrobnosti jsou v [FAQ](/#faq).
 
 ## Manuál: jakýkoliv e-shop, úpravy u vás
 
-**Manuál (3 990 Kč)** je PDF s konkrétními kroky: co kam vložit ve vaší administraci. Tempo držíte vy. Funguje to, i když e-shop není na WordPressu.
+**Manuál (1 990 Kč)** je PDF s konkrétními kroky: co kam vložit ve vaší administraci. Tempo držíte vy. Funguje to, i když e-shop není na WordPressu.
 
 Když scan pozná, že nejde o WooCommerce, Auto se nenabízí. Není to penalizace platformy. Je to hranice toho, co lze bezpečně automatizovat.
 

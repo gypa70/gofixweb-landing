@@ -11,7 +11,7 @@
  *   ADMIN_BASIC_USER     — volitelně (default gofixweb)
  *   UNSUBSCRIBE_SECRET   — HMAC pro /unsubscribe a /unsub-status
  *
- * GET /checkout — nabídka (manual_fix 3 990 Kč / wp_autofix 4 990 Kč + VOP);
+ * GET /checkout — nabídka (manual_fix / wp_autofix, obě 1 990 Kč; Auto + VOP);
  *   POST /checkout spustí Stripe Checkout Session.
  * POST /exit-intent — důvod odchodu z nabídky (price|trust|dismiss).
  * GET /survey/{id} — follow-up dotazník (price|trust|other) po CTA kliku bez platby.
@@ -49,10 +49,15 @@ function aliasTldRedirect(request) {
   return Response.redirect(dest.toString(), 301);
 }
 
-const COMPLETE_AUDIT_AMOUNT = 499000;
-const MANUAL_FIX_AMOUNT = 399000;
+const ONE_TIME_FIX_AMOUNT = 199000;
+const LEGACY_MANUAL_FIX_AMOUNT = 399000;
+const LEGACY_AUTO_OR_AUDIT_AMOUNT = 499000;
+const COMPLETE_AUDIT_AMOUNT = LEGACY_AUTO_OR_AUDIT_AMOUNT;
+const MANUAL_FIX_AMOUNT = ONE_TIME_FIX_AMOUNT;
 const COMPLETE_AUDIT_CURRENCY = "czk";
 const STRIPE_COMPLETE_AUDIT_PAYMENT_LINK = "plink_1RUHIXFNuCwT88vQ2QjVj3Dz";
+const STRIPE_MANUAL_FIX_PRICE_ID = "price_1UBU78Gx3oG33hb4pxNKgtEP";
+const STRIPE_AUTO_FIX_PRICE_ID = "price_1UBU79Gx3oG33hb4lTT3JdEW";
 const MANUAL_FIX_NAME = "Manuální oprava e-shopu";
 const AUTO_FIX_NAME = "Automatická oprava e-shopu";
 const MANUAL_FIX_DESCRIPTION =
@@ -367,9 +372,9 @@ function paidAuditProduct(session) {
   const ref = String(
     session?.client_reference_id || session?.metadata?.product || "",
   ).trim();
-  if (ref === "manual_fix" || amountTotal === MANUAL_FIX_AMOUNT) return "manual_fix";
+  if (ref === "manual_fix" || amountTotal === LEGACY_MANUAL_FIX_AMOUNT) return "manual_fix";
   if (ref === "wp_autofix") return "wp_autofix";
-  if (amountTotal === COMPLETE_AUDIT_AMOUNT || ref === "complete_audit") return "complete_audit";
+  if (amountTotal === LEGACY_AUTO_OR_AUDIT_AMOUNT || ref === "complete_audit") return "complete_audit";
   return null;
 }
 
@@ -413,16 +418,16 @@ function classifyCheckoutProduct(session) {
   const ref = String(session?.client_reference_id || meta.product || "").trim();
   const paymentLink = sessionPaymentLinkId(session);
 
-  if (ref === "manual_fix" || amountTotal === MANUAL_FIX_AMOUNT) {
-    return { product: "manual_fix", ambiguous: false, amount: Number.isFinite(amountTotal) ? amountTotal : MANUAL_FIX_AMOUNT };
+  if (ref === "manual_fix" || amountTotal === LEGACY_MANUAL_FIX_AMOUNT) {
+    return { product: "manual_fix", ambiguous: false, amount: Number.isFinite(amountTotal) ? amountTotal : LEGACY_MANUAL_FIX_AMOUNT };
   }
   if (ref === "wp_autofix") {
-    return { product: "wp_autofix", ambiguous: false, amount: Number.isFinite(amountTotal) ? amountTotal : COMPLETE_AUDIT_AMOUNT };
+    return { product: "wp_autofix", ambiguous: false, amount: Number.isFinite(amountTotal) ? amountTotal : ONE_TIME_FIX_AMOUNT };
   }
   if (ref === "complete_audit" || paymentLink === STRIPE_COMPLETE_AUDIT_PAYMENT_LINK) {
-    return { product: "complete_audit", ambiguous: false, amount: Number.isFinite(amountTotal) ? amountTotal : COMPLETE_AUDIT_AMOUNT };
+    return { product: "complete_audit", ambiguous: false, amount: Number.isFinite(amountTotal) ? amountTotal : LEGACY_AUTO_OR_AUDIT_AMOUNT };
   }
-  if (amountTotal === COMPLETE_AUDIT_AMOUNT) {
+  if (amountTotal === LEGACY_AUTO_OR_AUDIT_AMOUNT) {
     return { product: "ambiguous_4990", ambiguous: true, amount: amountTotal };
   }
   return null;
@@ -1383,7 +1388,7 @@ function checkoutOfferPage({
 } = {}) {
   const isAuto = product === "wp_autofix";
   const title = isAuto ? AUTO_FIX_NAME : MANUAL_FIX_NAME;
-  const priceLabel = isAuto ? "4 990 Kč" : "3 990 Kč";
+  const priceLabel = "1 990 Kč";
   const blurb = isAuto ? AUTO_FIX_DESCRIPTION : MANUAL_FIX_DESCRIPTION;
   const intro = isAuto
     ? "Před platbou je potřeba souhlas s obchodními podmínkami a se zásahem do webu."
@@ -1567,9 +1572,14 @@ async function handleCheckout(request, env) {
     }
   }
 
-  const amount = product === "manual_fix" ? MANUAL_FIX_AMOUNT : COMPLETE_AUDIT_AMOUNT;
+  const amount = ONE_TIME_FIX_AMOUNT;
   const name = product === "manual_fix" ? MANUAL_FIX_NAME : AUTO_FIX_NAME;
   const description = product === "manual_fix" ? MANUAL_FIX_DESCRIPTION : AUTO_FIX_DESCRIPTION;
+  const priceId = String(
+    product === "manual_fix"
+      ? env.STRIPE_MANUAL_FIX_PRICE_ID || STRIPE_MANUAL_FIX_PRICE_ID
+      : env.STRIPE_AUTO_FIX_PRICE_ID || STRIPE_AUTO_FIX_PRICE_ID,
+  ).trim();
   let successUrl = "https://gofixweb.com/";
   if (product === "wp_autofix") {
     const next = new URL(ONBOARDING_URL);
@@ -1594,11 +1604,15 @@ async function handleCheckout(request, env) {
   if (domain) body.set("metadata[domain]", domain);
   if (email && EMAIL_RE.test(email)) body.set("customer_email", email);
   body.set("line_items[0][quantity]", "1");
-  body.set("line_items[0][price_data][currency]", COMPLETE_AUDIT_CURRENCY);
-  body.set("line_items[0][price_data][unit_amount]", String(amount));
-  body.set("line_items[0][price_data][product_data][name]", name);
-  body.set("line_items[0][price_data][product_data][description]", description);
-  body.set("line_items[0][price_data][product_data][tax_code]", "txcd_10000000");
+  if (priceId) {
+    body.set("line_items[0][price]", priceId);
+  } else {
+    body.set("line_items[0][price_data][currency]", COMPLETE_AUDIT_CURRENCY);
+    body.set("line_items[0][price_data][unit_amount]", String(amount));
+    body.set("line_items[0][price_data][product_data][name]", name);
+    body.set("line_items[0][price_data][product_data][description]", description);
+    body.set("line_items[0][price_data][product_data][tax_code]", "txcd_10000000");
+  }
   body.set("managed_payments[enabled]", "false");
   body.set("locale", "cs");
 
