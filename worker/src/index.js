@@ -1599,6 +1599,21 @@ function hasEngagementTs(value) {
   return Boolean(value && String(value).trim());
 }
 
+function engagementRank(row) {
+  if (hasEngagementTs(row?.replied_at)) return 3;
+  if (hasEngagementTs(row?.clicked_at)) return 2;
+  if (hasEngagementTs(row?.opened_at)) return 1;
+  return 0;
+}
+
+function sortAdminDeliveryRows(rows) {
+  return [...rows].sort((a, b) => {
+    const rankDiff = engagementRank(b) - engagementRank(a);
+    if (rankDiff) return rankDiff;
+    return String(b?.sent_at || "").localeCompare(String(a?.sent_at || ""));
+  });
+}
+
 function engagementRowClass(row) {
   if (hasEngagementTs(row?.replied_at)) return "eng-replied";
   if (hasEngagementTs(row?.clicked_at)) return "eng-clicked";
@@ -1689,7 +1704,7 @@ function renderAdminHtml(snapshot, {
 } = {}) {
   const stats = snapshot?.stats || {};
   const halt = snapshot?.halt || {};
-  const rows = Array.isArray(snapshot?.rows) ? snapshot.rows : [];
+  const rows = sortAdminDeliveryRows(Array.isArray(snapshot?.rows) ? snapshot.rows : []);
   const halted = Boolean(halt.halted || stats.halted);
   const haltClass = halted ? "halt-on" : "halt-off";
   const haltLabel = halted ? "ZAPNUTO" : "VYPNUTO";
