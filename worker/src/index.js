@@ -2170,9 +2170,9 @@ function renderAdminHtml(snapshot, {
     th, td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
     th { color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
     td.reason { color: var(--text-light); max-width: 280px; word-break: break-word; }
-    tr.eng-opened td { background: rgba(14, 165, 233, 0.42); }
-    tr.eng-clicked td { background: rgba(34, 197, 94, 0.45); }
-    tr.eng-replied td { background: rgba(249, 115, 22, 0.46); }
+    tr.eng-opened td { background: rgba(14, 165, 233, 0.72); }
+    tr.eng-clicked td { background: rgba(34, 197, 94, 0.74); }
+    tr.eng-replied td { background: rgba(249, 115, 22, 0.76); }
     tr.eng-opened td:first-child { box-shadow: inset 4px 0 0 #38bdf8; }
     tr.eng-clicked td:first-child { box-shadow: inset 4px 0 0 #4ade80; }
     tr.eng-replied td:first-child { box-shadow: inset 4px 0 0 #fb923c; }
