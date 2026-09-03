@@ -24,6 +24,29 @@ const ALLOWED_ORIGINS = new Set([
   "https://www.gofixweb.com",
 ]);
 
+const ALIAS_TLD_HOSTS = new Set([
+  "gofixweb.cz",
+  "www.gofixweb.cz",
+  "gofixweb.eu",
+  "www.gofixweb.eu",
+  "gofixweb.de",
+  "www.gofixweb.de",
+  "gofixweb.ai",
+  "www.gofixweb.ai",
+]);
+
+function aliasTldRedirect(request) {
+  const url = new URL(request.url);
+  if (!ALIAS_TLD_HOSTS.has(url.hostname.toLowerCase())) return null;
+  const dest = new URL(request.url);
+  dest.protocol = "https:";
+  dest.hostname = "gofixweb.com";
+  dest.port = "";
+  dest.username = "";
+  dest.password = "";
+  return Response.redirect(dest.toString(), 301);
+}
+
 const COMPLETE_AUDIT_AMOUNT = 499000;
 const MANUAL_FIX_AMOUNT = 399000;
 const COMPLETE_AUDIT_CURRENCY = "czk";
@@ -2535,6 +2558,9 @@ async function handleUnsubStatus(request, env) {
 
 export default {
   async fetch(request, env, ctx) {
+    const aliasRedirect = aliasTldRedirect(request);
+    if (aliasRedirect) return aliasRedirect;
+
     const url = new URL(request.url);
     const origin = request.headers.get("Origin") || "";
 

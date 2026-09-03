@@ -1,0 +1,42 @@
+name: Setup TLD 301 redirects
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Cloudflare zones, SSL settings, and 301 rules
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PORKBUN_API_KEY: ${{ secrets.PORKBUN_API_KEY }}
+          PORKBUN_SECRET_API_KEY: ${{ secrets.PORKBUN_SECRET_API_KEY }}
+        run: python scripts/setup_tld_redirects.py
+
+      - name: Verify token can list zones
+        if: failure()
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ]; then
+            echo "CLOUDFLARE_API_TOKEN is empty"
+            exit 1
+          fi
+          curl -sS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/user/tokens/verify" \
+            | python -c "import sys,json; d=json.load(sys.stdin); print(json.dumps(d, indent=2)[:2000])"
+
+  verify:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe SSL and 301 from a clean network
+        run: python scripts/verify_tld_redirects.py
+        env:
+          VERIFY_STRICT: "false"
