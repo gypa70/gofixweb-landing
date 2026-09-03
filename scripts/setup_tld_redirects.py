@@ -134,13 +134,22 @@ def get_zone(name: str) -> dict[str, Any] | None:
     return rows[0] if rows else None
 
 
-def ensure_zone(name: str, acc: str) -> dict[str, Any]:
+def list_all_zones() -> list[dict[str, Any]]:
+    payload = cf("GET", "/zones?per_page=50")
+    rows = payload.get("result") or []
+    print(f"Cloudflare zones visible to token: {len(rows)}")
+    for row in rows:
+        print(f"  - {row.get('name')} id={row.get('id')} status={row.get('status')}")
+    return rows
+
+
+def ensure_zone(name: str, acc: str) -> dict[str, Any] | None:
     existing = get_zone(name)
     if existing:
         print(f"[{name}] zone exists id={existing['id']} status={existing.get('status')}")
         return existing
     print(f"[{name}] creating zone")
-    payload = cf(
+    status, payload = cf_try(
         "POST",
         "/zones",
         {
@@ -150,6 +159,9 @@ def ensure_zone(name: str, acc: str) -> dict[str, Any]:
             "type": "full",
         },
     )
+    if status >= 400 or not payload.get("success"):
+        print(f"[{name}] zone create failed HTTP {status}: {payload.get('errors') or payload}")
+        return None
     zone = payload["result"]
     print(f"[{name}] created id={zone['id']} ns={zone.get('name_servers')}")
     return zone
@@ -329,12 +341,17 @@ def main() -> None:
 
     acc = account_id()
     print(f"Account {acc}")
+    list_all_zones()
 
     zones: dict[str, dict[str, Any]] = {}
+    missing: list[str] = []
     for name in DOMAINS:
         if name == PRIMARY:
             die("refusing to modify gofixweb.com")
         zone = ensure_zone(name, acc)
+        if not zone:
+            missing.append(name)
+            continue
         zones[name] = zone
         ensure_web_and_mail_dns(zone)
         ensure_https_settings(zone["id"], name)
@@ -342,7 +359,6 @@ def main() -> None:
         ns = zone.get("name_servers") or []
         print(f"[{name}] Cloudflare NS: {ns}")
         print(f"[{name}] SSL pack status: {ssl_status(zone['id'])}")
-        # .cz registrar is Websupport, not Porkbun.
         if name.endswith(".cz"):
             print(f"[{name}] Websupport registrar — NS must be changed there, not Porkbun")
             print(f"[{name}] target NS: {', '.join(ns)}")
@@ -354,6 +370,15 @@ def main() -> None:
         print(
             f"{name}: zone={zone['id']} status={zone.get('status')} "
             f"ns={zone.get('name_servers')} ssl={ssl_status(zone['id'])}"
+        )
+    if missing:
+        die(
+            "No Cloudflare zone for: "
+            + ", ".join(missing)
+            + ". Need Cloudflare token permission Zone:Edit "
+            + "(com.cloudflare.api.account.zone.create) plus registrar API "
+            + "(Porkbun for .eu/.de/.ai, Websupport for .cz) to point NS at Cloudflare. "
+            + "MX/mail on gofixweb.com was not changed."
         )
 
 
