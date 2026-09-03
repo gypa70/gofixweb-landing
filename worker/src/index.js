@@ -438,8 +438,12 @@ function emptyStripeOrders() {
     },
     bySeries: {},
     matched: 0,
+    matchedEmail: 0,
+    matchedDomain: 0,
+    matchedClicked: 0,
     unmatched: 0,
     matchedNoSeries: 0,
+    matches: [],
     liveMode: null,
     fetched: 0,
     qc: { count: 0, amount: 0 },
@@ -447,20 +451,97 @@ function emptyStripeOrders() {
   };
 }
 
+const GENERIC_MAIL_DOMAINS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "seznam.cz",
+  "email.cz",
+  "post.cz",
+  "outlook.com",
+  "outlook.cz",
+  "hotmail.com",
+  "hotmail.cz",
+  "live.com",
+  "msn.com",
+  "yahoo.com",
+  "yahoo.cz",
+  "icloud.com",
+  "me.com",
+  "aol.com",
+  "proton.me",
+  "protonmail.com",
+  "centrum.cz",
+  "atlas.cz",
+  "volny.cz",
+  "zoznam.sk",
+  "azet.sk",
+  "mail.com",
+  "gmx.com",
+  "gmx.de",
+]);
+
+function isGenericMailDomain(domain) {
+  return GENERIC_MAIL_DOMAINS.has(String(domain || "").trim().toLowerCase());
+}
+
+function hasOrderTs(value) {
+  return Boolean(value && String(value).trim());
+}
+
+function earlierOrderTs(left, right) {
+  const a = hasOrderTs(left) ? String(left).trim() : "";
+  const b = hasOrderTs(right) ? String(right).trim() : "";
+  if (!a) return b;
+  if (!b) return a;
+  return a <= b ? a : b;
+}
+
+function contactRecord(raw) {
+  const email = String(raw?.email || "").trim().toLowerCase();
+  const domain = String(raw?.domain || "").trim().toLowerCase().replace(/^www\./i, "");
+  return {
+    email,
+    domain,
+    series_id: raw?.series_id || null,
+    sent_at: raw?.sent_at || null,
+    clicked_at: raw?.clicked_at || null,
+  };
+}
+
+function mergeContactRecord(existing, incoming) {
+  if (!existing) return incoming;
+  return {
+    email: existing.email || incoming.email,
+    domain: existing.domain || incoming.domain,
+    series_id: existing.series_id || incoming.series_id,
+    sent_at: earlierOrderTs(existing.sent_at, incoming.sent_at) || null,
+    clicked_at: earlierOrderTs(existing.clicked_at, incoming.clicked_at) || null,
+  };
+}
+
+function betterDomainContact(existing, incoming) {
+  if (!existing) return incoming;
+  if (!incoming) return existing;
+  const existingClick = hasOrderTs(existing.clicked_at);
+  const incomingClick = hasOrderTs(incoming.clicked_at);
+  if (incomingClick !== existingClick) return incomingClick ? incoming : existing;
+  const existingSent = String(existing.sent_at || "");
+  const incomingSent = String(incoming.sent_at || "");
+  if (incomingSent && (!existingSent || incomingSent < existingSent)) return incoming;
+  if (incoming.series_id && !existing.series_id) return incoming;
+  return existing;
+}
+
 function buildContactIndex(snapshot) {
   const byEmail = new Map();
   const byDomain = new Map();
   const add = (raw) => {
-    const email = String(raw?.email || "").trim().toLowerCase();
-    const domain = String(raw?.domain || "").trim().toLowerCase().replace(/^www\./i, "");
-    const seriesId = raw?.series_id || null;
-    if (email && !byEmail.has(email)) {
-      byEmail.set(email, { email, domain, series_id: seriesId });
-    } else if (email && seriesId && !byEmail.get(email).series_id) {
-      byEmail.get(email).series_id = seriesId;
+    const rec = contactRecord(raw);
+    if (rec.email) {
+      byEmail.set(rec.email, mergeContactRecord(byEmail.get(rec.email), rec));
     }
-    if (domain && !byDomain.has(domain)) {
-      byDomain.set(domain, { email, domain, series_id: seriesId });
+    if (rec.domain && !isGenericMailDomain(rec.domain)) {
+      byDomain.set(rec.domain, betterDomainContact(byDomain.get(rec.domain), rec));
     }
   };
   for (const row of Array.isArray(snapshot?.contacts) ? snapshot.contacts : []) add(row);
@@ -473,13 +554,50 @@ function matchOrderToCampaign(session, index) {
   const domain = sessionDomain(session);
   if (email && index.byEmail.has(email)) {
     const hit = index.byEmail.get(email);
-    return { matched: true, how: "email", series_id: hit.series_id || null };
+    return {
+      matched: true,
+      how: "email",
+      probable: false,
+      series_id: hit.series_id || null,
+      contact: hit,
+    };
   }
-  if (domain && index.byDomain.has(domain)) {
+  if (domain && !isGenericMailDomain(domain) && index.byDomain.has(domain)) {
     const hit = index.byDomain.get(domain);
-    return { matched: true, how: "domain", series_id: hit.series_id || null };
+    return {
+      matched: true,
+      how: "domain",
+      probable: true,
+      series_id: hit.series_id || null,
+      contact: hit,
+    };
   }
-  return { matched: false, how: null, series_id: null };
+  return { matched: false, how: null, probable: false, series_id: null, contact: null };
+}
+
+function sessionPaidAtIso(session) {
+  const created = Number(session?.created);
+  if (Number.isFinite(created) && created > 0) {
+    return new Date(created * 1000).toISOString();
+  }
+  return "";
+}
+
+function clickedBeforePayment(clickedAt, paidAtIso) {
+  if (!hasOrderTs(clickedAt)) return false;
+  if (!paidAtIso) return true;
+  const clickMs = Date.parse(String(clickedAt));
+  const paidMs = Date.parse(String(paidAtIso));
+  if (Number.isNaN(clickMs) || Number.isNaN(paidMs)) return true;
+  return clickMs <= paidMs;
+}
+
+function orderProductLabel(product) {
+  if (product === "manual_fix") return "Manuál";
+  if (product === "wp_autofix") return "Auto";
+  if (product === "complete_audit") return "Kompletní audit";
+  if (product === "ambiguous_4990") return "4 990 Kč (nerozlišené)";
+  return product || "—";
 }
 
 function summarizeStripeOrders(sessions, snapshot) {
@@ -511,6 +629,11 @@ function summarizeStripeOrders(sessions, snapshot) {
     const match = matchOrderToCampaign(session, index);
     if (match.matched) {
       out.matched += 1;
+      if (match.how === "email") out.matchedEmail += 1;
+      if (match.how === "domain") out.matchedDomain += 1;
+      const paidAt = sessionPaidAtIso(session);
+      const clicked = clickedBeforePayment(match.contact?.clicked_at, paidAt);
+      if (clicked) out.matchedClicked += 1;
       if (match.series_id) {
         if (!out.bySeries[match.series_id]) {
           out.bySeries[match.series_id] = { count: 0, amount: 0 };
@@ -520,10 +643,24 @@ function summarizeStripeOrders(sessions, snapshot) {
       } else {
         out.matchedNoSeries += 1;
       }
+      out.matches.push({
+        domain: match.contact?.domain || sessionDomain(session) || "",
+        contact_email: match.contact?.email || "",
+        payer_email: sessionCustomerEmail(session),
+        product: classified.product,
+        amount,
+        teaser_at: match.contact?.sent_at || "",
+        paid_at: paidAt,
+        how: match.how,
+        probable: Boolean(match.probable),
+        clicked,
+        series_id: match.series_id || "",
+      });
     } else {
       out.unmatched += 1;
     }
   }
+  out.matches.sort((a, b) => String(b.paid_at || "").localeCompare(String(a.paid_at || "")));
   return out;
 }
 
@@ -565,6 +702,85 @@ function formatCzkFromHalere(halere) {
   return `${czk.toLocaleString("cs-CZ")} Kč`;
 }
 
+function csvEscape(value) {
+  const raw = String(value ?? "");
+  if (/[",\n]/.test(raw)) return `"${raw.replace(/"/g, '""')}"`;
+  return raw;
+}
+
+function matchedOrdersCsvHref(matches) {
+  const header = [
+    "shoda",
+    "domena",
+    "email_kontaktu",
+    "email_platby",
+    "produkt",
+    "castka_kc",
+    "teaser",
+    "platba",
+    "klik_pred_platbou",
+  ];
+  const lines = [header.join(",")];
+  for (const row of matches) {
+    lines.push([
+      row.probable ? "pravdepodobna_domena" : "jista_email",
+      csvEscape(row.domain),
+      csvEscape(row.contact_email),
+      csvEscape(row.payer_email),
+      csvEscape(orderProductLabel(row.product)),
+      csvEscape(Math.round(Number(row.amount || 0) / 100)),
+      csvEscape(row.teaser_at),
+      csvEscape(row.paid_at),
+      row.clicked ? "ano" : "ne",
+    ].join(","));
+  }
+  return `data:text/csv;charset=utf-8,${encodeURIComponent(lines.join("\n"))}`;
+}
+
+function renderMatchedOrdersDetail(data) {
+  const matches = Array.isArray(data.matches) ? data.matches : [];
+  if (!matches.length) return "";
+  const rows = matches.map((row) => {
+    const trClass = row.clicked ? ' class="eng-clicked"' : "";
+    const how = row.probable
+      ? `<span class="probable-tag">pravděpodobná (doména)</span>`
+      : `<span class="exact-tag">jistá (e-mail)</span>`;
+    return `<tr${trClass}>
+      <td>${escapeHtml(row.domain || "—")}</td>
+      <td>${escapeHtml(row.contact_email || "—")}</td>
+      <td>${escapeHtml(row.payer_email || "—")}</td>
+      <td>${escapeHtml(orderProductLabel(row.product))}</td>
+      <td>${escapeHtml(formatCzkFromHalere(row.amount))}</td>
+      <td>${formatWhen(row.teaser_at)}</td>
+      <td>${formatWhen(row.paid_at)}</td>
+      <td>${how}</td>
+    </tr>`;
+  }).join("");
+  return `<details class="orders-match-details">
+    <summary>Spárované konverze — ${escapeHtml(matches.length)} k ruční kontrole</summary>
+    <p class="hint">Zelený řádek = kontakt před platbou kliknul na CTA v teaseru.
+    Pravděpodobná shoda = jiný e-mail na stejné doméně než v kampani (ne Gmail/Seznam a podobné schránky).</p>
+    <p class="hint"><a href="${matchedOrdersCsvHref(matches)}" download="gofixweb-sparovane-konverze.csv">Stáhnout CSV</a></p>
+    <div class="orders-match-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Doména</th>
+            <th>E-mail kontaktu</th>
+            <th>E-mail platby</th>
+            <th>Produkt</th>
+            <th>Částka</th>
+            <th>Teaser</th>
+            <th>Platba</th>
+            <th>Shoda</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </details>`;
+}
+
 function renderOrdersBox(orders, ordersError) {
   const data = orders || emptyStripeOrders();
   const qc = data.qc || { count: 0, amount: 0 };
@@ -586,11 +802,14 @@ function renderOrdersBox(orders, ordersError) {
   const ambiguousNote = ambiguous
     ? `<p class="hint">Nerozlišené 4 990 Kč: ${ambiguous} — stejná cena Auto i Kompletní audit; bez metadata.product / client_reference_id je nejde spolehlivě oddělit.</p>`
     : "";
+  const matchHint = data.matched
+    ? `<p class="hint">Spárováno: ${escapeHtml(data.matchedEmail)} jistá shoda e-mailu · ${escapeHtml(data.matchedDomain)} pravděpodobná shoda domény · ${escapeHtml(data.matchedClicked)} s klikem na CTA před platbou.</p>`
+    : "";
   return `<div class="orders-box">
     <h2>Objednávky</h2>
     <p class="hint">${escapeHtml(modeLabel)}. Načteno při otevření stránky (obnova 60 s), ne ze staré cache.
     Objednávky a tržby jsou jen succeeded platby bez refundu od zákazníků.
-    Párování na kampaň je jen podle e-mailu nebo domény — Stripe neukládá vlnu/sérii.</p>
+    Jistá shoda kampaně = stejný e-mail. Pravděpodobná = stejná e-shopová doména, jiný e-mail. Stripe vlnu/sérii neukládá.</p>
     ${err}
     <div class="cards">
       <div class="card"><div class="k">Objednávky</div><div class="v">${escapeHtml(data.count)}</div></div>
@@ -605,11 +824,13 @@ function renderOrdersBox(orders, ordersError) {
     ${excluded
       ? `<p class="hint">Vyřazeno (refund / reverse / storno): ${escapeHtml(excluded)}.</p>`
       : ""}
+    ${matchHint}
     ${seriesLines}
     ${data.matchedNoSeries
       ? `<p class="hint">Spárováno s kontaktem, ale bez vlny: ${escapeHtml(data.matchedNoSeries)}.</p>`
       : ""}
     ${ambiguousNote}
+    ${renderMatchedOrdersDetail(data)}
   </div>`;
 }
 
@@ -1931,6 +2152,12 @@ function renderAdminHtml(snapshot, {
     .orders-box h2 { font-size: 1.05rem; margin-bottom: 0.35rem; }
     .orders-box .cards { margin-top: 0.75rem; }
     .orders-box .card .v { font-size: 1.05rem; font-weight: 700; }
+    .orders-match-details { margin-top: 0.85rem; }
+    .orders-match-details > summary { cursor: pointer; color: var(--green); font-weight: 600; }
+    .orders-match-table { overflow-x: auto; margin-top: 0.55rem; }
+    .orders-match-table table { min-width: 760px; }
+    .probable-tag { color: var(--warn); font-size: 0.75rem; font-weight: 600; }
+    .exact-tag { color: #4ade80; font-size: 0.75rem; font-weight: 600; }
     .suppress-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.55rem; margin-top: 0.7rem; }
     .suppress-form label { color: var(--text-muted); font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.25rem; flex: 1 1 180px; }
     .suppress-form input[type=email],
