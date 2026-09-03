@@ -14,7 +14,7 @@
  * GET /checkout — nabídka (manual_fix / wp_autofix, obě 1 990 Kč; Auto + VOP);
  *   POST /checkout spustí Stripe Checkout Session.
  * POST /exit-intent — důvod odchodu z nabídky (price|trust|dismiss).
- * GET /survey/{id} — follow-up dotazník (price|trust|other) po CTA kliku bez platby.
+ * GET /survey/{id} — follow-up dotazník (price|trust|other) z 48h nebo 2h e-mailu.
  * POST /submit — formulář: whitelist e-mail spustí free scan, ostatní jen poptávku.
  * POST /wp-onboarding — handshake WordPress REST; uložení credentials běží v GHA.
  */
@@ -841,41 +841,61 @@ function renderOrdersBox(orders, ordersError) {
   </div>`;
 }
 
-function emptySurveyStats() {
-  return { sent: 0, price: 0, trust: 0, other: 0, pending: 0 };
+function emptyWhyNotBuyStats() {
+  return {
+    price: 0,
+    trust: 0,
+    other: 0,
+    dismiss: 0,
+    pending: 0,
+    answered: 0,
+    sent_emails: 0,
+    by_source: {
+      exit_intent: { label: "Exit-intent popup", price: 0, trust: 0, other: 0, dismiss: 0, total: 0 },
+      click_48h: { label: "48h e-mail po kliku", price: 0, trust: 0, other: 0, pending: 0, sent: 0 },
+      open_2h: { label: "2h e-mail po otevření", price: 0, trust: 0, other: 0, pending: 0, sent: 0 },
+    },
+  };
 }
 
-function emptyExitIntentStats() {
-  return { price: 0, trust: 0, dismiss: 0, total: 0 };
+function sourceLine(row, extras) {
+  const data = row && typeof row === "object" ? row : {};
+  const label = escapeHtml(data.label || "");
+  const bits = extras
+    .map(([key, name]) => `${name} ${escapeHtml(data[key] ?? 0)}`)
+    .join(" · ");
+  return `<p class="hint"><strong>${label}:</strong> ${bits}</p>`;
 }
 
-function renderSurveyBox(survey) {
-  const data = survey && typeof survey === "object" ? survey : emptySurveyStats();
+function renderWhyNotBuyBox(why) {
+  const data = why && typeof why === "object" ? why : emptyWhyNotBuyStats();
+  const src = data.by_source && typeof data.by_source === "object"
+    ? data.by_source
+    : emptyWhyNotBuyStats().by_source;
   return `<div class="orders-box">
-    <h2>Proč nekoupili</h2>
-    <p class="hint">Follow-up 48 hodin po kliku na CTA, bez spárované Stripe platby (stejná logika jako Objednávky). Max. jeden e-mail na kontakt, suppression list platí.</p>
+    <h2>Proč nekoupili/neklikli</h2>
+    <p class="hint">Sjednocené odpovědi z exit-intent popupu, 48h e-mailu po kliku bez platby a 2h e-mailu po otevření bez kliku. Max. jeden e-mail daného typu na kontakt, suppression list platí.</p>
     <div class="cards">
       <div class="card"><div class="k">Cena</div><div class="v">${escapeHtml(data.price ?? 0)}</div></div>
       <div class="card"><div class="k">Důvěra</div><div class="v">${escapeHtml(data.trust ?? 0)}</div></div>
       <div class="card"><div class="k">Jiné</div><div class="v">${escapeHtml(data.other ?? 0)}</div></div>
-      <div class="card"><div class="k">Zatím bez odpovědi</div><div class="v warn">${escapeHtml(data.pending ?? 0)}</div></div>
+      <div class="card"><div class="k">Zavřeno bez odpovědi</div><div class="v warn">${escapeHtml(data.dismiss ?? 0)}</div></div>
+      <div class="card"><div class="k">E-maily bez odpovědi</div><div class="v warn">${escapeHtml(data.pending ?? 0)}</div></div>
     </div>
-    <p class="hint">Odesláno dotazníků: ${escapeHtml(data.sent ?? 0)}.</p>
+    <p class="hint">Odpovědí celkem: ${escapeHtml(data.answered ?? 0)}. Odesláno e-mailů: ${escapeHtml(data.sent_emails ?? 0)}.</p>
+    <h3 style="font-size:0.95rem;margin:1rem 0 0.4rem;">Rozpad podle zdroje</h3>
+    ${sourceLine(src.exit_intent, [["price", "Cena"], ["trust", "Důvěra"], ["dismiss", "Zavřeno"], ["total", "Celkem"]])}
+    ${sourceLine(src.click_48h, [["price", "Cena"], ["trust", "Důvěra"], ["other", "Jiné"], ["pending", "Bez odpovědi"], ["sent", "Odesláno"]])}
+    ${sourceLine(src.open_2h, [["price", "Cena"], ["trust", "Důvěra"], ["other", "Jiné"], ["pending", "Bez odpovědi"], ["sent", "Odesláno"]])}
   </div>`;
 }
 
-function renderExitIntentBox(exitIntent) {
-  const data = exitIntent && typeof exitIntent === "object" ? exitIntent : emptyExitIntentStats();
-  return `<div class="orders-box">
-    <h2>Proč odcházejí</h2>
-    <p class="hint">Exit-intent popup na stránce s nabídkou (/checkout), než návštěvník odejde bez objednávky. Jednou za návštěvu. Přímé návštěvy bez tracking_id se počítají taky.</p>
-    <div class="cards">
-      <div class="card"><div class="k">Cena</div><div class="v">${escapeHtml(data.price ?? 0)}</div></div>
-      <div class="card"><div class="k">Důvěra</div><div class="v">${escapeHtml(data.trust ?? 0)}</div></div>
-      <div class="card"><div class="k">Zavřeno bez odpovědi</div><div class="v warn">${escapeHtml(data.dismiss ?? 0)}</div></div>
-    </div>
-    <p class="hint">Celkem záznamů: ${escapeHtml(data.total ?? 0)}.</p>
-  </div>`;
+function renderSurveyBox(survey) {
+  return renderWhyNotBuyBox(survey);
+}
+
+function renderExitIntentBox() {
+  return "";
 }
 
 async function verifyStripeWebhookSignature(rawBody, signatureHeader, secret) {
@@ -1331,15 +1351,17 @@ function exitIntentScript(trackingId) {
     send("dismiss");
     hide();
   }
-  document.addEventListener("mouseout", function (e) {
+  var ARM_MS = 1500;
+  var armed = false;
+  window.setTimeout(function () { armed = true; }, ARM_MS);
+  function onViewportLeave(e) {
+    if (!armed) return;
     if (e.relatedTarget) return;
-    if (typeof e.clientY === "number" && e.clientY > 8) return;
+    if (typeof e.clientY !== "number" || e.clientY > 0) return;
     show();
-  });
-  document.documentElement.addEventListener("mouseleave", function (e) {
-    if (typeof e.clientY === "number" && e.clientY > 8) return;
-    show();
-  });
+  }
+  document.addEventListener("mouseleave", onViewportLeave);
+  document.documentElement.addEventListener("mouseleave", onViewportLeave);
   var coarse = false;
   try {
     coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
@@ -1650,6 +1672,7 @@ const ADMIN_LINKS = {
   unsub: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-unsubscribe.yml",
   engagement: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-engagement.yml",
   survey: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-click-survey.yml",
+  openSurvey: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-open-survey.yml",
   exitIntent: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-exit-intent.yml",
   actions: "https://github.com/gypa70/gofixweb-scanner/actions",
 };
@@ -2433,8 +2456,7 @@ function renderAdminHtml(snapshot, {
     <h2 style="font-size:1.05rem;margin:0 0 0.65rem;">E-mailové série</h2>
     <div class="series-grid">${seriesCards}</div>
     ${renderOrdersBox(orders, ordersError)}
-    ${renderSurveyBox(snapshot?.survey)}
-    ${renderExitIntentBox(snapshot?.exit_intent)}
+    ${renderWhyNotBuyBox(snapshot?.why_not_buy)}
     <div class="links">
       <a href="${ADMIN_LINKS.scans}" target="_blank" rel="noopener">GHA scan jobs</a>
       <a href="${ADMIN_LINKS.bounce}" target="_blank" rel="noopener">GHA bounce monitor</a>
@@ -2443,7 +2465,8 @@ function renderAdminHtml(snapshot, {
       <a href="${ADMIN_LINKS.auto}" target="_blank" rel="noopener">GHA automatika</a>
       <a href="${ADMIN_LINKS.unsub}" target="_blank" rel="noopener">GHA unsubscribe</a>
       <a href="${ADMIN_LINKS.engagement}" target="_blank" rel="noopener">GHA engagement</a>
-      <a href="${ADMIN_LINKS.survey}" target="_blank" rel="noopener">GHA click survey</a>
+      <a href="${ADMIN_LINKS.survey}" target="_blank" rel="noopener">GHA 48h survey</a>
+      <a href="${ADMIN_LINKS.openSurvey}" target="_blank" rel="noopener">GHA 2h survey</a>
       <a href="${ADMIN_LINKS.exitIntent}" target="_blank" rel="noopener">GHA exit-intent</a>
       <a href="${ADMIN_LINKS.actions}" target="_blank" rel="noopener">Všechny Actions</a>
       <a href="${GMAIL_BOUNCE_SEARCH_URL}" target="_blank" rel="noopener">Gmail bounce search</a>
@@ -2904,6 +2927,7 @@ const ENG_CACHE_TTL = 31536000;
 const TRACKING_ID_RE = /^[A-Za-z0-9]{8,64}$/;
 const CLICK_PRODUCTS = new Set(["manual_fix", "wp_autofix"]);
 const SURVEY_REASONS = new Set(["price", "trust", "other"]);
+const SURVEY_SOURCES = new Set(["click_48h", "open_2h"]);
 const EXIT_INTENT_REASONS = new Set(["price", "trust", "dismiss"]);
 const PIXEL_GIF = Uint8Array.from([
   71, 73, 70, 56, 57, 97, 1, 0, 1, 0, 128, 0, 0, 0, 0, 0, 255, 255, 255,
@@ -3025,13 +3049,29 @@ function surveyOtherFormHtml(actionUrl) {
 </html>`;
 }
 
-function surveyCacheKey(trackingId) {
-  return `https://survey.gofixweb/${String(trackingId || "").trim()}`;
+function surveyCacheKey(trackingId, source) {
+  const src = SURVEY_SOURCES.has(source) ? source : "click_48h";
+  return `https://survey.gofixweb/${src}/${String(trackingId || "").trim()}`;
 }
 
-async function recordSurveyOnce(env, trackingId, reason, freeText) {
+function surveySourceFromUrl(url) {
+  const raw = String(url.searchParams.get("src") || "").trim();
+  return SURVEY_SOURCES.has(raw) ? raw : "click_48h";
+}
+
+async function surveyTokenMatches(env, id, reason, source, token) {
+  if (source === "click_48h") {
+    if (await tokenMatchesTracking(env, `survey\n${id}\n${reason}`, token)) return true;
+    if (await tokenMatchesTracking(env, `survey\n${id}\n${reason}\nclick_48h`, token)) return true;
+    return false;
+  }
+  return tokenMatchesTracking(env, `survey\n${id}\n${reason}\n${source}`, token);
+}
+
+async function recordSurveyOnce(env, trackingId, reason, freeText, source) {
+  const src = SURVEY_SOURCES.has(source) ? source : "click_48h";
   const cache = caches.default;
-  const key = surveyCacheKey(trackingId);
+  const key = surveyCacheKey(trackingId, src);
   const hit = await cache.match(key);
   if (hit) return false;
   await cache.put(key, new Response("1"), { expirationTtl: ENG_CACHE_TTL });
@@ -3039,6 +3079,7 @@ async function recordSurveyOnce(env, trackingId, reason, freeText) {
     await dispatchGithubEvent(env, "email-click-survey", {
       tracking_id: trackingId,
       reason,
+      source: src,
       text: String(freeText || "").slice(0, 500),
       at: new Date().toISOString(),
     });
@@ -3055,6 +3096,7 @@ async function handleSurvey(request, env) {
   const id = match[1];
   const reason = String(url.searchParams.get("reason") || "").trim().toLowerCase();
   const token = String(url.searchParams.get("t") || "").trim();
+  const source = surveySourceFromUrl(url);
   const invalid = unsubscribeHtml(
     "Odkaz je neplatný",
     "Tento odkaz na dotazník je neplatný nebo poškozený.",
@@ -3062,7 +3104,7 @@ async function handleSurvey(request, env) {
   if (!TRACKING_ID_RE.test(id) || !SURVEY_REASONS.has(reason)) {
     return new Response(invalid, { status: 400, headers: { "Content-Type": "text/html; charset=UTF-8" } });
   }
-  if (!(await tokenMatchesTracking(env, `survey\n${id}\n${reason}`, token))) {
+  if (!(await surveyTokenMatches(env, id, reason, source, token))) {
     return new Response(invalid, { status: 400, headers: { "Content-Type": "text/html; charset=UTF-8" } });
   }
   const thanks = new Response(surveyThanksHtml(), {
@@ -3095,7 +3137,7 @@ async function handleSurvey(request, env) {
   if (request.method === "HEAD") {
     return new Response(null, { status: 200, headers: { "X-Robots-Tag": "noindex, nofollow" } });
   }
-  await recordSurveyOnce(env, id, reason, note);
+  await recordSurveyOnce(env, id, reason, note, source);
   return thanks;
 }
 
