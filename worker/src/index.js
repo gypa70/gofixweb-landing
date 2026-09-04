@@ -940,6 +940,54 @@ function renderOrdersBox(orders, ordersError) {
   </div>`;
 }
 
+function emptySubscribers() {
+  return {
+    active: 0,
+    by_plan: { basic: 0, pro: 0, premium: 0 },
+    mrr_haleru: 0,
+    canceled_30d: 0,
+  };
+}
+
+function subscribersFromSnapshot(snapshot) {
+  const empty = emptySubscribers();
+  const raw = snapshot && typeof snapshot.subscribers === "object" && snapshot.subscribers
+    ? snapshot.subscribers
+    : {};
+  const byPlan = { ...empty.by_plan, ...(raw.by_plan || raw.byPlan || {}) };
+  return {
+    ...empty,
+    active: Number(raw.active || 0),
+    by_plan: {
+      basic: Number(byPlan.basic || 0),
+      pro: Number(byPlan.pro || 0),
+      premium: Number(byPlan.premium || 0),
+    },
+    mrr_haleru: Number(raw.mrr_haleru || raw.mrrHaleru || 0),
+    canceled_30d: Number(raw.canceled_30d || raw.canceled30d || 0),
+  };
+}
+
+function renderSubscribersBox(snapshot) {
+  const data = subscribersFromSnapshot(snapshot);
+  const plans = data.by_plan;
+  return `<div class="orders-box">
+    <h2>Předplatitelé</h2>
+    <p class="hint">Ze snapshotu DB (GHA každých 5 min), ne živý Stripe při načtení stránky.
+    Aktivní = řádky v tabulce subscriptions se stavem active.
+    MRR = součet měsíčních cen aktivních tarifů (Basic 1 490 / Pro 3 990 / Premium 6 990 Kč).
+    Zrušené / expirované = stav canceled/expired a Stripe customer.subscription.deleted za posledních 30 dní.</p>
+    <div class="cards">
+      <div class="card"><div class="k">Aktivní</div><div class="v ok">${escapeHtml(data.active)}</div></div>
+      <div class="card"><div class="k">Basic</div><div class="v">${escapeHtml(plans.basic)}</div></div>
+      <div class="card"><div class="k">Pro</div><div class="v">${escapeHtml(plans.pro)}</div></div>
+      <div class="card"><div class="k">Premium</div><div class="v">${escapeHtml(plans.premium)}</div></div>
+      <div class="card"><div class="k">MRR</div><div class="v">${escapeHtml(formatCzkFromHalere(data.mrr_haleru))}</div></div>
+      <div class="card"><div class="k">Zrušené / expirované (30 dní)</div><div class="v warn">${escapeHtml(data.canceled_30d)}</div></div>
+    </div>
+  </div>`;
+}
+
 function emptyWhyNotBuyStats() {
   return {
     price: 0,
@@ -3194,6 +3242,7 @@ function renderAdminHtml(snapshot, {
     <h2 style="font-size:1.05rem;margin:0 0 0.65rem;">E-mailové série</h2>
     <div class="series-grid">${seriesCards}</div>
     ${renderOrdersBox(orders, ordersError)}
+    ${renderSubscribersBox(snapshot)}
     ${renderWhyNotBuyBox(snapshot?.why_not_buy)}
     <div class="links">
       <a href="${ADMIN_LINKS.scans}" target="_blank" rel="noopener">GHA scan jobs</a>
