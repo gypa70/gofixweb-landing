@@ -133,17 +133,7 @@ jobs:
         run: |
           set -euo pipefail
           npx wrangler secret list --name gofixweb-report-trigger > /tmp/cf-secrets.json
-          python - <<'PY'
-import json
-data = json.load(open("/tmp/cf-secrets.json", encoding="utf-8"))
-if isinstance(data, dict):
-    data = data.get("secrets") or data.get("result") or []
-names = {item.get("name") for item in data}
-missing = [name for name in ("STRIPE_WEBHOOK_SECRET", "STRIPE_WEBHOOK_SECRET_TEST") if name not in names]
-if missing:
-    raise SystemExit(f"missing Worker secrets: {missing}")
-print("webhook secrets present:", ", ".join(sorted(names)))
-PY
+          python -c "import json,sys; data=json.load(open('/tmp/cf-secrets.json',encoding='utf-8')); data=data if isinstance(data,list) else data.get('secrets') or data.get('result') or []; names={item.get('name') for item in data}; missing=[name for name in ('STRIPE_WEBHOOK_SECRET','STRIPE_WEBHOOK_SECRET_TEST') if name not in names]; raise SystemExit('missing Worker secrets: '+str(missing) if missing else 0)"
 
       - name: Ensure live Stripe subscription prices and webhook events
         if: steps.cf.outputs.present == 'true'
