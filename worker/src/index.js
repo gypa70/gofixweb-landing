@@ -2857,7 +2857,7 @@ function renderAdminHtml(snapshot, {
   const launchedRun = findRunById(runState, launchedRunId);
   const batchBusy = Boolean((runState?.active || []).length)
     || (launched && (!launchedRun || isActiveRun(launchedRun)));
-  const refreshSec = batchBusy ? 8 : 60;
+  const refreshSec = batchBusy ? 8 : 30;
   const generated = snapshot?.generated_at
     ? formatWhen(snapshot.generated_at)
     : "—";
