@@ -1,0 +1,147 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Manrope:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 170 20% 7%;
+    --foreground: 150 10% 96%;
+
+    --card: 172 17% 10%;
+    --card-foreground: 150 10% 96%;
+
+    --popover: 172 17% 11%;
+    --popover-foreground: 150 10% 96%;
+
+    --primary: 152 68% 46%;
+    --primary-foreground: 165 45% 6%;
+
+    --secondary: 172 14% 15%;
+    --secondary-foreground: 150 10% 94%;
+
+    --muted: 172 13% 14%;
+    --muted-foreground: 160 8% 63%;
+
+    --accent: 38 92% 56%;
+    --accent-foreground: 30 60% 8%;
+
+    --destructive: 4 68% 52%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 172 12% 19%;
+    --input: 172 12% 19%;
+    --ring: 152 68% 46%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 170 20% 7%;
+    --foreground: 150 10% 96%;
+    --card: 172 17% 10%;
+    --card-foreground: 150 10% 96%;
+    --popover: 172 17% 11%;
+    --popover-foreground: 150 10% 96%;
+    --primary: 152 68% 46%;
+    --primary-foreground: 165 45% 6%;
+    --secondary: 172 14% 15%;
+    --secondary-foreground: 150 10% 94%;
+    --muted: 172 13% 14%;
+    --muted-foreground: 160 8% 63%;
+    --accent: 38 92% 56%;
+    --accent-foreground: 30 60% 8%;
+    --destructive: 4 68% 52%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 172 12% 19%;
+    --input: 172 12% 19%;
+    --ring: 152 68% 46%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+    font-size: 1rem;
+    line-height: 1.65;
+    font-kerning: normal;
+    text-wrap: pretty;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: 'Bricolage Grotesque', 'Manrope', sans-serif;
+    text-wrap: balance;
+  }
+
+  h1 {
+    font-size: clamp(2.25rem, 4.4vw + 0.9rem, 4.35rem);
+    font-weight: 800;
+    line-height: 1.03;
+    letter-spacing: -0.033em;
+  }
+
+  h2 {
+    font-size: clamp(1.7rem, 2.3vw + 0.85rem, 2.85rem);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.026em;
+  }
+
+  h3 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    line-height: 1.28;
+    letter-spacing: -0.012em;
+  }
+
+  input,
+  button,
+  textarea {
+    font-family: inherit;
+  }
+}
+
+@layer utilities {
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  .display {
+    font-family: 'Bricolage Grotesque', 'Manrope', sans-serif;
+  }
+
+  .rise {
+    opacity: 0;
+    animation: rise 620ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .section-line {
+    border-top: 1px solid hsl(var(--border));
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

@@ -22,11 +22,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build blog from markdown
-        run: python scripts/build_blog.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build landing
+        working-directory: frontend
+        run: npm run build
+
+      - name: Assemble GitHub Pages artifact
+        run: |
+          set -euo pipefail
+          rm -rf publish
+          mkdir -p publish
+          cp -a frontend/dist/. publish/
+          mkdir -p publish/data
+          cp data/public_stats.json publish/data/public_stats.json
+          cp -a wordpress-autofix publish/wordpress-autofix
+          cp frontend/dist/index.html publish/404.html
+          python -c "import json,sys; data=json.load(open('publish/data/public_stats.json',encoding='utf-8')); raise SystemExit(0 if isinstance(data.get('scanned_shops'), int) else 1)"
+
       - uses: actions/configure-pages@v4
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: publish
       - id: deployment
         uses: actions/deploy-pages@v4

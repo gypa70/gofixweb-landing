@@ -1,0 +1,37 @@
+{
+  "status": "success",
+  "results": [
+    {
+      "status": "success",
+      "filename": "hero-backdrop-abstract-dark-teal.jpg",
+      "url": "https://mgx-backend-cdn.metadl.com/generate/images/1580179/2026-09-04/vy54qcqcakwa/hero-backdrop-abstract-dark-teal.png",
+      "path": "https://mgx-backend-cdn.metadl.com/generate/images/1580179/2026-09-04/vy54qcqcakwa/hero-backdrop-abstract-dark-teal.png",
+      "absolute_path": "https://mgx-backend-cdn.metadl.com/generate/images/1580179/2026-09-04/vy54qcqcakwa/hero-backdrop-abstract-dark-teal.png"
+    },
+    {
+      "status": "success",
+      "filename": "testimonial-portrait-male-eshop-owner.jpg",
+      "url": "https://mgx-backend-cdn.metadl.com/generate/images/1580179/2026-09-04/vy54q5qcakvq/testimonial-portrait-male-eshop-owner.png",
+      "path": "https://mgx-backend-cdn.metadl.com/generate/images/1580179/2026-09-04/vy54q5qcakvq/testimonial-portrait-male-eshop-owner.png",
+      "absolute_path": "https://mgx-backend-cdn.metadl.com/generate/images/1580179/2026-09-04/vy54q5qcakvq/testimonial-portrait-male-eshop-owner.png"
+    },
+    {
+      "status": "success",
+      "filename": "testimonial-portrait-female-ecommerce-manager.jpg",
+      "url": "https://mgx-backend-cdn.metadl.com/generate/images/1580179/2026-09-04/vy54rmacakuq/testimonial-portrait-female-ecommerce-manager.png",
+      "path": "https://mgx-backend-cdn.metadl.com/generate/images/1580179/2026-09-04/vy54rmacakuq/testimonial-portrait-female-ecommerce-manager.png",
+      "absolute_path": "https://mgx-backend-cdn.metadl.com/generate/images/1580179/2026-09-04/vy54rmacakuq/testimonial-portrait-female-ecommerce-manager.png"
+    },
+    {
+      "status": "success",
+      "filename": "testimonial-portrait-male-marketing-director.jpg",
+      "url": "https://mgx-backend-cdn.metadl.com/generate/images/1580179/2026-09-04/vy54ryycakwq/testimonial-portrait-male-marketing-director.png",
+      "path": "https://mgx-backend-cdn.metadl.com/generate/images/1580179/2026-09-04/vy54ryycakwq/testimonial-portrait-male-marketing-director.png",
+      "absolute_path": "https://mgx-backend-cdn.metadl.com/generate/images/1580179/2026-09-04/vy54ryycakwq/testimonial-portrait-male-marketing-director.png"
+    }
+  ],
+  "success_count": 4,
+  "failed_count": 0,
+  "running_count": 0,
+  "message": "Generated 4/4 images total"
+}

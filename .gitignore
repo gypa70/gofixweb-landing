@@ -1,2 +1,6 @@
 shot-*.png
 *-screenshot.png
+frontend/node_modules/
+frontend/dist/
+publish/
+**/__pycache__/

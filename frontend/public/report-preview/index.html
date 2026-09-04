@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GoFixWeb PDF — redesign (light) · teaser / kompletní / před-po</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="report.css">
+</head>
+<body>
+<div class="kit">
+
+  <h1>GoFixWeb PDF — redesign · světlé téma</h1>
+  <p class="lead">
+    Tři typy reportu složené z jednoho designového systému. A4, okraje 18 / 15 / 26 mm, obsah 170 mm,
+    font Arial. Nosný layout jsou tabulky, plné obdélníky a tenké linky — žádný grid ani flex uvnitř
+    stránky, žádné stíny, blur, clip-path ani animace. Grid a stín se objevují jen v tomto náhledovém
+    rámu mimo A4. Data jsou placeholder (<b>example.cz</b>), bez platebních odkazů a bez zákaznických dat.
+  </p>
+
+  <p class="note">
+    <b>Změna proti exportu:</b> pozadí je bílé, ne tmavé <code>#1a2332</code>. Report je dokument, který se
+    tiskne a čte v PDF prohlížeči — tmavé pozadí patří landing page, ne A4. Barevné role zůstávají tři a
+    nemíchají se: <b>zelená = oprava</b>, <b>jantarová = ztráta v Kč</b>, <b>červená = chybový stav</b>.
+    Neutrální šedá není čtvrtá role, ale absence stavu.
+  </p>
+
+  <h2 class="grp">Barevné role</h2>
+  <div>
+    <span class="swatch"><i style="background:#15803d"></i><b>Oprava</b><span>#15803d · návod, provedená oprava, zlepšení</span></span>
+    <span class="swatch"><i style="background:#b45309"></i><b>Ztráta v Kč</b><span>#b45309 · výhradně peněžní dopad</span></span>
+    <span class="swatch"><i style="background:#b91c1c"></i><b>Chybový stav</b><span>#b91c1c · rozbitý / naměřený špatný stav</span></span>
+    <span class="swatch"><i style="background:#475569"></i><b>Bez stavu</b><span>#475569 · neutrální, „neověřeno“</span></span>
+  </div>
+
+  <!-- ================================================================
+       TYP 2 — VSTUPNÍ REPORT (TEASER)
+       ================================================================ -->
+  <h2 class="grp">Typ 2 — Vstupní report (teaser) · jednotný pro obě varianty</h2>
+  <p class="note">
+    V okamžiku odeslání ještě není známa <code>varianta</code> — vzniká až objednávkou. Varianty se tu
+    proto objevují jen jako nabídka v CTA, nikdy jako stav reportu. Pole <code>stav</code> se nepoužívá.
+    Zakryté nálezy drží jantarovou částku, aby byl vidět rozsah ztráty, ale ne její příčina.
+  </p>
+
+  <article class="page" aria-label="Teaser">
+    <div class="label">Typ 2 — Vstupní report (teaser)</div>
+    <div class="logo">GoFix<span>Web</span></div>
+    <p class="slogan">AI, která zefektivní váš e-shop</p>
+    <p class="subtitle">Vstupní report — nález č. 1</p>
+    <p class="meta">E-shop: <b>example.cz</b></p>
+    <p class="meta url">URL: https://example.cz</p>
+    <p class="meta date">Datum skenu: 04.09.2026</p>
+    <hr class="rule">
+
+    <table class="kpi">
+      <tr>
+        <td class="loss-cell">
+          <p class="cap">Odhad měsíční ztráty</p>
+          <p class="loss-big">7 700 Kč</p>
+          <p class="loss-sub">za 12 měsíců 92 400 Kč</p>
+        </td>
+        <td class="score-cell">
+          <p class="cap">Skóre webu při skenu</p>
+          <p class="score-big">62 / 100</p>
+          <table class="bar"><tr><td class="f-bad" style="width:62%"></td><td class="rest"></td></tr></table>
+          <p class="score-sub">Nalezeny 3 chyby s finančním dopadem</p>
+        </td>
+      </tr>
+    </table>
+
+    <h2 class="sec">Co jsme našli</h2>
+    <table class="data">
+      <thead><tr><th>Problém</th><th style="width:34mm">Měsíční dopad</th></tr></thead>
+      <tbody>
+        <tr><td>Pomalá rychlost načítání — homepage</td><td class="amt">5 100 Kč</td></tr>
+        <tr class="masked"><td>■ ■ ■ ■ ■ ■  Nález č. 2</td><td class="amt">1 700 Kč</td></tr>
+        <tr class="masked"><td>■ ■ ■ ■ ■ ■  Nález č. 3</td><td class="amt">900 Kč</td></tr>
+      </tbody>
+    </table>
+    <p class="tnote">Zakryté nálezy odemkne kompletní report. Částky jsou uvedené i u zakrytých položek.</p>
+
+    <table class="fin">
+      <tr>
+        <td class="left">
+          <div class="head">Bez opravy</div>
+          Měsíční ztráta 7 700 Kč<br>
+          × 12 měsíců<br>
+          <span class="big">Ročně 92 400 Kč</span>
+        </td>
+        <td class="right">
+          <div class="head">S opravou</div>
+          Jednorázová investice<br>
+          Návratnost v řádu dnů<br>
+          <span class="big">Bez opakovaných plateb</span>
+        </td>
+      </tr>
+    </table>
+
+    <h2 class="sec">Dvě varianty stejného reportu</h2>
+    <table class="cta-row">
+      <tr>
+        <td>
+          <div class="vlabel">Manuál</div>
+          <div class="price">1 990 Kč</div>
+          Přesný návod k vložení, krok za krokem.<br>
+          Opravíte sami, na jakékoli platformě.
+        </td>
+        <td>
+          <div class="vlabel">Auto</div>
+          <div class="price">4 990 Kč</div>
+          WooCommerce — zásah provedeme za vás.<br>
+          Součástí je i report Před / Po.
+        </td>
+      </tr>
+    </table>
+
+    <div class="footer">© 2026 FinalEdge s.r.o. / GoFixWeb<br>gofixweb.com | info@gofixweb.com | Obchodní podmínky | Ochrana osobních údajů</div>
+  </article>
+
+  <!-- ================================================================
+       TYP 1 — KOMPLETNÍ REPORT · MANUÁL
+       ================================================================ -->
+  <h2 class="grp">Typ 1 — Kompletní report · varianta MANUÁL</h2>
+  <p class="note">
+    <code>varianta = "manual"</code>. Pole <code>stav</code> se nepoužívá vůbec — nikdo žádnou opravu
+    neprovádí, karta tedy nemá co potvrzovat a nenese štítek stavu. Zjištěná vada je červená
+    (chybový stav), návod zelený (oprava), částka jantarová (ztráta). Text cesty v administraci se řídí
+    polem <code>platforma</code>.
+  </p>
+
+  <article class="page" aria-label="Kompletní MANUÁL">
+    <div class="label">Typ 1 — Kompletní report (MANUÁL)</div>
+    <div class="logo">GoFix<span>Web</span></div>
+    <p class="slogan">AI, která zefektivní váš e-shop</p>
+    <p class="subtitle">Kompletní report — varianta MANUÁL</p>
+    <p class="meta">E-shop: <b>example.cz</b></p>
+    <p class="meta url">URL: https://example.cz</p>
+    <p class="meta date">Datum skenu: 04.09.2026 · Platforma: WooCommerce</p>
+    <hr class="rule">
+
+    <table class="variant v-manual">
+      <tr>
+        <td class="tag">MANUÁL</td>
+        <td class="desc">Návod k vlastní opravě. U každého nálezu najdete přesnou cestu v administraci a text k vložení. Skóre je stav při skenu, tedy před opravou.</td>
+      </tr>
+    </table>
+
+    <table class="kpi">
+      <tr>
+        <td class="loss-cell">
+          <p class="cap">Měsíční ztráta celkem</p>
+          <p class="loss-big">7 700 Kč</p>
+          <p class="loss-sub">za 12 měsíců 92 400 Kč</p>
+        </td>
+        <td class="score-cell">
+          <p class="cap">Celkové skóre webu</p>
+          <p class="score-big">62 / 100</p>
+          <table class="bar"><tr><td class="f-bad" style="width:62%"></td><td class="rest"></td></tr></table>
+          <p class="score-sub">Stav při skenu 04.09.2026</p>
+        </td>
+      </tr>
+    </table>
+
+    <table class="metrics">
+      <tr><td class="mk">Rychlost (mobil)</td><td class="mv v-bad">48</td><td class="mb"><table class="bar"><tr><td class="f-bad" style="width:48%"></td><td class="rest"></td></tr></table></td></tr>
+      <tr><td class="mk">SEO</td><td class="mv v-mid">71</td><td class="mb"><table class="bar"><tr><td class="f-mid" style="width:71%"></td><td class="rest"></td></tr></table></td></tr>
+      <tr><td class="mk">Mobilní zobrazení</td><td class="mv v-mid">68</td><td class="mb"><table class="bar"><tr><td class="f-mid" style="width:68%"></td><td class="rest"></td></tr></table></td></tr>
+      <tr><td class="mk">Nefunkční odkazy</td><td class="mv v-bad">2</td><td class="mb">Vedou na neexistující stránky</td></tr>
+    </table>
+
+    <h2 class="sec">Nalezené chyby</h2>
+    <table class="data">
+      <thead><tr><th>Problém</th><th style="width:26mm">Kde</th><th>Zjištěný stav</th><th style="width:22mm">Kč/měs.</th></tr></thead>
+      <tbody>
+        <tr><td>Rychlost načítání</td><td>Homepage</td><td><span class="s-error">LCP 4,8 s</span> — banner 2,4 MB</td><td class="amt">5 100</td></tr>
+        <tr><td>Title tag</td><td>Homepage</td><td><span class="s-error">Chybí</span> — jen „Domů“</td><td class="amt">1 700</td></tr>
+        <tr><td>Meta description</td><td>Homepage</td><td><span class="s-error">Chybí</span> — Google si popis skládá sám</td><td class="amt">900</td></tr>
+      </tbody>
+    </table>
+    <p class="tnote">Maximálně 5 nálezů s nejvyšším finančním dopadem. Postup k opravě následuje níže.</p>
+
+    <h2 class="sec">Nálezy a postup opravy</h2>
+
+    <table class="card">
+      <tr class="card-head">
+        <td class="num">1</td>
+        <td class="title">Chybí title tag</td>
+        <td class="amt">1 700 Kč / měs.</td>
+      </tr>
+      <tr>
+        <td class="card-body" colspan="3">
+          <table class="kv">
+            <tr><td class="k">Kde</td><td class="v">Homepage — https://example.cz</td></tr>
+            <tr><td class="k">Zjištěno</td><td class="v"><span class="err">Titulek je „Domů“</span> — bez názvu e-shopu a bez klíčového slova.</td></tr>
+            <tr><td class="k">Platforma</td><td class="v">WooCommerce (WordPress 6.5, plugin Yoast SEO)</td></tr>
+          </table>
+          <div class="box b-fix">
+            <div class="bh">Text k vložení</div>
+            <span class="snippet">Example.cz | vitamíny s dopravou zdarma</span>
+          </div>
+          <div class="box b-fix">
+            <div class="bh">Kde a jak to opravit</div>
+            <table class="steps">
+              <tr><td class="sn">1.</td><td>Přihlaste se do WordPress administrace na https://example.cz/wp-admin</td></tr>
+              <tr><td class="sn">2.</td><td>V levém menu zvolte <b>Stránky</b> a otevřete stránku nastavenou jako titulní.</td></tr>
+              <tr><td class="sn">3.</td><td>Sjeďte pod editor do panelu <b>Yoast SEO</b> a rozklikněte <b>Vyhledávání Google</b>.</td></tr>
+              <tr><td class="sn">4.</td><td>Do pole <b>SEO titulek</b> vložte text výše. Původní obsah pole smažte.</td></tr>
+              <tr><td class="sn">5.</td><td>Klikněte <b>Aktualizovat</b> vpravo nahoře.</td></tr>
+            </table>
+          </div>
+          <table class="kv">
+            <tr><td class="k">Ověření</td><td class="v">Otevřete stránku, stiskněte Ctrl+U a v hlavičce zkontrolujte tag &lt;title&gt;.</td></tr>
+            <tr><td class="k">Čas</td><td class="v">2 minuty · bez potřeby programátora</td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <table class="card">
+      <tr class="card-head">
+        <td class="num">2</td>
+        <td class="title">Chybí meta description</td>
+        <td class="amt">900 Kč / měs.</td>
+      </tr>
+      <tr>
+        <td class="card-body" colspan="3">
+          <table class="kv">
+            <tr><td class="k">Kde</td><td class="v">Homepage — https://example.cz</td></tr>
+            <tr><td class="k">Zjištěno</td><td class="v"><span class="err">Značka description v hlavičce chybí</span>, Google si popisek skládá sám.</td></tr>
+            <tr><td class="k">Platforma</td><td class="v">WooCommerce (plugin Yoast SEO)</td></tr>
+          </table>
+          <div class="box b-fix">
+            <div class="bh">Text k vložení</div>
+            <span class="snippet">Vitamíny a doplňky stravy s dopravou zdarma nad 799 Kč. Odesíláme do 24 hodin, vracení zboží do 30 dnů.</span>
+          </div>
+          <div class="box b-fix">
+            <div class="bh">Kde a jak to opravit</div>
+            <table class="steps">
+              <tr><td class="sn">1.</td><td>Otevřete stejnou stránku jako u nálezu č. 1 (<b>Stránky</b> → titulní stránka).</td></tr>
+              <tr><td class="sn">2.</td><td>V panelu <b>Yoast SEO</b> → <b>Vyhledávání Google</b> najděte pole <b>Meta popis</b>.</td></tr>
+              <tr><td class="sn">3.</td><td>Vložte text výše a zkontrolujte, že ukazatel délky zůstává v zelené části.</td></tr>
+              <tr><td class="sn">4.</td><td>Klikněte <b>Aktualizovat</b>.</td></tr>
+            </table>
+          </div>
+          <table class="kv">
+            <tr><td class="k">Ověření</td><td class="v">Ve zdroji stránky musí být &lt;meta name="description" …&gt; s vaším textem.</td></tr>
+            <tr><td class="k">Čas</td><td class="v">2 minuty · bez potřeby programátora</td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <div class="footer">© 2026 FinalEdge s.r.o. / GoFixWeb<br>gofixweb.com | info@gofixweb.com | Obchodní podmínky | Ochrana osobních údajů</div>
+  </article>
+
+  <article class="page" aria-label="Kompletní MANUÁL strana 2">
+    <div class="label">Typ 1 — MANUÁL, strana 2 (jiná platforma)</div>
+    <div class="logo">GoFix<span>Web</span></div>
+    <p class="slogan">AI, která zefektivní váš e-shop</p>
+    <p class="subtitle">Kompletní report — varianta MANUÁL</p>
+    <hr class="rule">
+    <p class="cont">Pokračování nálezů · example.cz · strana 2</p>
+
+    <h2 class="sec">Týž nález při <code>platforma = "shoptet"</code></h2>
+    <p class="tnote">Ukázka, že návod není generický — pole <code>platforma</code> mění cestu v administraci.</p>
+
+    <table class="card">
+      <tr class="card-head">
+        <td class="num">3</td>
+        <td class="title">Pomalá rychlost načítání — nekomprimované obrázky</td>
+        <td class="amt">5 100 Kč / měs.</td>
+      </tr>
+      <tr>
+        <td class="card-body" colspan="3">
+          <table class="kv">
+            <tr><td class="k">Kde</td><td class="v">Homepage — hlavní banner a 8 náhledů produktů</td></tr>
+            <tr><td class="k">Zjištěno</td><td class="v"><span class="err">Banner 2,4 MB ve formátu PNG, LCP 4,8 s na mobilu.</span></td></tr>
+            <tr><td class="k">Platforma</td><td class="v">Shoptet</td></tr>
+          </table>
+          <div class="box b-loss">
+            <div class="bh">Proč to stojí peníze</div>
+            Při načítání nad 3 sekundy odchází část návštěvníků ještě před zobrazením produktů.
+            Na vašem objemu návštěvnosti to odpovídá 5 100 Kč měsíčně.
+          </div>
+          <div class="box b-fix">
+            <div class="bh">Kde a jak to opravit</div>
+            <table class="steps">
+              <tr><td class="sn">1.</td><td>Přihlaste se do administrace Shoptetu na https://example.cz/admin</td></tr>
+              <tr><td class="sn">2.</td><td>Jděte do <b>Vzhled a obsah</b> → <b>Karusel / Banner</b>.</td></tr>
+              <tr><td class="sn">3.</td><td>Stáhněte současný banner, zmenšete na šířku 1920 px a uložte jako JPG s kvalitou 80 %.</td></tr>
+              <tr><td class="sn">4.</td><td>Nahrajte zmenšenou verzi zpět přes <b>Nahradit obrázek</b> a uložte.</td></tr>
+              <tr><td class="sn">5.</td><td>V <b>Nastavení</b> → <b>Obrázky</b> zapněte <b>Automatická optimalizace obrázků</b>.</td></tr>
+            </table>
+          </div>
+          <table class="kv">
+            <tr><td class="k">Ověření</td><td class="v">Po 24 h změřte adresu znovu v PageSpeed Insights, sledujte metriku LCP.</td></tr>
+            <tr><td class="k">Čas</td><td class="v">20 minut · bez potřeby programátora</td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <h2 class="sec">Co dál</h2>
+    <p class="tnote">
+      Srovnávací report Před / Po vydáváme u varianty Auto, kde opravu provádíme sami a známe datum obou
+      měření. U varianty Manuál nevzniká — nevíme, kdy a v jakém rozsahu opravy provedete.
+      Po vlastní opravě si můžete web nechat naskenovat znovu.
+    </p>
+
+    <div class="footer">© 2026 FinalEdge s.r.o. / GoFixWeb<br>gofixweb.com | info@gofixweb.com | Obchodní podmínky | Ochrana osobních údajů</div>
+  </article>
+
+  <!-- ================================================================
+       TYP 1 — KOMPLETNÍ REPORT · AUTO (tři stavy)
+       ================================================================ -->
+  <h2 class="grp">Typ 1 — Kompletní report · varianta AUTO · tři stavy</h2>
+  <p class="note">
+    <code>varianta = "auto"</code>, povolené stavy <b>opraveno / neovereno / nelze_automaticky</b>.
+    Report jde ven <b>před</b> dokončením automatické opravy, proto tu <u>není</u> skóre po opravě ani
+    srovnání 62 → 88 — to patří výhradně do typu 3. Skóre je stav při skenu.
+  </p>
+  <p class="note">
+    <b>opraveno</b> — potvrzeno audit trailem (<code>wp_autofix_log status=applied</code>), zelený box.
+    <b>neovereno</b> — oprava je zařazená, ale ještě neproběhla; neutrální šedý box, záměrně ne zelený,
+    aby nevypadal jako potvrzený výsledek, a ne červený, protože o chybu nejde.
+    <b>nelze_automaticky</b> — typ nálezu se automaticky neřeší; karta spadne na zelený návodový box,
+    aby zákazník nezůstal bez řešení.
+  </p>
+
+  <article class="page" aria-label="Kompletní AUTO">
+    <div class="label">Typ 1 — Kompletní report (AUTO)</div>
+    <div class="logo">GoFix<span>Web</span></div>
+    <p class="slogan">AI, která zefektivní váš e-shop</p>
+    <p class="subtitle">Kompletní report — varianta AUTO</p>
+    <p class="meta">E-shop: <b>example.cz</b></p>
+    <p class="meta url">URL: https://example.cz</p>
+    <p class="meta date">Datum skenu: 04.09.2026 · Platforma: WooCommerce</p>
+    <hr class="rule">
+
+    <table class="variant v-auto">
+      <tr>
+        <td class="tag">AUTO</td>
+        <td class="desc">Opravy provádíme za vás, nemusíte nic vkládat. Skóre je stav při skenu — tento report vzniká ještě před dokončením zásahu. Výsledek doložíme reportem Před / Po.</td>
+      </tr>
+    </table>
+
+    <table class="kpi">
+      <tr>
+        <td class="loss-cell">
+          <p class="cap">Měsíční ztráta celkem</p>
+          <p class="loss-big">7 700 Kč</p>
+          <p class="loss-sub">za 12 měsíců 92 400 Kč</p>
+        </td>
+        <td class="score-cell">
+          <p class="cap">Celkové skóre webu</p>
+          <p class="score-big">62 / 100</p>
+          <table class="bar"><tr><td class="f-bad" style="width:62%"></td><td class="rest"></td></tr></table>
+          <p class="score-sub">Stav při skenu — hodnota po opravě bude v reportu Před / Po</p>
+        </td>
+      </tr>
+    </table>
+
+    <h2 class="sec">Nálezy a stav opravy</h2>
+    <table class="data">
+      <thead><tr><th>Problém</th><th style="width:26mm">Kde</th><th style="width:44mm">Stav</th><th style="width:22mm">Kč/měs.</th></tr></thead>
+      <tbody>
+        <tr><td>Title tag</td><td>Homepage</td><td><span class="s-fix">Opraveno 04.09.2026</span></td><td class="amt">1 700</td></tr>
+        <tr><td>Meta description</td><td>Homepage</td><td><span class="s-pending">Zařazeno k opravě</span></td><td class="amt">900</td></tr>
+        <tr><td>Sekce homepage</td><td>Homepage</td><td><span class="s-manual">Nelze automaticky</span></td><td class="amt">5 100</td></tr>
+      </tbody>
+    </table>
+    <p class="tnote">Stav „zařazeno k opravě“ znamená, že zásah zatím nemá záznam v auditním logu. Potvrzení najdete v reportu Před / Po.</p>
+
+    <table class="card">
+      <tr class="card-head">
+        <td class="num">1</td>
+        <td class="title">Chybí title tag</td>
+        <td class="amt">1 700 Kč / měs.</td>
+      </tr>
+      <tr>
+        <td class="card-body" colspan="3">
+          <table class="kv">
+            <tr><td class="k">Kde</td><td class="v">Homepage — https://example.cz</td></tr>
+            <tr><td class="k">Zjištěno</td><td class="v"><span class="err">Titulek byl „Domů“</span> — bez názvu e-shopu a bez klíčového slova.</td></tr>
+            <tr><td class="k">Stav</td><td class="v"><span class="pill p-fix">OPRAVENO 04.09.2026 09:14</span></td></tr>
+          </table>
+          <div class="box b-fix">
+            <div class="bh">Provedená oprava</div>
+            Titulek titulní stránky nastaven na:
+            <span class="snippet">Example.cz | vitamíny s dopravou zdarma</span>
+            Zapsáno přes WooCommerce REST API do pole Yoast SEO Title. Původní hodnota „Domů“ uložena pro případný návrat.
+          </div>
+          <table class="kv">
+            <tr><td class="k">Doklad</td><td class="v">Záznam v auditním logu: status <span class="fix">applied</span>, 04.09.2026 09:14.</td></tr>
+            <tr><td class="k">Vaše akce</td><td class="v">Žádná. Oprava je nasazená.</td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <table class="card">
+      <tr class="card-head">
+        <td class="num">2</td>
+        <td class="title">Chybí meta description</td>
+        <td class="amt">900 Kč / měs.</td>
+      </tr>
+      <tr>
+        <td class="card-body" colspan="3">
+          <table class="kv">
+            <tr><td class="k">Kde</td><td class="v">Homepage — https://example.cz</td></tr>
+            <tr><td class="k">Zjištěno</td><td class="v"><span class="err">Značka description v hlavičce chybí</span>, Google si popisek skládá sám.</td></tr>
+            <tr><td class="k">Stav</td><td class="v"><span class="pill p-pending">ZAŘAZENO K OPRAVĚ</span></td></tr>
+          </table>
+          <div class="box b-pending">
+            <div class="bh">Naplánovaná oprava</div>
+            Doplníme meta popis:
+            <span class="snippet">Vitamíny a doplňky stravy s dopravou zdarma nad 799 Kč. Odesíláme do 24 hodin, vracení zboží do 30 dnů.</span>
+            Tento report vznikl před zápisem změny, proto zatím nepotvrzujeme, že je nasazená.
+            Nasazení doložíme v reportu Před / Po.
+          </div>
+          <table class="kv">
+            <tr><td class="k">Doklad</td><td class="v">Bude doplněn po zápisu — v tuto chvíli žádný záznam v auditním logu neexistuje.</td></tr>
+            <tr><td class="k">Vaše akce</td><td class="v">Žádná. Čekáte na report Před / Po.</td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <table class="card">
+      <tr class="card-head">
+        <td class="num">3</td>
+        <td class="title">Příliš mnoho sekcí na homepage</td>
+        <td class="amt">5 100 Kč / měs.</td>
+      </tr>
+      <tr>
+        <td class="card-body" colspan="3">
+          <table class="kv">
+            <tr><td class="k">Kde</td><td class="v">Homepage — 11 sekcí nad patičkou</td></tr>
+            <tr><td class="k">Zjištěno</td><td class="v"><span class="err">Návštěvník musí projít 11 sekcí</span>, než dojde k výpisu produktů.</td></tr>
+            <tr><td class="k">Stav</td><td class="v"><span class="pill p-manual">NELZE AUTOMATICKY</span></td></tr>
+          </table>
+          <div class="box b-fix">
+            <div class="bh">Kde a jak to opravit</div>
+            Redukce sekcí je obsahové rozhodnutí — museli bychom určit, co z webu zmizí.
+            Postup proto předáváme vám:
+            <table class="steps">
+              <tr><td class="sn">1.</td><td>V administraci otevřete <b>Stránky</b> → titulní stránka.</td></tr>
+              <tr><td class="sn">2.</td><td>Ponechte nad výpisem produktů maximálně tři sekce: banner, přínosy, produkty.</td></tr>
+              <tr><td class="sn">3.</td><td>Zbylé sekce přesuňte pod výpis nebo na samostatnou stránku.</td></tr>
+              <tr><td class="sn">4.</td><td>Klikněte <b>Aktualizovat</b>.</td></tr>
+            </table>
+          </div>
+          <table class="kv">
+            <tr><td class="k">Proč ručně</td><td class="v">Zásah maže nebo přesouvá váš obsah. Bez vašeho rozhodnutí ho neprovádíme.</td></tr>
+            <tr><td class="k">Čas</td><td class="v">15 minut · bez potřeby programátora</td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <div class="footer">© 2026 FinalEdge s.r.o. / GoFixWeb<br>gofixweb.com | info@gofixweb.com | Obchodní podmínky | Ochrana osobních údajů</div>
+  </article>
+
+  <!-- ================================================================
+       TYP 3 — PŘED / PO
+       ================================================================ -->
+  <h2 class="grp">Typ 3 — Před / Po · jen AUTO, jen dva stavy</h2>
+  <p class="note">
+    Generuje se <b>až po dokončení</b> opravy, povolené stavy jsou proto pouze
+    <b>opraveno / nelze_automaticky</b>. Stav <code>neovereno</code> se tu nikdy neobjeví — kdyby ho
+    generátor dostal, jde o chybu na vstupu, ne o zobrazitelný stav. Teprve zde je legitimní srovnání
+    62 → 88, protože existují obě měření (<code>mereni_pred</code>, <code>mereni_po</code>).
+    Ve srovnávací tabulce drží sloupec „Před“ červenou (naměřený špatný stav) a „Po“ zelenou (oprava).
+  </p>
+
+  <article class="page" aria-label="Před/Po">
+    <div class="label">Typ 3 — Před / Po (AUTO)</div>
+    <div class="logo">GoFix<span>Web</span></div>
+    <p class="slogan">AI, která zefektivní váš e-shop</p>
+    <p class="subtitle">Srovnání před a po opravě</p>
+    <p class="meta">E-shop: <b>example.cz</b></p>
+    <p class="meta url">URL: https://example.cz</p>
+    <p class="meta date">Měřeno před: 01.09.2026 · po: 04.09.2026</p>
+    <hr class="rule">
+
+    <table class="variant v-auto">
+      <tr>
+        <td class="tag">AUTO</td>
+        <td class="desc">Opravy provedl GoFixWeb dne 04.09.2026. Obě měření pořídil stejný nástroj se stejným nastavením.</td>
+      </tr>
+    </table>
+
+    <table class="kpi">
+      <tr>
+        <td class="score-cell">
+          <p class="cap">Skóre před opravou</p>
+          <p class="score-big" style="color:#b91c1c">62 / 100</p>
+          <table class="bar"><tr><td class="f-bad" style="width:62%"></td><td class="rest"></td></tr></table>
+          <p class="score-sub">Měřeno 01.09.2026</p>
+        </td>
+        <td class="score-cell" style="background:#f0fdf4;border-color:#86efac">
+          <p class="cap">Skóre po opravě</p>
+          <p class="score-big" style="color:#15803d">88 / 100</p>
+          <table class="bar"><tr><td class="f-good" style="width:88%"></td><td class="rest"></td></tr></table>
+          <p class="score-sub">Měřeno 04.09.2026 · zlepšení o 26 bodů</p>
+        </td>
+      </tr>
+    </table>
+
+    <div class="source">
+      <b>Zdroj dat</b><br>
+      Google PageSpeed Insights (laboratorní měření) + on-page SEO z HTML stránky.<br>
+      Mezi oběma měřeními neproběhl žádný jiný zásah do webu než opravy uvedené níže.
+    </div>
+
+    <h2 class="sec">Srovnání metrik</h2>
+    <table class="data">
+      <thead><tr><th>Metrika</th><th style="width:24mm">Před</th><th style="width:24mm">Po</th><th style="width:26mm">Změna</th></tr></thead>
+      <tbody>
+        <tr><td>Celkové skóre</td><td class="before">62</td><td class="after">88</td><td class="delta">+26</td></tr>
+        <tr><td>Rychlost (mobil)</td><td class="before">48</td><td class="after">81</td><td class="delta">+33</td></tr>
+        <tr><td>SEO</td><td class="before">71</td><td class="after">94</td><td class="delta">+23</td></tr>
+        <tr><td>Mobilní zobrazení</td><td class="before">68</td><td class="after">90</td><td class="delta">+22</td></tr>
+        <tr><td>LCP (mobil)</td><td class="before">4,8 s</td><td class="after">2,1 s</td><td class="delta">−2,7 s</td></tr>
+        <tr><td>Nefunkční odkazy</td><td class="before">2</td><td class="after">0</td><td class="delta">−2</td></tr>
+      </tbody>
+    </table>
+
+    <h2 class="sec">Nálezy po dokončení</h2>
+    <table class="data">
+      <thead><tr><th>Problém</th><th style="width:26mm">Kde</th><th style="width:44mm">Stav</th><th style="width:22mm">Kč/měs.</th></tr></thead>
+      <tbody>
+        <tr><td>Title tag</td><td>Homepage</td><td><span class="s-fix">Opraveno</span></td><td class="amt">1 700</td></tr>
+        <tr><td>Meta description</td><td>Homepage</td><td><span class="s-fix">Opraveno</span></td><td class="amt">900</td></tr>
+        <tr><td>Sekce homepage</td><td>Homepage</td><td><span class="s-manual">Nelze automaticky</span></td><td class="amt">5 100</td></tr>
+      </tbody>
+    </table>
+
+    <table class="fin">
+      <tr>
+        <td class="left">
+          <div class="head">Zbývající ztráta</div>
+          Nález, který automaticky vyřešit nelze:<br>
+          <span class="big">5 100 Kč / měsíc</span><br>
+          Návod k opravě najdete v kompletním reportu.
+        </td>
+        <td class="right">
+          <div class="head">Odstraněná ztráta</div>
+          Dvě opravy nasazené 04.09.2026:<br>
+          <span class="big">2 600 Kč / měsíc</span><br>
+          Ročně 31 200 Kč.
+        </td>
+      </tr>
+    </table>
+
+    <h2 class="sec">Poznámka k měření</h2>
+    <p class="tnote">
+      Meta description je zde už ve stavu <b>opraveno</b> — na rozdíl od kompletního reportu, který šel ven
+      před zápisem změny. Hodnoty pocházejí z laboratorního měření, které se mezi spuštěními mírně liší.
+      Uvedená čísla nejsou příslib budoucích obchodních výsledků, ale záznam naměřeného technického stavu.
+    </p>
+
+    <div class="footer">© 2026 FinalEdge s.r.o. / GoFixWeb<br>gofixweb.com | info@gofixweb.com | Obchodní podmínky | Ochrana osobních údajů</div>
+  </article>
+
+</div>
+</body>
+</html>

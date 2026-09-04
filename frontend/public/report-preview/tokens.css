@@ -1,0 +1,95 @@
+/* ==========================================================================
+   GoFixWeb PDF — LIGHT tokens (redesign)
+   ==========================================================================
+   Nahrazuje původní dark paletu z exportu (--page-bg: #1a2332).
+   Reporty jdou zákazníkovi jako A4 dokument, který se tiskne a čte v PDF
+   prohlížeči — proto světlé pozadí, ne dark mód z landing page.
+
+   Barevné role zůstávají přesně tři, jak bylo zadáno:
+     zelená   = OPRAVA        (návod k opravě, provedená oprava, zlepšení)
+     jantarová= ZTRÁTA v Kč   (všechny peněžní částky dopadu)
+     červená  = CHYBOVÝ STAV  (co je na webu rozbité, naměřený špatný stav)
+
+   Neutrální šedá NENÍ čtvrtá role — je to absence stavu (meta, mřížka,
+   „neověřeno“ u typu 1 AUTO, kde výsledek zatím není znám).
+
+   Každá hodnota je plná krycí barva. Žádná průhlednost, žádný gradient —
+   v ReportLab jde vše přes colors.HexColor() a BACKGROUND.
+   ========================================================================== */
+
+:root {
+  /* ---------- Plochy a text ---------- */
+  --page-bg: #ffffff;        /* pozadí A4 */
+  --surface-1: #f8fafc;      /* jemný podklad (sudé řádky, levý finanční sloupec) */
+  --surface-2: #f1f5f9;      /* silnější podklad (hlavička tabulky, tělo karty) */
+  --surface-3: #e8edf3;      /* zakrytý obsah v teaseru */
+
+  --ink: #0f172a;            /* hlavní text */
+  --ink-soft: #334155;       /* běžný text v tabulkách a boxech */
+  --ink-dim: #64748b;        /* popisky, meta, patička */
+
+  --hairline: #cbd5e1;       /* rámečky tabulek, 0.5 pt linky */
+  --hairline-soft: #e2e8f0;  /* vnitřní dělicí linky */
+
+  /* ---------- Role: OPRAVA (zelená) ---------- */
+  --fix: #15803d;            /* text a čísla */
+  --fix-strong: #166534;     /* nadpisy v zeleném boxu */
+  --fix-bg: #f0fdf4;         /* výplň boxu */
+  --fix-border: #86efac;     /* rámeček boxu */
+  --fix-rule: #16a34a;       /* dělicí linka pod hlavičkou, zachováno z exportu */
+
+  /* ---------- Role: ZTRÁTA v Kč (jantarová) ---------- */
+  --loss: #b45309;           /* částky */
+  --loss-strong: #92400e;    /* velké číslo měsíční ztráty */
+  --loss-bg: #fffbeb;
+  --loss-border: #fcd34d;
+
+  /* ---------- Role: CHYBOVÝ STAV (červená) ---------- */
+  --error: #b91c1c;          /* naměřená vada, regrese */
+  --error-bg: #fef2f2;
+  --error-border: #fca5a5;
+
+  /* ---------- Neutrální: bez stavu / neověřeno ---------- */
+  --pending: #475569;
+  --pending-bg: #f1f5f9;
+  --pending-border: #cbd5e1;
+
+  /* ---------- Značka ---------- */
+  --logo-ink: #0f172a;       /* „GoFix“ */
+  --logo-accent: #15803d;    /* „Web“ */
+  --watermark: #f1f5f9;      /* diagonální vodoznak, kreslí se pod obsah */
+  --footer-text: #64748b;
+
+  /* ---------- Skóre (ukazatel plnění) ---------- */
+  --bar-track: #e2e8f0;
+  --bar-good: #15803d;
+  --bar-mid: #b45309;
+  --bar-bad: #b91c1c;
+
+  /* ---------- Typografie ---------- */
+  --font: Arial, Helvetica, sans-serif;
+  --body-size: 9pt;
+  --table-font-size: 9pt;
+  --small-size: 8pt;
+  --section-size: 11pt;
+  --subtitle-size: 12pt;
+  --logo-size: 16pt;
+  --loss-big: 26pt;
+
+  /* ---------- Geometrie A4 (beze změny z exportu) ---------- */
+  --page-w: 210mm;
+  --page-h: 297mm;
+  --margin-x: 18mm;
+  --margin-top: 15mm;
+  --margin-bottom: 26mm;
+  --table-w: 170mm;
+  --table-pad: 6px;
+  --section-gap: 8px;
+
+  /* ---------- Šířky sloupců = colWidths v ReportLab ---------- */
+  --kv-label-w: 32mm;
+  --card-num-w: 8mm;
+  --card-amt-w: 34mm;
+  --step-num-w: 6mm;
+  --variant-tag-w: 30mm;
+}
