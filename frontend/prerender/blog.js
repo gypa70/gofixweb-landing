@@ -1,8 +1,7 @@
 import React from 'react';
 import { renderToString } from 'react-dom/server';
-import { Route, Routes } from 'react-router-dom';
 import { StaticRouter } from 'react-router-dom/server';
-import BlogRoutes from '../src/blog-routes';
+import { AppRoutes } from '../src/App';
 import { getBlogPost, getPostSeoMeta } from '../src/lib/blog';
 
 function getHeadElements(url) {
@@ -159,18 +158,7 @@ function getHeadElements(url) {
 
 export async function prerender({ url }) {
   const html = renderToString(
-    React.createElement(
-      StaticRouter,
-      { location: url },
-      React.createElement(
-        Routes,
-        null,
-        React.createElement(
-          Route,
-          { path: '/blog/*', element: React.createElement(BlogRoutes) },
-        ),
-      ),
-    ),
+    React.createElement(StaticRouter, { location: url }, React.createElement(AppRoutes)),
   );
 
   const slug = url
