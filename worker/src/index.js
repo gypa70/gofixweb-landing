@@ -1160,15 +1160,7 @@ function subscriptionLifecyclePayload({
     billing_reason: billingReason || "",
     customer_id: customerId || "",
     price_id: priceId || "",
-    period_start: periodStart || "",
-    period_end: periodEnd || "",
     amount_haleru: amountHaleru || 0,
-    metadata: metadata && typeof metadata === "object" ? metadata : {},
-    subscription_metadata:
-      subscriptionMetadata && typeof subscriptionMetadata === "object"
-        ? subscriptionMetadata
-        : {},
-    livemode: livemode !== false,
   };
 }
 
