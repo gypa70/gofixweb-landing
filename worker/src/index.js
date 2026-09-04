@@ -1068,6 +1068,29 @@ function stripeObjectId(value) {
   return String(value.id || "").trim();
 }
 
+function invoiceSubscriptionId(invoice) {
+  return (
+    stripeObjectId(invoice?.subscription) ||
+    stripeObjectId(invoice?.parent?.subscription_details?.subscription)
+  );
+}
+
+function invoiceSubscriptionMetadata(invoice) {
+  const fromDetails = invoice?.subscription_details?.metadata;
+  if (fromDetails && typeof fromDetails === "object") return fromDetails;
+  const fromParent = invoice?.parent?.subscription_details?.metadata;
+  if (fromParent && typeof fromParent === "object") return fromParent;
+  return {};
+}
+
+function invoicePriceId(invoice) {
+  const lines = invoice?.lines?.data || [];
+  const price = lines[0]?.price || {};
+  const fromPrice = stripeObjectId(price.id || price);
+  if (fromPrice) return fromPrice;
+  return stripeObjectId(lines[0]?.pricing?.price_details?.price);
+}
+
 async function stripeGet(env, path, { testMode = false } = {}) {
   const secret = String(
     testMode
@@ -1232,17 +1255,15 @@ async function resolveCustomerEmail(env, object, { testMode = false } = {}) {
 async function handleSubscriptionInvoiceEvent(event, env, type) {
   const invoice = event?.data?.object || {};
   const testMode = event?.livemode === false;
-  const subscriptionId = stripeObjectId(invoice.subscription);
+  const subscriptionId = invoiceSubscriptionId(invoice);
   if (!subscriptionId) {
     return stripeOkResponse({ ok: true, ignored: true, reason: "not_subscription_invoice" });
   }
   const eventId = String(event?.id || "").trim();
   const lines = invoice?.lines?.data || [];
-  const price = lines[0]?.price || {};
-  const priceId = stripeObjectId(price.id || price);
+  const priceId = invoicePriceId(invoice);
   const amount = Number(invoice.amount_paid ?? invoice.amount_due ?? lines[0]?.amount ?? 0);
-  const subMeta =
-    (invoice.subscription_details && invoice.subscription_details.metadata) || {};
+  const subMeta = invoiceSubscriptionMetadata(invoice);
   const invMeta = invoice.metadata && typeof invoice.metadata === "object" ? invoice.metadata : {};
   let plan =
     String(subMeta.plan || invMeta.plan || invMeta.product || "").trim().toLowerCase();
