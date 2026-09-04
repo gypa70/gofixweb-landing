@@ -1487,6 +1487,84 @@ function exitIntentScript(trackingId, product) {
 </script>`;
 }
 
+/** Stejné pravidlo jako utils/translations.py get_locale: host .sk → sk, jinak cz. */
+function localeFromDomain(raw) {
+  let host = String(raw || "").trim().toLowerCase();
+  if (!host) return "cz";
+  try {
+    if (host.includes("://")) host = new URL(host).hostname || host;
+    else if (host.startsWith("//")) host = new URL(`https:${host}`).hostname || host;
+  } catch {
+    /* keep host */
+  }
+  host = host.split("@").pop().split("/")[0].split(":")[0];
+  return host.endsWith(".sk") ? "sk" : "cz";
+}
+
+function checkoutLocale(domain, email) {
+  const raw = String(domain || "").trim() || String(email || "").trim();
+  return localeFromDomain(raw);
+}
+
+const CHECKOUT_COPY = {
+  cz: {
+    lang: "cs",
+    stripeLocale: "cs",
+    manualName: MANUAL_FIX_NAME,
+    autoName: AUTO_FIX_NAME,
+    manualBlurb: MANUAL_FIX_DESCRIPTION,
+    autoBlurb: AUTO_FIX_DESCRIPTION,
+    manualIntro: "Jednorázová platba. Po zaplacení dostanete přesný návod k opravě nálezů.",
+    autoIntro: "Před platbou je potřeba souhlas s obchodními podmínkami a se zásahem do webu.",
+    pay: "Pokračovat k platbě",
+    vopBefore: "Souhlasím s",
+    vopTerms: "obchodními podmínkami",
+    vopMid: "a s tím, že GoFixWeb provede automatické úpravy mého webu popsané v",
+    vopArticle: "čl. 8 VOP",
+    exitTitle: "Než odejdete — můžete nám prosím říct proč?",
+    exitPrice: "Cena mi nesedí",
+    exitTrust: "Nevím, jestli vám můžu důvěřovat",
+    exitDismiss: "Zavřít bez odpovědi",
+    vopError: "Bez souhlasu s VOP nelze pokračovat k platbě.",
+    unknownProduct: "Neznámý produkt.",
+    stripeMissing: "Stripe Checkout není nakonfigurovaný (STRIPE_SECRET_KEY).",
+    vopRecordFailed: "Souhlas se nepodařilo zaznamenat. Zkuste to znovu.",
+    payFailed: "Nepodařilo se otevřít platbu. Zkuste to znovu.",
+    stripeNoUrl: "Stripe Checkout nevrátil URL.",
+  },
+  sk: {
+    lang: "sk",
+    stripeLocale: "sk",
+    manualName: "Manuálna oprava e-shopu",
+    autoName: "Automatická oprava e-shopu",
+    manualBlurb:
+      "Presný návod na opravu zistení — zásahy vykonáte sami vo svojej administrácii (jednorazová platba).",
+    autoBlurb:
+      "Automatický zápis SEO a rýchlostných opráv priamo do vášho WordPress webu (jednorazový zásah)",
+    manualIntro: "Jednorazová platba. Po zaplatení dostanete presný návod na opravu zistení.",
+    autoIntro: "Pred platbou je potrebný súhlas s obchodnými podmienkami a so zásahom do webu.",
+    pay: "Pokračovať k platbe",
+    vopBefore: "Súhlasím s",
+    vopTerms: "obchodnými podmienkami",
+    vopMid: "a s tým, že GoFixWeb vykoná automatické úpravy môjho webu popísané v",
+    vopArticle: "čl. 8 VOP",
+    exitTitle: "Kým odídete — môžete nám prosím povedať prečo?",
+    exitPrice: "Cena mi nesedí",
+    exitTrust: "Neviem, či vám môžem dôverovať",
+    exitDismiss: "Zavrieť bez odpovede",
+    vopError: "Bez súhlasu s VOP nie je možné pokračovať k platbe.",
+    unknownProduct: "Neznámy produkt.",
+    stripeMissing: "Stripe Checkout nie je nakonfigurovaný (STRIPE_SECRET_KEY).",
+    vopRecordFailed: "Súhlas sa nepodarilo zaznamenať. Skúste to znova.",
+    payFailed: "Nepodarilo sa otvoriť platbu. Skúste to znova.",
+    stripeNoUrl: "Stripe Checkout nevrátil URL.",
+  },
+};
+
+function checkoutCopy(domain, email) {
+  return CHECKOUT_COPY[checkoutLocale(domain, email)] || CHECKOUT_COPY.cz;
+}
+
 function checkoutOfferPage({
   product = "manual_fix",
   domain = "",
@@ -1495,12 +1573,11 @@ function checkoutOfferPage({
   errorMessage = "",
 } = {}) {
   const isAuto = product === "wp_autofix";
-  const title = isAuto ? AUTO_FIX_NAME : MANUAL_FIX_NAME;
+  const copy = checkoutCopy(domain, email);
+  const title = isAuto ? copy.autoName : copy.manualName;
   const priceLabel = "1 990 Kč";
-  const blurb = isAuto ? AUTO_FIX_DESCRIPTION : MANUAL_FIX_DESCRIPTION;
-  const intro = isAuto
-    ? "Před platbou je potřeba souhlas s obchodními podmínkami a se zásahem do webu."
-    : "Jednorázová platba. Po zaplacení dostanete přesný návod k opravě nálezů.";
+  const blurb = isAuto ? copy.autoBlurb : copy.manualBlurb;
+  const intro = isAuto ? copy.autoIntro : copy.manualIntro;
   const err = errorMessage
     ? `<p class="err" id="vop-error">${escapeHtml(errorMessage)}</p>`
     : "";
@@ -1508,10 +1585,10 @@ function checkoutOfferPage({
     ? `<label for="vop-consent">
         <input type="checkbox" id="vop-consent" name="vop_consent" value="1" required>
         <span>
-          Souhlasím s
-          <a href="${VOP_TERMS_URL}" target="_blank" rel="noopener">obchodními podmínkami</a>
-          a s tím, že GoFixWeb provede automatické úpravy mého webu popsané v
-          <a href="${VOP_AUTOFIX_SECTION_URL}" target="_blank" rel="noopener">čl. 8 VOP</a>
+          ${escapeHtml(copy.vopBefore)}
+          <a href="${VOP_TERMS_URL}" target="_blank" rel="noopener">${escapeHtml(copy.vopTerms)}</a>
+          ${escapeHtml(copy.vopMid)}
+          <a href="${VOP_AUTOFIX_SECTION_URL}" target="_blank" rel="noopener">${escapeHtml(copy.vopArticle)}</a>
         </span>
       </label>`
     : "";
@@ -1529,7 +1606,7 @@ function checkoutOfferPage({
   </script>`
     : "";
   const html = `<!DOCTYPE html>
-<html lang="cs">
+<html lang="${escapeHtml(copy.lang)}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1571,18 +1648,18 @@ function checkoutOfferPage({
       <input type="hidden" name="email" value="${escapeHtml(email)}">
       <input type="hidden" name="tid" value="${escapeHtml(trackingId)}">
       ${vopBlock}
-      <button type="submit" id="pay-btn"${payDisabled}>Pokračovat k platbě</button>
+      <button type="submit" id="pay-btn"${payDisabled}>${escapeHtml(copy.pay)}</button>
     </form>
   </div>
   <div id="gfw-exit-modal" class="gfw-exit" hidden aria-hidden="true" role="dialog" aria-labelledby="gfw-exit-title" aria-modal="true">
     <div class="gfw-exit-card">
-      <button type="button" id="gfw-exit-close" class="gfw-exit-x" aria-label="Zavřít bez odpovědi">&times;</button>
-      <p id="gfw-exit-title">Než odejdete — můžete nám prosím říct proč?</p>
+      <button type="button" id="gfw-exit-close" class="gfw-exit-x" aria-label="${escapeHtml(copy.exitDismiss)}">&times;</button>
+      <p id="gfw-exit-title">${escapeHtml(copy.exitTitle)}</p>
       <div class="gfw-exit-actions">
-        <button type="button" id="gfw-exit-price">Cena mi nesedí</button>
-        <button type="button" id="gfw-exit-trust">Nevím, jestli vám můžu důvěřovat</button>
+        <button type="button" id="gfw-exit-price">${escapeHtml(copy.exitPrice)}</button>
+        <button type="button" id="gfw-exit-trust">${escapeHtml(copy.exitTrust)}</button>
       </div>
-      <button type="button" id="gfw-exit-dismiss" class="gfw-exit-skip">Zavřít bez odpovědi</button>
+      <button type="button" id="gfw-exit-dismiss" class="gfw-exit-skip">${escapeHtml(copy.exitDismiss)}</button>
     </div>
   </div>
   ${payScript}
@@ -1625,9 +1702,10 @@ async function handleCheckout(request, env) {
     tid = String(form.get("tid") || tid).trim();
   }
   if (tid && !TRACKING_ID_RE.test(tid)) tid = "";
+  const copy = checkoutCopy(domain, email);
 
   if (product !== "manual_fix" && product !== "wp_autofix") {
-    return new Response("Neznámý produkt.", { status: 400 });
+    return new Response(copy.unknownProduct, { status: 400 });
   }
 
   if (product === "wp_autofix") {
@@ -1640,7 +1718,7 @@ async function handleCheckout(request, env) {
         trackingId: tid,
         errorMessage:
           request.method === "POST" && !consented
-            ? "Bez souhlasu s VOP nelze pokračovat k platbě."
+            ? copy.vopError
             : "",
       });
     }
@@ -1655,7 +1733,7 @@ async function handleCheckout(request, env) {
 
   const secret = String(env.STRIPE_SECRET_KEY || "").trim();
   if (!secret) {
-    return new Response("Stripe Checkout není nakonfigurovaný (STRIPE_SECRET_KEY).", {
+    return new Response(copy.stripeMissing, {
       status: 503,
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
@@ -1673,7 +1751,7 @@ async function handleCheckout(request, env) {
       });
     } catch (err) {
       console.error("vop_consent_dispatch_failed", err);
-      return new Response("Souhlas se nepodařilo zaznamenat. Zkuste to znovu.", {
+      return new Response(copy.vopRecordFailed, {
         status: 502,
         headers: { "Content-Type": "text/plain; charset=utf-8" },
       });
@@ -1681,8 +1759,8 @@ async function handleCheckout(request, env) {
   }
 
   const amount = ONE_TIME_FIX_AMOUNT;
-  const name = product === "manual_fix" ? MANUAL_FIX_NAME : AUTO_FIX_NAME;
-  const description = product === "manual_fix" ? MANUAL_FIX_DESCRIPTION : AUTO_FIX_DESCRIPTION;
+  const name = product === "manual_fix" ? copy.manualName : copy.autoName;
+  const description = product === "manual_fix" ? copy.manualBlurb : copy.autoBlurb;
   const priceId = String(
     product === "manual_fix"
       ? env.STRIPE_MANUAL_FIX_PRICE_ID || STRIPE_MANUAL_FIX_PRICE_ID
@@ -1722,7 +1800,7 @@ async function handleCheckout(request, env) {
     body.set("line_items[0][price_data][product_data][tax_code]", "txcd_10000000");
   }
   body.set("managed_payments[enabled]", "false");
-  body.set("locale", "cs");
+  body.set("locale", copy.stripeLocale);
 
   const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
@@ -1735,11 +1813,11 @@ async function handleCheckout(request, env) {
   if (!response.ok) {
     const text = await response.text();
     console.error("stripe_checkout_create_failed", response.status, text);
-    return new Response("Nepodařilo se otevřít platbu. Zkuste to znovu.", { status: 502 });
+    return new Response(copy.payFailed, { status: 502 });
   }
   const session = await response.json();
   if (!session.url) {
-    return new Response("Stripe Checkout nevrátil URL.", { status: 502 });
+    return new Response(copy.stripeNoUrl, { status: 502 });
   }
   return Response.redirect(session.url, 303);
 }
