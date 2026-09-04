@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Vytvoří (nebo najde) měsíční Stripe Prices Basic/Pro/Premium v CZK.
 
-Nespouští se samo — LP tlačítka zůstanou 'Připravujeme', dokud product
-neověří end-to-end v test mode. Lookup keys:
+Vytvoří (nebo najde) měsíční Stripe Prices. Lookup keys:
   gofixweb_basic_1490_month
   gofixweb_pro_3990_month
   gofixweb_premium_6990_month

@@ -41,4 +41,4 @@ Není to migrace na WooCommerce. Není to přepsání katalogu. Není to hostov�
 2. Chcete seznam kroků a zůstat na stávající platformě? Manuál.
 3. Máte WooCommerce a nechcete klikat desítky obrazovek? Auto, s Application Password, které po práci smažete.
 
-Ceník předplatného na průběžné skeny je zatím v přípravě. Jednorázová oprava z teaser reportu je to, co teď reálně objednáváte.
+Pravidelný sken a opravy jdou objednat i jako měsíční předplatné (Basic / Pro / Premium) na [ceníku](/#tarify). Jednorázovou opravu z teaser reportu tím nijak nahradit nemusíte.

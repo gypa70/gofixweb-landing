@@ -14,7 +14,7 @@
  *   UNSUBSCRIBE_SECRET   — HMAC pro /unsubscribe a /unsub-status
  *
  * GET /checkout — nabídka (manual_fix / wp_autofix jednorázově; basic/pro/premium
- *   měsíčně — LP tlačítka zatím Připravujeme). POST spustí Stripe Checkout Session.
+ *   měsíčně). POST spustí Stripe Checkout Session.
  * POST /stripe-webhook — checkout.session.completed (jednorázově) a invoice.paid
  *   / invoice.payment_failed / customer.subscription.deleted (předplatné).
  * POST /exit-intent — důvod odchodu z nabídky (price|trust|dismiss).
@@ -69,7 +69,7 @@ const MANUAL_FIX_DESCRIPTION =
 const AUTO_FIX_DESCRIPTION =
   "Automatické zapsání SEO a rychlostních oprav přímo do vašeho WordPress webu (jednorázový zásah)";
 const ONBOARDING_URL = "https://gofixweb.com/wordpress-autofix";
-const VOP_VERSION = "2026-08-30";
+const VOP_VERSION = "2026-09-04";
 const VOP_TERMS_URL = "https://gofixweb.com/terms.html";
 const VOP_AUTOFIX_SECTION_URL = `${VOP_TERMS_URL}#vop-autofix-section`;
 
@@ -1189,6 +1189,15 @@ async function handleStripeWebhook(request, env) {
 
   const type = String(event?.type || "");
   const eventId = String(event?.id || "").trim();
+  console.log(
+    "stripe_webhook_verified",
+    JSON.stringify({
+      mode: verify.mode || "",
+      livemode: event?.livemode !== false,
+      type,
+      event_id: eventId,
+    }),
+  );
 
   if (type === "invoice.paid" || type === "invoice.payment_failed") {
     return handleSubscriptionInvoiceEvent(event, env, type);
