@@ -4,7 +4,9 @@
  * Secrets (wrangler secret put):
  *   GITHUB_TOKEN       — PAT s repo scope pro gofixweb-scanner
  *   STRIPE_SECRET_KEY  — Stripe secret key pro GET /checkout (Checkout Session)
- *   STRIPE_WEBHOOK_SECRET — Stripe webhook signing secret pro /stripe-webhook
+ *   STRIPE_SECRET_KEY_TEST — volitelně test-mode Stripe secret (GET u test eventů)
+ *   STRIPE_WEBHOOK_SECRET — live webhook signing secret pro /stripe-webhook
+ *   STRIPE_WEBHOOK_SECRET_TEST — test-mode webhook signing secret (stejná URL)
  *   TURNSTILE_SECRET   — Turnstile secret key (siteverify)
  *
  *   ADMIN_BASIC_PASSWORD — heslo Basic Auth pro GET /admin
@@ -1020,6 +1022,33 @@ async function verifyStripeWebhookSignature(rawBody, signatureHeader, secret) {
   return matched ? { ok: true } : { ok: false, error: "stripe_signature_invalid" };
 }
 
+async function verifyStripeWebhook(rawBody, signatureHeader, env) {
+  const live = String(env.STRIPE_WEBHOOK_SECRET || "").trim();
+  const test = String(env.STRIPE_WEBHOOK_SECRET_TEST || "").trim();
+  if (!live && !test) {
+    return { ok: false, error: "stripe_not_configured" };
+  }
+
+  if (live) {
+    const liveResult = await verifyStripeWebhookSignature(rawBody, signatureHeader, live);
+    if (liveResult.ok) return { ok: true, mode: "live" };
+    if (
+      liveResult.error === "stripe_signature_missing" ||
+      liveResult.error === "stripe_signature_expired"
+    ) {
+      return liveResult;
+    }
+  }
+
+  if (test) {
+    const testResult = await verifyStripeWebhookSignature(rawBody, signatureHeader, test);
+    if (testResult.ok) return { ok: true, mode: "test" };
+    return testResult;
+  }
+
+  return { ok: false, error: "stripe_signature_invalid" };
+}
+
 function stripeOkResponse(body = { ok: true }) {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -1039,8 +1068,12 @@ function stripeObjectId(value) {
   return String(value.id || "").trim();
 }
 
-async function stripeGet(env, path) {
-  const secret = String(env.STRIPE_SECRET_KEY || "").trim();
+async function stripeGet(env, path, { testMode = false } = {}) {
+  const secret = String(
+    testMode
+      ? env.STRIPE_SECRET_KEY_TEST || ""
+      : env.STRIPE_SECRET_KEY || "",
+  ).trim();
   if (!secret) return null;
   const response = await fetch(`https://api.stripe.com/v1/${path.replace(/^\//, "")}`, {
     headers: { Authorization: `Bearer ${secret}` },
@@ -1092,6 +1125,7 @@ function subscriptionLifecyclePayload({
   amountHaleru,
   metadata,
   subscriptionMetadata,
+  livemode,
 }) {
   return {
     event_type: eventType,
@@ -1111,6 +1145,7 @@ function subscriptionLifecyclePayload({
       subscriptionMetadata && typeof subscriptionMetadata === "object"
         ? subscriptionMetadata
         : {},
+    livemode: livemode !== false,
   };
 }
 
@@ -1125,11 +1160,7 @@ async function handleStripeWebhook(request, env) {
 
   const signature = request.headers.get("Stripe-Signature") || "";
   const rawBody = await request.text();
-  const verify = await verifyStripeWebhookSignature(
-    rawBody,
-    signature,
-    env.STRIPE_WEBHOOK_SECRET,
-  );
+  const verify = await verifyStripeWebhook(rawBody, signature, env);
   if (!verify.ok) {
     return new Response(verify.error, { status: 400 });
   }
@@ -1186,20 +1217,21 @@ async function handleStripeWebhook(request, env) {
   return stripeOkResponse({ ok: true, queued: true });
 }
 
-async function resolveCustomerEmail(env, object) {
+async function resolveCustomerEmail(env, object, { testMode = false } = {}) {
   let email = String(
     object?.customer_email || object?.customer_details?.email || "",
   ).trim().toLowerCase();
   if (email && EMAIL_RE.test(email)) return email;
   const customerId = stripeObjectId(object?.customer);
   if (!customerId) return "";
-  const customer = await stripeGet(env, `customers/${customerId}`);
+  const customer = await stripeGet(env, `customers/${customerId}`, { testMode });
   email = String(customer?.email || "").trim().toLowerCase();
   return EMAIL_RE.test(email) ? email : "";
 }
 
 async function handleSubscriptionInvoiceEvent(event, env, type) {
   const invoice = event?.data?.object || {};
+  const testMode = event?.livemode === false;
   const subscriptionId = stripeObjectId(invoice.subscription);
   if (!subscriptionId) {
     return stripeOkResponse({ ok: true, ignored: true, reason: "not_subscription_invoice" });
@@ -1216,9 +1248,9 @@ async function handleSubscriptionInvoiceEvent(event, env, type) {
     String(subMeta.plan || invMeta.plan || invMeta.product || "").trim().toLowerCase();
   if (!isSubscriptionPlan(plan)) plan = planFromPriceId(priceId, env) || planFromAmount(amount);
   let domain = String(subMeta.domain || invMeta.domain || "").trim();
-  let email = await resolveCustomerEmail(env, invoice);
+  let email = await resolveCustomerEmail(env, invoice, { testMode });
   if (!domain || !plan || !email) {
-    const sub = await stripeGet(env, `subscriptions/${subscriptionId}`);
+    const sub = await stripeGet(env, `subscriptions/${subscriptionId}`, { testMode });
     const sm = (sub && sub.metadata) || {};
     if (!domain) domain = String(sm.domain || "").trim();
     if (!isSubscriptionPlan(plan)) {
@@ -1227,7 +1259,7 @@ async function handleSubscriptionInvoiceEvent(event, env, type) {
         || plan;
     }
     if (!email) email = String(sub?.customer_email || "").trim().toLowerCase();
-    if (!email) email = await resolveCustomerEmail(env, sub || {});
+    if (!email) email = await resolveCustomerEmail(env, sub || {}, { testMode });
   }
   const payload = subscriptionLifecyclePayload({
     eventType: type,
@@ -1244,6 +1276,7 @@ async function handleSubscriptionInvoiceEvent(event, env, type) {
     amountHaleru: amount,
     metadata: invMeta,
     subscriptionMetadata: subMeta,
+    livemode: !testMode,
   });
   try {
     await dispatchSubscriptionLifecycle(env, payload);
@@ -1256,9 +1289,10 @@ async function handleSubscriptionInvoiceEvent(event, env, type) {
 
 async function handleSubscriptionDeletedEvent(event, env) {
   const sub = event?.data?.object || {};
+  const testMode = event?.livemode === false;
   const subscriptionId = stripeObjectId(sub.id || sub);
   const meta = sub.metadata && typeof sub.metadata === "object" ? sub.metadata : {};
-  const email = await resolveCustomerEmail(env, sub);
+  const email = await resolveCustomerEmail(env, sub, { testMode });
   const payload = subscriptionLifecyclePayload({
     eventType: "customer.subscription.deleted",
     eventId: String(event?.id || "").trim(),
@@ -1269,6 +1303,7 @@ async function handleSubscriptionDeletedEvent(event, env) {
     customerId: stripeObjectId(sub.customer),
     metadata: meta,
     subscriptionMetadata: meta,
+    livemode: !testMode,
   });
   try {
     await dispatchSubscriptionLifecycle(env, payload);
@@ -1281,18 +1316,20 @@ async function handleSubscriptionDeletedEvent(event, env) {
 
 async function handleSubscriptionCheckoutCompleted(event, env) {
   const session = event?.data?.object || {};
+  const testMode = event?.livemode === false;
   const meta = session.metadata && typeof session.metadata === "object" ? session.metadata : {};
   const payload = subscriptionLifecyclePayload({
     eventType: "checkout.session.completed",
     eventId: String(event?.id || "").trim(),
     subscriptionId: stripeObjectId(session.subscription),
-    email: await resolveCustomerEmail(env, session),
+    email: await resolveCustomerEmail(env, session, { testMode }),
     domain: String(meta.domain || "").trim(),
     plan: String(meta.plan || meta.product || "").trim().toLowerCase(),
     billingReason: "checkout",
     customerId: stripeObjectId(session.customer),
     metadata: meta,
     subscriptionMetadata: meta,
+    livemode: !testMode,
   });
   try {
     await dispatchSubscriptionLifecycle(env, payload);
