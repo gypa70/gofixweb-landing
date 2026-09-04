@@ -11,8 +11,10 @@
  *   ADMIN_BASIC_USER     — volitelně (default gofixweb)
  *   UNSUBSCRIBE_SECRET   — HMAC pro /unsubscribe a /unsub-status
  *
- * GET /checkout — nabídka (manual_fix / wp_autofix, obě 1 990 Kč; Auto + VOP);
- *   POST /checkout spustí Stripe Checkout Session.
+ * GET /checkout — nabídka (manual_fix / wp_autofix jednorázově; basic/pro/premium
+ *   měsíčně — LP tlačítka zatím Připravujeme). POST spustí Stripe Checkout Session.
+ * POST /stripe-webhook — checkout.session.completed (jednorázově) a invoice.paid
+ *   / invoice.payment_failed / customer.subscription.deleted (předplatné).
  * POST /exit-intent — důvod odchodu z nabídky (price|trust|dismiss).
  * GET /survey/{id} — follow-up dotazník (price|trust|other) z 48h nebo 2h e-mailu.
  * POST /submit — formulář: whitelist e-mail spustí free scan, ostatní jen poptávku.
@@ -68,6 +70,31 @@ const ONBOARDING_URL = "https://gofixweb.com/wordpress-autofix";
 const VOP_VERSION = "2026-08-30";
 const VOP_TERMS_URL = "https://gofixweb.com/terms.html";
 const VOP_AUTOFIX_SECTION_URL = `${VOP_TERMS_URL}#vop-autofix-section`;
+
+const SUBSCRIPTION_PLANS = {
+  basic: {
+    amount: 149000,
+    display: "Basic",
+    priceEnv: "STRIPE_BASIC_PRICE_ID",
+    priceLabel: "1 490 Kč / měsíc",
+  },
+  pro: {
+    amount: 399000,
+    display: "Pro",
+    priceEnv: "STRIPE_PRO_PRICE_ID",
+    priceLabel: "3 990 Kč / měsíc",
+  },
+  premium: {
+    amount: 699000,
+    display: "Premium",
+    priceEnv: "STRIPE_PREMIUM_PRICE_ID",
+    priceLabel: "6 990 Kč / měsíc",
+  },
+};
+
+function isSubscriptionPlan(product) {
+  return Boolean(SUBSCRIPTION_PLANS[String(product || "").trim().toLowerCase()]);
+}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STRIPE_TIMESTAMP_TOLERANCE_SEC = 300;
@@ -1000,6 +1027,97 @@ function stripeOkResponse(body = { ok: true }) {
   });
 }
 
+function unixToIso(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return "";
+  return new Date(n * 1000).toISOString();
+}
+
+function stripeObjectId(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  return String(value.id || "").trim();
+}
+
+async function stripeGet(env, path) {
+  const secret = String(env.STRIPE_SECRET_KEY || "").trim();
+  if (!secret) return null;
+  const response = await fetch(`https://api.stripe.com/v1/${path.replace(/^\//, "")}`, {
+    headers: { Authorization: `Bearer ${secret}` },
+  });
+  if (!response.ok) return null;
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function planFromPriceId(priceId, env) {
+  const raw = String(priceId || "").trim();
+  if (!raw) return "";
+  for (const [plan, spec] of Object.entries(SUBSCRIPTION_PLANS)) {
+    const envId = String(env?.[spec.priceEnv] || "").trim();
+    if (envId && envId === raw) return plan;
+  }
+  const lower = raw.toLowerCase();
+  if (lower.includes("premium")) return "premium";
+  if (lower.includes("pro")) return "pro";
+  if (lower.includes("basic")) return "basic";
+  return "";
+}
+
+function planFromAmount(amount) {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return "";
+  const haleru = n < 1000 ? n * 100 : n;
+  for (const [plan, spec] of Object.entries(SUBSCRIPTION_PLANS)) {
+    if (haleru === spec.amount) return plan;
+  }
+  return "";
+}
+
+function subscriptionLifecyclePayload({
+  eventType,
+  eventId,
+  subscriptionId,
+  email,
+  domain,
+  plan,
+  billingReason,
+  customerId,
+  priceId,
+  periodStart,
+  periodEnd,
+  amountHaleru,
+  metadata,
+  subscriptionMetadata,
+}) {
+  return {
+    event_type: eventType,
+    event_id: eventId,
+    subscription_id: subscriptionId || "",
+    email: email || "",
+    domain: domain || "",
+    plan: plan || "",
+    billing_reason: billingReason || "",
+    customer_id: customerId || "",
+    price_id: priceId || "",
+    period_start: periodStart || "",
+    period_end: periodEnd || "",
+    amount_haleru: amountHaleru || 0,
+    metadata: metadata && typeof metadata === "object" ? metadata : {},
+    subscription_metadata:
+      subscriptionMetadata && typeof subscriptionMetadata === "object"
+        ? subscriptionMetadata
+        : {},
+  };
+}
+
+async function dispatchSubscriptionLifecycle(env, payload) {
+  await dispatchGithubEvent(env, "subscription-lifecycle", payload);
+}
+
 async function handleStripeWebhook(request, env) {
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -1023,11 +1141,24 @@ async function handleStripeWebhook(request, env) {
     return new Response("invalid_json", { status: 400 });
   }
 
-  if (event?.type !== "checkout.session.completed") {
+  const type = String(event?.type || "");
+  const eventId = String(event?.id || "").trim();
+
+  if (type === "invoice.paid" || type === "invoice.payment_failed") {
+    return handleSubscriptionInvoiceEvent(event, env, type);
+  }
+  if (type === "customer.subscription.deleted") {
+    return handleSubscriptionDeletedEvent(event, env);
+  }
+  if (type !== "checkout.session.completed") {
     return stripeOkResponse({ ok: true, ignored: true });
   }
 
   const session = event?.data?.object || {};
+  if (String(session.mode || "") === "subscription" || isSubscriptionPlan(session?.metadata?.plan || session?.metadata?.product)) {
+    return handleSubscriptionCheckoutCompleted(event, env);
+  }
+
   const product = paidAuditProduct(session);
   if (!product) {
     return stripeOkResponse({ ok: true, ignored: true, reason: "not_complete_audit" });
@@ -1035,7 +1166,6 @@ async function handleStripeWebhook(request, env) {
   const email = String(
     session.customer_email || session.customer_details?.email || "",
   ).trim().toLowerCase();
-  const eventId = String(event?.id || "").trim();
 
   if (!email || !EMAIL_RE.test(email) || !eventId) {
     return new Response("missing_email_or_event_id", { status: 400 });
@@ -1054,6 +1184,123 @@ async function handleStripeWebhook(request, env) {
   }
 
   return stripeOkResponse({ ok: true, queued: true });
+}
+
+async function resolveCustomerEmail(env, object) {
+  let email = String(
+    object?.customer_email || object?.customer_details?.email || "",
+  ).trim().toLowerCase();
+  if (email && EMAIL_RE.test(email)) return email;
+  const customerId = stripeObjectId(object?.customer);
+  if (!customerId) return "";
+  const customer = await stripeGet(env, `customers/${customerId}`);
+  email = String(customer?.email || "").trim().toLowerCase();
+  return EMAIL_RE.test(email) ? email : "";
+}
+
+async function handleSubscriptionInvoiceEvent(event, env, type) {
+  const invoice = event?.data?.object || {};
+  const subscriptionId = stripeObjectId(invoice.subscription);
+  if (!subscriptionId) {
+    return stripeOkResponse({ ok: true, ignored: true, reason: "not_subscription_invoice" });
+  }
+  const eventId = String(event?.id || "").trim();
+  const lines = invoice?.lines?.data || [];
+  const price = lines[0]?.price || {};
+  const priceId = stripeObjectId(price.id || price);
+  const amount = Number(invoice.amount_paid ?? invoice.amount_due ?? lines[0]?.amount ?? 0);
+  const subMeta =
+    (invoice.subscription_details && invoice.subscription_details.metadata) || {};
+  const invMeta = invoice.metadata && typeof invoice.metadata === "object" ? invoice.metadata : {};
+  let plan =
+    String(subMeta.plan || invMeta.plan || invMeta.product || "").trim().toLowerCase();
+  if (!isSubscriptionPlan(plan)) plan = planFromPriceId(priceId, env) || planFromAmount(amount);
+  let domain = String(subMeta.domain || invMeta.domain || "").trim();
+  let email = await resolveCustomerEmail(env, invoice);
+  if (!domain || !plan || !email) {
+    const sub = await stripeGet(env, `subscriptions/${subscriptionId}`);
+    const sm = (sub && sub.metadata) || {};
+    if (!domain) domain = String(sm.domain || "").trim();
+    if (!isSubscriptionPlan(plan)) {
+      plan = String(sm.plan || sm.product || "").trim().toLowerCase()
+        || planFromPriceId(stripeObjectId(sub?.items?.data?.[0]?.price), env)
+        || plan;
+    }
+    if (!email) email = String(sub?.customer_email || "").trim().toLowerCase();
+    if (!email) email = await resolveCustomerEmail(env, sub || {});
+  }
+  const payload = subscriptionLifecyclePayload({
+    eventType: type,
+    eventId,
+    subscriptionId,
+    email,
+    domain,
+    plan,
+    billingReason: String(invoice.billing_reason || ""),
+    customerId: stripeObjectId(invoice.customer),
+    priceId,
+    periodStart: unixToIso(invoice.period_start),
+    periodEnd: unixToIso(invoice.period_end),
+    amountHaleru: amount,
+    metadata: invMeta,
+    subscriptionMetadata: subMeta,
+  });
+  try {
+    await dispatchSubscriptionLifecycle(env, payload);
+  } catch (err) {
+    console.error("subscription_dispatch_failed", err);
+    return new Response("dispatch_failed", { status: 502 });
+  }
+  return stripeOkResponse({ ok: true, queued: true, type, plan });
+}
+
+async function handleSubscriptionDeletedEvent(event, env) {
+  const sub = event?.data?.object || {};
+  const subscriptionId = stripeObjectId(sub.id || sub);
+  const meta = sub.metadata && typeof sub.metadata === "object" ? sub.metadata : {};
+  const email = await resolveCustomerEmail(env, sub);
+  const payload = subscriptionLifecyclePayload({
+    eventType: "customer.subscription.deleted",
+    eventId: String(event?.id || "").trim(),
+    subscriptionId,
+    email,
+    domain: String(meta.domain || "").trim(),
+    plan: String(meta.plan || meta.product || "").trim().toLowerCase(),
+    customerId: stripeObjectId(sub.customer),
+    metadata: meta,
+    subscriptionMetadata: meta,
+  });
+  try {
+    await dispatchSubscriptionLifecycle(env, payload);
+  } catch (err) {
+    console.error("subscription_deleted_dispatch_failed", err);
+    return new Response("dispatch_failed", { status: 502 });
+  }
+  return stripeOkResponse({ ok: true, queued: true, type: "customer.subscription.deleted" });
+}
+
+async function handleSubscriptionCheckoutCompleted(event, env) {
+  const session = event?.data?.object || {};
+  const meta = session.metadata && typeof session.metadata === "object" ? session.metadata : {};
+  const payload = subscriptionLifecyclePayload({
+    eventType: "checkout.session.completed",
+    eventId: String(event?.id || "").trim(),
+    subscriptionId: stripeObjectId(session.subscription),
+    email: await resolveCustomerEmail(env, session),
+    domain: String(meta.domain || "").trim(),
+    plan: String(meta.plan || meta.product || "").trim().toLowerCase(),
+    billingReason: "checkout",
+    customerId: stripeObjectId(session.customer),
+    metadata: meta,
+    subscriptionMetadata: meta,
+  });
+  try {
+    await dispatchSubscriptionLifecycle(env, payload);
+  } catch (err) {
+    console.error("subscription_checkout_dispatch_failed", err);
+    return new Response("dispatch_failed", { status: 502 });
+  }
+  return stripeOkResponse({ ok: true, queued: true, type: "checkout.session.completed" });
 }
 
 const WP_COPY = {
@@ -1531,6 +1778,14 @@ const CHECKOUT_COPY = {
     vopRecordFailed: "Souhlas se nepodařilo zaznamenat. Zkuste to znovu.",
     payFailed: "Nepodařilo se otevřít platbu. Zkuste to znovu.",
     stripeNoUrl: "Stripe Checkout nevrátil URL.",
+    domainLabel: "URL e-shopu",
+    domainPlaceholder: "example.cz",
+    domainError: "Zadejte URL e-shopu — bez ní nelze spustit pravidelné scany.",
+    emailLabel: "E-mail",
+    subIntro: "Měsíční předplatné. Po zaplacení připojíte WordPress (Application Password) a spustíme pravidelné scany a opravy.",
+    subBlurbBasic: "Měsíční sken, 1 oprava, 1 sloučený e-mail s nálezy i provedenými opravami.",
+    subBlurbPro: "Týdenní sken, až 4 opravy měsíčně, 1 sloučený e-mail týdně.",
+    subBlurbPremium: "Denní sken a optimalizace, 1 sloučený e-mail denně.",
   },
   sk: {
     lang: "sk",
@@ -1558,6 +1813,14 @@ const CHECKOUT_COPY = {
     vopRecordFailed: "Súhlas sa nepodarilo zaznamenať. Skúste to znova.",
     payFailed: "Nepodarilo sa otvoriť platbu. Skúste to znova.",
     stripeNoUrl: "Stripe Checkout nevrátil URL.",
+    domainLabel: "URL e-shopu",
+    domainPlaceholder: "example.sk",
+    domainError: "Zadajte URL e-shopu — bez nej nie je možné spustiť pravidelné skeny.",
+    emailLabel: "E-mail",
+    subIntro: "Mesačné predplatné. Po zaplatení pripojíte WordPress (Application Password) a spustíme pravidelné skeny a opravy.",
+    subBlurbBasic: "Mesačný sken, 1 oprava, 1 zlúčený e-mail s nálezmi aj vykonanými opravami.",
+    subBlurbPro: "Týždenný sken, až 4 opravy mesačne, 1 zlúčený e-mail týždenne.",
+    subBlurbPremium: "Denný sken a optimalizácia, 1 zlúčený e-mail denne.",
   },
 };
 
@@ -1685,6 +1948,196 @@ function autofixConsentPage({ domain = "", email = "", trackingId = "", errorMes
   });
 }
 
+function subscriptionOfferPage({
+  product = "basic",
+  domain = "",
+  email = "",
+  trackingId = "",
+  errorMessage = "",
+} = {}) {
+  const plan = String(product || "").trim().toLowerCase();
+  const spec = SUBSCRIPTION_PLANS[plan] || SUBSCRIPTION_PLANS.basic;
+  const copy = checkoutCopy(domain, email);
+  const blurbs = {
+    basic: copy.subBlurbBasic,
+    pro: copy.subBlurbPro,
+    premium: copy.subBlurbPremium,
+  };
+  const title = `GoFixWeb ${spec.display}`;
+  const err = errorMessage
+    ? `<p class="err" id="vop-error">${escapeHtml(errorMessage)}</p>`
+    : "";
+  const html = `<!DOCTYPE html>
+<html lang="${escapeHtml(copy.lang)}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(title)} — GoFixWeb</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, system-ui, sans-serif; background: #1a2332; color: #fff; line-height: 1.6; min-height: 100vh; }
+    .wrap { width: min(560px, 92vw); margin: 0 auto; padding: 3rem 0 4rem; }
+    h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 0.75rem; }
+    p { color: #cbd5e1; margin-bottom: 1rem; }
+    a { color: #16a34a; }
+    .price { font-size: 1.35rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem; }
+    .card { border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.25rem; background: #243044; }
+    label { display: flex; gap: 0.7rem; align-items: flex-start; color: #e2e8f0; font-size: 0.95rem; cursor: pointer; }
+    label.field { flex-direction: column; gap: 0.35rem; margin-bottom: 0.85rem; cursor: default; }
+    input[type="checkbox"] { margin-top: 0.3rem; width: 1.1rem; height: 1.1rem; flex-shrink: 0; }
+    input[type="text"], input[type="email"] { width: 100%; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 0.65rem 0.75rem; background: #1a2332; color: #fff; font-size: 1rem; }
+    button { margin-top: 1.25rem; width: 100%; border: 0; border-radius: 8px; padding: 0.85rem 1rem; font-weight: 700; font-size: 1rem; background: #16a34a; color: #fff; cursor: pointer; }
+    button:disabled { background: #475569; color: #cbd5e1; cursor: not-allowed; }
+    .err { color: #fca5a5; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>${escapeHtml(title)}</h1>
+    <p class="price">${escapeHtml(spec.priceLabel)}</p>
+    <p>${escapeHtml(blurbs[plan] || copy.subBlurbBasic)}</p>
+    <p>${escapeHtml(copy.subIntro)}</p>
+    ${err}
+    <form id="gfw-pay-form" method="post" action="/checkout" class="card">
+      <input type="hidden" name="product" value="${escapeHtml(plan)}">
+      <input type="hidden" name="tid" value="${escapeHtml(trackingId)}">
+      <label class="field" for="sub-domain">${escapeHtml(copy.domainLabel)}
+        <input type="text" id="sub-domain" name="domain" value="${escapeHtml(domain)}" required placeholder="${escapeHtml(copy.domainPlaceholder)}">
+      </label>
+      <label class="field" for="sub-email">${escapeHtml(copy.emailLabel)}
+        <input type="email" id="sub-email" name="email" value="${escapeHtml(email)}" required placeholder="jan@eshop.cz">
+      </label>
+      <label for="vop-consent">
+        <input type="checkbox" id="vop-consent" name="vop_consent" value="1" required>
+        <span>
+          ${escapeHtml(copy.vopBefore)}
+          <a href="${VOP_TERMS_URL}" target="_blank" rel="noopener">${escapeHtml(copy.vopTerms)}</a>
+          ${escapeHtml(copy.vopMid)}
+          <a href="${VOP_AUTOFIX_SECTION_URL}" target="_blank" rel="noopener">${escapeHtml(copy.vopArticle)}</a>
+        </span>
+      </label>
+      <button type="submit" id="pay-btn" disabled>${escapeHtml(copy.pay)}</button>
+    </form>
+  </div>
+  <script>
+    (function () {
+      var cb = document.getElementById("vop-consent");
+      var btn = document.getElementById("pay-btn");
+      if (!cb || !btn) return;
+      function sync() { btn.disabled = !cb.checked; }
+      cb.addEventListener("change", sync);
+      sync();
+    })();
+  </script>
+</body>
+</html>`;
+  return new Response(html, {
+    status: errorMessage ? 400 : 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+async function handleSubscriptionCheckout(request, env, { plan, domain, email, consent, tid }) {
+  const copy = checkoutCopy(domain, email);
+  const spec = SUBSCRIPTION_PLANS[plan];
+  const consented = isVopConsented(consent);
+  const domainOk = Boolean(String(domain || "").trim());
+  const emailOk = Boolean(email && EMAIL_RE.test(email));
+  if (request.method !== "POST" || !consented || !domainOk || !emailOk) {
+    let errorMessage = "";
+    if (request.method === "POST" && !consented) errorMessage = copy.vopError;
+    else if (request.method === "POST" && !domainOk) errorMessage = copy.domainError;
+    return subscriptionOfferPage({
+      product: plan,
+      domain,
+      email,
+      trackingId: tid,
+      errorMessage,
+    });
+  }
+
+  const secret = String(env.STRIPE_SECRET_KEY || "").trim();
+  if (!secret) {
+    return new Response(copy.stripeMissing, {
+      status: 503,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
+
+  try {
+    await dispatchGithubEvent(env, "wp-vop-consent", {
+      email,
+      domain,
+      ip: clientIp(request),
+      vop_version: VOP_VERSION,
+      consent_at: new Date().toISOString(),
+      product: plan,
+    });
+  } catch (err) {
+    console.error("vop_consent_dispatch_failed", err);
+    return new Response(copy.vopRecordFailed, {
+      status: 502,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
+
+  const next = new URL(ONBOARDING_URL);
+  next.searchParams.set("email", email);
+  const shop = /^https?:\/\//i.test(domain) ? domain : `https://${domain}`;
+  next.searchParams.set("shop", shop);
+
+  const priceId = String(env[spec.priceEnv] || "").trim();
+  const body = new URLSearchParams();
+  body.set("mode", "subscription");
+  body.set("success_url", next.toString());
+  body.set("cancel_url", "https://gofixweb.com/#tarify");
+  body.set("client_reference_id", plan);
+  body.set("metadata[product]", plan);
+  body.set("metadata[plan]", plan);
+  body.set("metadata[domain]", domain);
+  body.set("metadata[vop_consent]", "1");
+  body.set("metadata[vop_version]", VOP_VERSION);
+  body.set("subscription_data[metadata][product]", plan);
+  body.set("subscription_data[metadata][plan]", plan);
+  body.set("subscription_data[metadata][domain]", domain);
+  body.set("customer_email", email);
+  body.set("line_items[0][quantity]", "1");
+  if (priceId) {
+    body.set("line_items[0][price]", priceId);
+  } else {
+    body.set("line_items[0][price_data][currency]", COMPLETE_AUDIT_CURRENCY);
+    body.set("line_items[0][price_data][unit_amount]", String(spec.amount));
+    body.set("line_items[0][price_data][recurring][interval]", "month");
+    body.set("line_items[0][price_data][product_data][name]", `GoFixWeb ${spec.display}`);
+    body.set("line_items[0][price_data][product_data][description]", copy[`subBlurb${spec.display}`] || "");
+    body.set("line_items[0][price_data][product_data][tax_code]", "txcd_10000000");
+  }
+  body.set("managed_payments[enabled]", "false");
+  body.set("locale", copy.stripeLocale);
+
+  const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${secret}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    console.error("stripe_subscription_checkout_failed", response.status, text);
+    return new Response(copy.payFailed, { status: 502 });
+  }
+  const session = await response.json();
+  if (!session.url) {
+    return new Response(copy.stripeNoUrl, { status: 502 });
+  }
+  return Response.redirect(session.url, 303);
+}
+
 async function handleCheckout(request, env) {
   const url = new URL(request.url);
   let product = String(url.searchParams.get("product") || "").trim();
@@ -1702,7 +2155,19 @@ async function handleCheckout(request, env) {
     tid = String(form.get("tid") || tid).trim();
   }
   if (tid && !TRACKING_ID_RE.test(tid)) tid = "";
+  product = String(product || "").trim();
+  const planKey = product.toLowerCase();
   const copy = checkoutCopy(domain, email);
+
+  if (isSubscriptionPlan(planKey)) {
+    return handleSubscriptionCheckout(request, env, {
+      plan: planKey,
+      domain,
+      email,
+      consent,
+      tid,
+    });
+  }
 
   if (product !== "manual_fix" && product !== "wp_autofix") {
     return new Response(copy.unknownProduct, { status: 400 });

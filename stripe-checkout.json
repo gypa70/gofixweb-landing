@@ -1,6 +1,6 @@
 {
   "status": "coming_soon",
-  "note": "Měsíční předplatné se aktuálně nepřijímá. Stripe Products/Prices se nemění.",
+  "note": "LP tlačítka zůstávají Připravujeme. Checkout /checkout?product=basic|pro|premium existuje ve Workeru, Stripe Price IDs se doplní po test-mode ověření.",
   "basic": "",
   "pro": "",
   "premium": ""
