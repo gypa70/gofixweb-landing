@@ -20,6 +20,7 @@
  * POST /exit-intent — důvod odchodu z nabídky (price|trust|dismiss).
  * GET /survey/{id} — 48h thanks (price|trust|other) nebo 2h personalizované stránky
  *   (findings|loss|price|later, src=open_2h).
+ * GET /result/{id} — 7. e-mail MANUÁL „Chci vidět výsledek“ (HMAC) spustí Před/Po sken.
  * POST /submit — formulář: whitelist e-mail spustí free scan, ostatní jen poptávku.
  * POST /wp-onboarding — handshake WordPress REST; uložení credentials běží v GHA.
  */
@@ -1036,6 +1037,66 @@ function renderWhyNotBuyBox(why) {
     ${sourceLine(src.exit_intent, [["price", "Cena"], ["trust", "Důvěra"], ["dismiss", "Zavřeno"], ["total", "Celkem"]])}
     ${sourceLine(src.click_48h, [["payfail", "Platba"], ["variant", "Varianta"], ["fear", "Zásah"], ["share", "Schválení"], ["pending", "Bez odpovědi"], ["sent", "Odesláno"]])}
     ${sourceLine(src.open_2h, [["findings", "Nálezy"], ["loss", "Ztráta"], ["price", "Cena"], ["later", "Později"], ["pending", "Bez odpovědi"], ["sent", "Odesláno"]])}
+  </div>`;
+}
+
+function landingLeadsFromSnapshot(snapshot) {
+  const raw = snapshot && typeof snapshot.landing_leads === "object" && snapshot.landing_leads
+    ? snapshot.landing_leads
+    : {};
+  const rows = Array.isArray(raw.rows) ? raw.rows.slice(0, 50) : [];
+  return {
+    newCount: Number(raw.new || 0),
+    handledCount: Number(raw.handled || 0),
+    rows,
+  };
+}
+
+function renderLandingLeadsBox(snapshot) {
+  const data = landingLeadsFromSnapshot(snapshot);
+  const tableRows = data.rows.length
+    ? data.rows.map((row) => {
+        const status = String(row.status || "new").toLowerCase() === "handled" ? "handled" : "new";
+        const statusLabel = status === "handled" ? "Vyřízená" : "Nová";
+        const statusCls = status === "handled" ? "ok" : "warn";
+        const name = String(row.name || "").trim() || "—";
+        const email = String(row.email || "").trim();
+        const domain = String(row.domain || "").trim();
+        const leadId = String(row.id || "").trim();
+        return `<tr>
+            <td>${escapeHtml(name)}</td>
+            <td>${escapeHtml(email || "—")}</td>
+            <td>${escapeHtml(domain || "—")}</td>
+            <td>${formatWhen(row.created_at)}</td>
+            <td class="${statusCls}">${statusLabel}</td>
+            <td>
+              <button type="button" class="launch prefill-scan"
+                data-domain="${escapeHtml(domain)}"
+                data-email="${escapeHtml(email)}"
+                data-lead-id="${escapeHtml(leadId)}">Odeslat report</button>
+            </td>
+          </tr>`;
+      }).join("")
+    : `<tr><td colspan="6" class="muted">Zatím žádná poptávka z landing page.</td></tr>`;
+  return `<div class="orders-box" id="landing-leads">
+    <h2>Poptávky z landing page</h2>
+    <p class="hint">Formulář mimo whitelist. Ukládá se do DB a notifikace jde na audit@gofixweb.com.
+    Posledních 50, nejnovější nahoře. „Odeslat report“ předvyplní testovací scan níže; po odeslání se poptávka označí jako vyřízená (snapshot se obnoví s persistem DB).</p>
+    <div class="cards">
+      <div class="card"><div class="k">Nové</div><div class="v warn">${escapeHtml(data.newCount)}</div></div>
+      <div class="card"><div class="k">Vyřízené</div><div class="v ok">${escapeHtml(data.handledCount)}</div></div>
+    </div>
+    <div class="orders-match-table" style="margin-top:0.75rem;">
+      <table>
+        <thead>
+          <tr>
+            <th>Jméno</th><th>E-mail</th><th>Doména</th>
+            <th>Přijato</th><th>Stav</th><th></th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
   </div>`;
 }
 
@@ -3176,6 +3237,7 @@ function renderAdminHtml(snapshot, {
   suppressedEmail = "",
   scanQueued = false,
   scanEmail = "",
+  scanLead = false,
   scanError = "",
   launchError = "",
   runState = {},
@@ -3224,7 +3286,11 @@ function renderAdminHtml(snapshot, {
     ? `<p class="banner-err">${escapeHtml(launchError)}</p>`
     : "";
   const scanNote = scanQueued
-    ? `<p class="banner-ok">Testovací scan je ve frontě GitHub Actions. PDF přijde na ${escapeHtml(scanEmail || ADMIN_DEV_SCAN_DEFAULT_EMAIL)} (obvykle do 10–15 minut). Záloha je i jako artefakt v GHA. Před-po potřebuje dříve uložený kompletní scan stejné domény.</p>`
+    ? `<p class="banner-ok">Testovací scan je ve frontě GitHub Actions. PDF přijde na ${escapeHtml(scanEmail || ADMIN_DEV_SCAN_DEFAULT_EMAIL)} (obvykle do 10–15 minut). Záloha je i jako artefakt v GHA. Před-po potřebuje dříve uložený kompletní scan stejné domény.${
+        scanLead
+          ? " Poptávka z landing page se označí jako vyřízená po persistu DB (obvykle do minuty)."
+          : ""
+      }</p>`
     : "";
   const scanErr = scanError
     ? `<p class="banner-err">${escapeHtml(scanError)}</p>`
@@ -3337,10 +3403,11 @@ function renderAdminHtml(snapshot, {
           <button class="launch" type="submit">Přidat do suppression listu</button>
         </form>
       </div>`;
-  const devScanBox = `<div class="suppress-box">
+  const devScanBox = `<div class="suppress-box" id="dev-scan">
         <h2>Spustit testovací scan</h2>
         <p class="hint">Stejná logika jako CLI <code>scripts/dev_scan.py</code> — bez denního limitu, jen za Basic Auth tohoto dashboardu. PDF přijde na zadaný e-mail; záloha je v <a href="${ADMIN_LINKS.devScan}" target="_blank" rel="noopener">GitHub Actions</a>.</p>
         <form class="suppress-form" method="post" action="/admin/dev-scan">
+          <input type="hidden" name="landing_lead_id" value="">
           <label>Doména / URL e-shopu
             <input type="text" name="shop_url" required placeholder="drpopov.cz" autocomplete="off">
           </label>
@@ -3438,6 +3505,7 @@ function renderAdminHtml(snapshot, {
     .orders-box h2 { font-size: 1.05rem; margin-bottom: 0.35rem; }
     .orders-box .cards { margin-top: 0.75rem; }
     .orders-box .card .v { font-size: 1.05rem; font-weight: 700; }
+    .orders-box button.launch { margin-top: 0; padding: 0.45rem 0.75rem; font-size: 0.8rem; }
     .orders-match-details { margin-top: 0.85rem; }
     .orders-match-details > summary { cursor: pointer; color: var(--green); font-weight: 600; }
     .orders-match-table { overflow-x: auto; margin-top: 0.55rem; }
@@ -3495,6 +3563,7 @@ function renderAdminHtml(snapshot, {
     </div>
     ${haltBox}
     ${suppressBox}
+    ${renderLandingLeadsBox(snapshot)}
     ${devScanBox}
     <h2 style="font-size:1.05rem;margin:0 0 0.65rem;">E-mailové série</h2>
     <div class="series-grid">${seriesCards}</div>
@@ -3571,6 +3640,24 @@ function renderAdminHtml(snapshot, {
         }
       });
     });
+    document.querySelectorAll("button.prefill-scan").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var form = document.querySelector('form[action="/admin/dev-scan"]');
+        if (!form) return;
+        var domain = btn.getAttribute("data-domain") || "";
+        var email = btn.getAttribute("data-email") || "";
+        var leadId = btn.getAttribute("data-lead-id") || "";
+        var shopInput = form.querySelector('input[name="shop_url"]');
+        var emailInput = form.querySelector('input[name="email"]');
+        var leadInput = form.querySelector('input[name="landing_lead_id"]');
+        if (shopInput) shopInput.value = domain;
+        if (emailInput && email) emailInput.value = email;
+        if (leadInput) leadInput.value = leadId;
+        var box = document.getElementById("dev-scan");
+        if (box && box.scrollIntoView) box.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (shopInput && shopInput.focus) shopInput.focus();
+      });
+    });
     setTimeout(function () { location.reload(); }, ${refreshSec}000);
   </script>
 </body>
@@ -3606,6 +3693,7 @@ async function handleAdminPage(request, env) {
   const suppressedEmail = String(url.searchParams.get("email") || "").trim().toLowerCase();
   const scanQueued = url.searchParams.get("scan") === "1";
   const scanEmail = String(url.searchParams.get("to") || "").trim().toLowerCase();
+  const scanLead = url.searchParams.get("lead") === "1";
   let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
   let error = "";
   let runState = emptyOutreachRunState();
@@ -3628,7 +3716,7 @@ async function handleAdminPage(request, env) {
   const orders = await resolveAdminOrders(snapshot);
   const ordersError = String(snapshot?.orders?.error || snapshot?.orders_error || "");
   return adminHtmlResponse(renderAdminHtml(snapshot, {
-    error, queued, launched, launchedSeries, launchedRunId, autoQueued, autoSizeQueued, suppressed, suppressedAlready, suppressedEmail, scanQueued, scanEmail, runState,
+    error, queued, launched, launchedSeries, launchedRunId, autoQueued, autoSizeQueued, suppressed, suppressedAlready, suppressedEmail, scanQueued, scanEmail, scanLead, runState,
     orders, ordersError,
   }));
 }
@@ -3951,11 +4039,13 @@ async function handleAdminDevScan(request, env) {
   let shopUrlRaw = "";
   let reportKind = "";
   let email = "";
+  let landingLeadId = "";
   try {
     const form = await request.formData();
     shopUrlRaw = String(form.get("shop_url") || form.get("domain") || "").trim();
     reportKind = String(form.get("report_kind") || "").trim().toLowerCase();
     email = String(form.get("email") || ADMIN_DEV_SCAN_DEFAULT_EMAIL).trim().toLowerCase();
+    landingLeadId = String(form.get("landing_lead_id") || "").trim();
   } catch {
     return fail("Neplatný formulář.");
   }
@@ -3975,15 +4065,21 @@ async function handleAdminDevScan(request, env) {
   if (!EMAIL_RE.test(email)) {
     return fail("Zadejte platnou e-mailovou adresu, kam poslat PDF.");
   }
+  if (landingLeadId && !/^\d+$/.test(landingLeadId)) {
+    landingLeadId = "";
+  }
+
+  const payload = {
+    source: "admin",
+    shop_url,
+    report_kind: reportKind,
+    email,
+    at: new Date().toISOString(),
+  };
+  if (landingLeadId) payload.landing_lead_id = landingLeadId;
 
   try {
-    await dispatchGithubEvent(env, "dev-scan", {
-      source: "admin",
-      shop_url,
-      report_kind: reportKind,
-      email,
-      at: new Date().toISOString(),
-    });
+    await dispatchGithubEvent(env, "dev-scan", payload);
   } catch (err) {
     console.error("admin_dev_scan_dispatch_failed", err);
     return fail("Testovací scan se nepodařilo spustit v GitHub Actions. Zkuste workflow ručně.", 502);
@@ -3991,6 +4087,7 @@ async function handleAdminDevScan(request, env) {
   const next = new URL("/admin", request.url);
   next.searchParams.set("scan", "1");
   next.searchParams.set("to", email);
+  if (landingLeadId) next.searchParams.set("lead", "1");
   return Response.redirect(next.toString(), 303);
 }
 
@@ -4140,6 +4237,69 @@ async function handleTrackClick(request, env) {
   const issues = String(url.searchParams.get("i") || url.searchParams.get("issues") || "").trim();
   if (issues) dest.searchParams.set("i", issues);
   return Response.redirect(dest.toString(), 302);
+}
+
+function resultScanCopy(lang) {
+  if (lang === "sk") {
+    return {
+      title: "Meranie spúšťame",
+      body: "Nový sken e-shopu práve beží. Finálne porovnanie Pred/Po vám príde e-mailom, zvyčajne do niekoľkých minút.",
+      invalidTitle: "Odkaz je neplatný",
+      invalidBody: "Tento odkaz na meranie je neplatný alebo poškodený.",
+    };
+  }
+  return {
+    title: "Měření spouštíme",
+    body: "Nový sken e-shopu právě běží. Finální srovnání Před/Po vám přijde e-mailem, obvykle během několika minut.",
+    invalidTitle: "Odkaz je neplatný",
+    invalidBody: "Tento odkaz na měření je neplatný nebo poškozený.",
+  };
+}
+
+async function handleResultScan(request, env) {
+  const url = new URL(request.url);
+  const match = url.pathname.match(/^\/result\/([A-Za-z0-9]{8,64})$/);
+  if (!match) return new Response("Not Found", { status: 404 });
+  const id = match[1];
+  const domain = String(url.searchParams.get("d") || "").trim();
+  const email = String(url.searchParams.get("e") || "").trim().toLowerCase();
+  const token = String(url.searchParams.get("t") || "").trim();
+  const lang = surveyLang(url);
+  const copy = resultScanCopy(lang);
+  const htmlHeaders = {
+    "Content-Type": "text/html; charset=UTF-8",
+    "Cache-Control": "no-store",
+    "X-Robots-Tag": "noindex, nofollow",
+  };
+  if (!TRACKING_ID_RE.test(id) || !(await tokenMatchesTracking(env, `result\n${id}\n${domain}\n${email}`, token))) {
+    return new Response(unsubscribeHtml(copy.invalidTitle, copy.invalidBody, lang), {
+      status: 400,
+      headers: htmlHeaders,
+    });
+  }
+  if (request.method === "HEAD") {
+    return new Response(null, { status: 200, headers: { "X-Robots-Tag": "noindex, nofollow" } });
+  }
+  const cache = caches.default;
+  const cacheKey = `https://result.gofixweb/${id}`;
+  const hit = await cache.match(cacheKey);
+  if (!hit) {
+    await cache.put(cacheKey, new Response("1"), { expirationTtl: ENG_CACHE_TTL });
+    try {
+      await dispatchGithubEvent(env, "final-report-scan", {
+        tracking_id: id,
+        domain,
+        email,
+        at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error("final_report_dispatch_failed", err);
+    }
+  }
+  return new Response(unsubscribeHtml(copy.title, copy.body, lang), {
+    status: 200,
+    headers: htmlHeaders,
+  });
 }
 
 function surveyLang(url) {
@@ -4859,6 +5019,13 @@ export default {
         return new Response("Method Not Allowed", { status: 405 });
       }
       return handleTrackClick(request, env);
+    }
+
+    if (/^\/result\/[A-Za-z0-9]{8,64}$/.test(url.pathname)) {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return handleResultScan(request, env);
     }
 
     if (/^\/survey-data\/[A-Za-z0-9]{8,64}$/.test(url.pathname)) {
