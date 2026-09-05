@@ -1280,7 +1280,14 @@ async function handleStripeWebhook(request, env) {
       event_id: eventId,
       product,
       domain: String(session?.metadata?.domain || "").trim(),
+      issues: parseCheckoutIssueTypes(session?.metadata?.issues).join(","),
     });
+    if (product === "manual_fix") {
+      await markManualFindingsPaid(
+        String(session?.metadata?.domain || "").trim(),
+        session?.metadata?.issues,
+      );
+    }
   } catch (err) {
     console.error("stripe_dispatch_failed", err);
     return new Response("dispatch_failed", { status: 502 });
@@ -1888,6 +1895,7 @@ const CHECKOUT_COPY = {
     manualHomepageLabel: "úprava vzhledu a rozvržení homepage (slider, sekce)",
     targetedShop: "E-shop: {shop}.",
     targetedFinding: "Tato objednávka je na návod k nálezu: {findings}.",
+    alreadyPaid: "Tento nález už máte objednaný. Návod jsme poslali e-mailem — druhá platba není potřeba.",
     unknownProduct: "Neznámý produkt.",
     stripeMissing: "Stripe Checkout není nakonfigurovaný (STRIPE_SECRET_KEY).",
     vopRecordFailed: "Souhlas se nepodařilo zaznamenat. Zkuste to znovu.",
@@ -1931,6 +1939,7 @@ const CHECKOUT_COPY = {
     manualHomepageLabel: "úprava vzhľadu a rozloženia homepage (slider, sekcie)",
     targetedShop: "E-shop: {shop}.",
     targetedFinding: "Táto objednávka je na návod k zisteniu: {findings}.",
+    alreadyPaid: "Toto zistenie už máte objednané. Návod sme poslali e-mailom — druhá platba nie je potrebná.",
     unknownProduct: "Neznámy produkt.",
     stripeMissing: "Stripe Checkout nie je nakonfigurovaný (STRIPE_SECRET_KEY).",
     vopRecordFailed: "Súhlas sa nepodarilo zaznamenať. Skúste to znova.",
@@ -2003,6 +2012,52 @@ function parseCheckoutIssueTypes(raw) {
   return out;
 }
 
+function checkoutDomainKey(raw) {
+  let host = String(raw || "").trim().toLowerCase();
+  host = host.replace(/^https?:\/\//i, "");
+  host = host.split("/")[0].split("@").pop().split(":")[0];
+  if (host.startsWith("www.")) host = host.slice(4);
+  return host.replace(/\.$/, "");
+}
+
+function manualFindingCacheRequest(domain, issueType) {
+  const shop = checkoutDomainKey(domain);
+  const key = String(issueType || "").trim();
+  return new Request(`https://manual-finding.gofixweb/${encodeURIComponent(shop)}/${encodeURIComponent(key)}`);
+}
+
+const MANUAL_FINDING_TTL_SEC = 90 * 24 * 60 * 60;
+
+async function markManualFindingsPaid(domain, issueTypes) {
+  const shop = checkoutDomainKey(domain);
+  const types = parseCheckoutIssueTypes(issueTypes);
+  if (!shop || !types.length) return;
+  await Promise.all(
+    types.map((issueType) =>
+      caches.default.put(
+        manualFindingCacheRequest(shop, issueType),
+        new Response("1", {
+          headers: { "Cache-Control": `max-age=${MANUAL_FINDING_TTL_SEC}` },
+        }),
+        { expirationTtl: MANUAL_FINDING_TTL_SEC },
+      ),
+    ),
+  );
+}
+
+async function unpaidManualFindings(domain, issueTypes) {
+  const types = parseCheckoutIssueTypes(issueTypes);
+  if (!types.length) return types;
+  const shop = checkoutDomainKey(domain);
+  if (!shop) return types;
+  const unpaid = [];
+  for (const issueType of types) {
+    const hit = await caches.default.match(manualFindingCacheRequest(shop, issueType));
+    if (!hit) unpaid.push(issueType);
+  }
+  return unpaid;
+}
+
 function checkoutAutofixSplit(issueTypes) {
   const types = Array.isArray(issueTypes) ? issueTypes : parseCheckoutIssueTypes(issueTypes);
   const autoTypes = types.filter((key) => AUTO_WRITABLE_ISSUE_TYPES.has(key));
@@ -2060,13 +2115,14 @@ function checkoutOfferPage({
   trackingId = "",
   errorMessage = "",
   issueTypes = "",
+  alreadyPaid = false,
 } = {}) {
   const isAuto = product === "wp_autofix";
   const copy = checkoutCopy(domain, email);
   const title = isAuto ? copy.autoName : copy.manualName;
-  const priceLabel = "1 990 Kč";
-  const blurb = isAuto ? copy.autoBlurb : copy.manualBlurb;
-  const intro = isAuto ? copy.autoIntro : copy.manualIntro;
+  const priceLabel = alreadyPaid ? "" : "1 990 Kč";
+  const blurb = alreadyPaid ? copy.alreadyPaid : (isAuto ? copy.autoBlurb : copy.manualBlurb);
+  const intro = alreadyPaid ? "" : (isAuto ? copy.autoIntro : copy.manualIntro);
   const err = errorMessage
     ? `<p class="err" id="vop-error">${escapeHtml(errorMessage)}</p>`
     : "";
@@ -2140,11 +2196,11 @@ function checkoutOfferPage({
 <body>
   <div class="wrap">
     <h1>${escapeHtml(title)}</h1>
-    <p class="price">${priceLabel}</p>
+    ${priceLabel ? `<p class="price">${priceLabel}</p>` : ""}
     <p>${escapeHtml(blurb)}</p>
-    <p>${escapeHtml(intro)}</p>
+    ${intro ? `<p>${escapeHtml(intro)}</p>` : ""}
     ${err}
-    <form id="gfw-pay-form" method="post" action="/checkout" class="card">
+    ${alreadyPaid ? "" : `<form id="gfw-pay-form" method="post" action="/checkout" class="card">
       <input type="hidden" name="product" value="${escapeHtml(product)}">
       <input type="hidden" name="domain" value="${escapeHtml(domain)}">
       <input type="hidden" name="email" value="${escapeHtml(email)}">
@@ -2153,7 +2209,7 @@ function checkoutOfferPage({
       ${vopBlock}
       ${findingsBlock}
       <button type="submit" id="pay-btn"${payDisabled}>${escapeHtml(copy.pay)}</button>
-    </form>
+    </form>`}
   </div>
   <div id="gfw-exit-modal" class="gfw-exit" hidden aria-hidden="true" role="dialog" aria-labelledby="gfw-exit-title" aria-modal="true">
     <div class="gfw-exit-card">
@@ -2166,8 +2222,8 @@ function checkoutOfferPage({
       <button type="button" id="gfw-exit-dismiss" class="gfw-exit-skip">${escapeHtml(copy.exitDismiss)}</button>
     </div>
   </div>
-  ${payScript}
-  ${exitIntentScript(trackingId, product)}
+  ${alreadyPaid ? "" : payScript}
+  ${alreadyPaid ? "" : exitIntentScript(trackingId, product)}
 </body>
 </html>`;
   return new Response(html, {
@@ -2415,6 +2471,24 @@ async function handleCheckout(request, env) {
 
   if (product !== "manual_fix" && product !== "wp_autofix") {
     return new Response(copy.unknownProduct, { status: 400 });
+  }
+
+  if (product === "manual_fix") {
+    const requested = parseCheckoutIssueTypes(issues);
+    if (requested.length) {
+      const unpaid = await unpaidManualFindings(domain, requested);
+      if (!unpaid.length) {
+        return checkoutOfferPage({
+          product,
+          domain,
+          email,
+          trackingId: tid,
+          issueTypes: requested.join(","),
+          alreadyPaid: true,
+        });
+      }
+      issues = unpaid.join(",");
+    }
   }
 
   if (product === "wp_autofix") {
