@@ -1886,6 +1886,8 @@ const CHECKOUT_COPY = {
     findingsManualOther: "Tyto nálezy budete muset dořešit sami podle návodu: {manual}.",
     autoSpeedLabel: "komprese obrázků a pluginy",
     manualHomepageLabel: "úprava vzhledu a rozvržení homepage (slider, sekce)",
+    targetedShop: "E-shop: {shop}.",
+    targetedFinding: "Tato objednávka je na návod k nálezu: {findings}.",
     unknownProduct: "Neznámý produkt.",
     stripeMissing: "Stripe Checkout není nakonfigurovaný (STRIPE_SECRET_KEY).",
     vopRecordFailed: "Souhlas se nepodařilo zaznamenat. Zkuste to znovu.",
@@ -1927,6 +1929,8 @@ const CHECKOUT_COPY = {
     findingsManualOther: "Tieto zistenia budete musieť dorobiť sami podľa návodu: {manual}.",
     autoSpeedLabel: "kompresia obrázkov a pluginy",
     manualHomepageLabel: "úprava vzhľadu a rozloženia homepage (slider, sekcie)",
+    targetedShop: "E-shop: {shop}.",
+    targetedFinding: "Táto objednávka je na návod k zisteniu: {findings}.",
     unknownProduct: "Neznámy produkt.",
     stripeMissing: "Stripe Checkout nie je nakonfigurovaný (STRIPE_SECRET_KEY).",
     vopRecordFailed: "Súhlas sa nepodarilo zaznamenať. Skúste to znova.",
@@ -2016,6 +2020,17 @@ function checkoutFindingLabels(types, locale) {
 }
 
 function checkoutFindingsHtml({ product, domain, email, issueTypes } = {}) {
+  if (product === "manual_fix") {
+    const types = parseCheckoutIssueTypes(issueTypes);
+    if (!types.length) return "";
+    const locale = checkoutLocale(domain, email);
+    const copy = checkoutCopy(domain, email);
+    const pack = CHECKOUT_ISSUE_LABELS[locale] || CHECKOUT_ISSUE_LABELS.cz;
+    const labels = types.map((key) => pack[key] || key);
+    const shop = String(domain || "").trim() || "—";
+    const text = `${copy.targetedShop.replace("{shop}", shop)} ${copy.targetedFinding.replace("{findings}", labels.join(", "))}`;
+    return `<p class="findings-split">${escapeHtml(text)}</p>`;
+  }
   if (product !== "wp_autofix") return "";
   const split = checkoutAutofixSplit(issueTypes);
   if (!split.show) return "";
@@ -2088,7 +2103,7 @@ function checkoutOfferPage({
     issueTypes: parsedIssues,
   });
   const issuesHidden =
-    isAuto && encodedIssues
+    encodedIssues
       ? `<input type="hidden" name="i" value="${escapeHtml(encodedIssues)}">`
       : "";
   const html = `<!DOCTYPE html>
@@ -2484,6 +2499,7 @@ async function handleCheckout(request, env) {
     body.set("metadata[vop_version]", VOP_VERSION);
   }
   if (domain) body.set("metadata[domain]", domain);
+  if (issues) body.set("metadata[issues]", parseCheckoutIssueTypes(issues).join(","));
   if (email && EMAIL_RE.test(email)) body.set("customer_email", email);
   body.set("line_items[0][quantity]", "1");
   if (priceId) {
