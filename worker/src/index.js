@@ -103,7 +103,7 @@ const STRIPE_TIMESTAMP_TOLERANCE_SEC = 300;
 const TURNSTILE_ACTION = "free-report";
 const TURNSTILE_HOSTNAMES = new Set(["gofixweb.com", "www.gofixweb.com"]);
 
-/** E-maily, které obcházejí rate limit a spouští plný scan — jen interní QC. */
+/** Interní QC e-maily: spustí plný scan. Rate limit 1× / e-mail / den platí i pro ně. */
 const RATE_LIMIT_WHITELIST = new Set([
   "audit@gofixweb.com",
   "trueforexway@gmail.com",
@@ -277,7 +277,7 @@ async function handleLeadSubmit(request, env, origin) {
   const domain = new URL(shop_url).hostname.replace(/^www\./i, "");
   const qcScan = isRateLimitWhitelisted(email);
   const cache = caches.default;
-  if (!qcScan && (await isRateLimited(email, cache))) {
+  if (await isRateLimited(email, cache)) {
     return jsonResponse(
       {
         ok: false,
@@ -295,7 +295,6 @@ async function handleLeadSubmit(request, env, origin) {
         name,
         email,
         shop_url,
-        skip_rate_limit: true,
         test_request: true,
       });
       return jsonResponse(
