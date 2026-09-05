@@ -18,7 +18,8 @@
  * POST /stripe-webhook — checkout.session.completed (jednorázově) a invoice.paid
  *   / invoice.payment_failed / customer.subscription.deleted (předplatné).
  * POST /exit-intent — důvod odchodu z nabídky (price|trust|dismiss).
- * GET /survey/{id} — follow-up dotazník (price|trust|other) z 48h nebo 2h e-mailu.
+ * GET /survey/{id} — 48h thanks (price|trust|other) nebo 2h personalizované stránky
+ *   (findings|loss|price|later, src=open_2h).
  * POST /submit — formulář: whitelist e-mail spustí free scan, ostatní jen poptávku.
  * POST /wp-onboarding — handshake WordPress REST; uložení credentials běží v GHA.
  */
@@ -999,7 +1000,7 @@ function emptyWhyNotBuyStats() {
     by_source: {
       exit_intent: { label: "Exit-intent popup", price: 0, trust: 0, other: 0, dismiss: 0, total: 0 },
       click_48h: { label: "48h e-mail po kliku", price: 0, trust: 0, other: 0, pending: 0, sent: 0 },
-      open_2h: { label: "2h e-mail po otevření", price: 0, trust: 0, other: 0, pending: 0, sent: 0 },
+      open_2h: { label: "2h e-mail po otevření", price: 0, trust: 0, other: 0, findings: 0, loss: 0, later: 0, pending: 0, sent: 0 },
     },
   };
 }
@@ -1024,7 +1025,9 @@ function renderWhyNotBuyBox(why) {
     <div class="cards">
       <div class="card"><div class="k">Cena</div><div class="v">${escapeHtml(data.price ?? 0)}</div></div>
       <div class="card"><div class="k">Důvěra</div><div class="v">${escapeHtml(data.trust ?? 0)}</div></div>
-      <div class="card"><div class="k">Jiné</div><div class="v">${escapeHtml(data.other ?? 0)}</div></div>
+      <div class="card"><div class="k">Nálezy (2h)</div><div class="v">${escapeHtml(data.findings ?? 0)}</div></div>
+      <div class="card"><div class="k">Ztráta (2h)</div><div class="v">${escapeHtml(data.loss ?? 0)}</div></div>
+      <div class="card"><div class="k">Později (2h)</div><div class="v">${escapeHtml(data.later ?? 0)}</div></div>
       <div class="card"><div class="k">Zavřeno bez odpovědi</div><div class="v warn">${escapeHtml(data.dismiss ?? 0)}</div></div>
       <div class="card"><div class="k">E-maily bez odpovědi</div><div class="v warn">${escapeHtml(data.pending ?? 0)}</div></div>
     </div>
@@ -1032,7 +1035,7 @@ function renderWhyNotBuyBox(why) {
     <h3 style="font-size:0.95rem;margin:1rem 0 0.4rem;">Rozpad podle zdroje</h3>
     ${sourceLine(src.exit_intent, [["price", "Cena"], ["trust", "Důvěra"], ["dismiss", "Zavřeno"], ["total", "Celkem"]])}
     ${sourceLine(src.click_48h, [["price", "Cena"], ["trust", "Důvěra"], ["other", "Jiné"], ["pending", "Bez odpovědi"], ["sent", "Odesláno"]])}
-    ${sourceLine(src.open_2h, [["price", "Cena"], ["trust", "Důvěra"], ["other", "Jiné"], ["pending", "Bez odpovědi"], ["sent", "Odesláno"]])}
+    ${sourceLine(src.open_2h, [["findings", "Nálezy"], ["loss", "Ztráta"], ["price", "Cena"], ["later", "Později"], ["pending", "Bez odpovědi"], ["sent", "Odesláno"]])}
   </div>`;
 }
 
@@ -4046,7 +4049,8 @@ async function cacheHasUnsub(email) {
 const ENG_CACHE_TTL = 31536000;
 const TRACKING_ID_RE = /^[A-Za-z0-9]{8,64}$/;
 const CLICK_PRODUCTS = new Set(["manual_fix", "wp_autofix"]);
-const SURVEY_REASONS = new Set(["price", "trust", "other"]);
+const SURVEY_REASONS = new Set(["price", "trust", "other", "findings", "loss", "later"]);
+const OPEN_PAGE_REASONS = new Set(["findings", "loss", "price", "later"]);
 const SURVEY_SOURCES = new Set(["click_48h", "open_2h"]);
 const EXIT_INTENT_REASONS = new Set(["price", "trust", "dismiss"]);
 const PIXEL_GIF = Uint8Array.from([
@@ -4196,6 +4200,242 @@ function surveyOtherFormHtml(actionUrl, lang) {
 </html>`;
 }
 
+const SURVEY_PAGE_COPY = {
+  cs: {
+    findingsTitle: "Co nálezy znamenají",
+    findingsLead: "Jen co je špatně a proč to odrazuje zákazníky nebo Google — bez návodu k opravě. Konkrétní kroky jsou v kompletním manuálu za 1 990 Kč.",
+    lossTitle: "Jak počítáme odhadovanou ztrátu",
+    lossLead: "Vzorec je stejný pro každý e-shop. Čísla níže jsou z měření vašeho webu a z odhadu návštěvnosti, který report používá.",
+    priceTitle: "Cena vedle odhadované ztráty",
+    laterTitle: "Kdy se ozvat",
+    laterBody: "Vyberte den. Do té doby vám další obchodní e-mail nepošleme. Přesně v ten den se ozveme s připomenutím reportu.",
+    laterSubmit: "Uložit termín",
+    laterThanks: "Termín jsme uložili. Ozveme se v ten den, dřív vás obchodně kontaktovat nebudeme.",
+    emptyFindings: "U tohoto e-shopu teď nemáme uložený seznam nálezů. Ozvěte se na info@gofixweb.com — doplníme to ručně.",
+    impact: "Odhad dopadu",
+    perMonth: "Kč/měsíc",
+    visits: "Odhad návštěv / měsíc",
+    conversion: "Použitá konverze",
+    aov: "Průměrná objednávka",
+    speed: "PageSpeed skóre (mobil)",
+    overall: "Celkové skóre webu",
+    totalLoss: "Součet odhadované měsíční ztráty",
+    weight: "Váha nálezu",
+    formulaRow: "měsíční ztráta = návštěvy × konverze × průměrná objednávka × váha",
+    priceLabel: "Jednorázová cena kompletního manuálu",
+    months: "Odhadovaná ztráta za měsíc",
+    priority: "Řešte nejdřív",
+    cta: "Chci opravit sám",
+    missing: "Data k tomuto odkazu se nepodařilo načíst. Zkuste to za chvíli, nebo napište na info@gofixweb.com.",
+  },
+  sk: {
+    findingsTitle: "Čo nálezy znamenajú",
+    findingsLead: "Len čo je zle a prečo to odrádza zákazníkov alebo Google — bez návodu na opravu. Konkrétne kroky sú v kompletnom manuáli za 1 990 Kč.",
+    lossTitle: "Ako počítame odhadovanú stratu",
+    lossLead: "Vzorec je rovnaký pre každý e-shop. Čísla nižšie sú z merania vášho webu a z odhadu návštevnosti, ktorý report používa.",
+    priceTitle: "Cena vedľa odhadovanej straty",
+    laterTitle: "Kedy sa ozvať",
+    laterBody: "Vyberte deň. Dovtedy vám ďalší obchodný e-mail nepošleme. Presne v ten deň sa ozveme s pripomenutím reportu.",
+    laterSubmit: "Uložiť termín",
+    laterThanks: "Termín sme uložili. Ozveme sa v ten deň, skôr vás obchodne kontaktovať nebudeme.",
+    emptyFindings: "Pri tomto e-shope teraz nemáme uložený zoznam nálezov. Napíšte na info@gofixweb.com — doplníme to ručne.",
+    impact: "Odhad dopadu",
+    perMonth: "Kč/mesiac",
+    visits: "Odhad návštev / mesiac",
+    conversion: "Použitá konverzia",
+    aov: "Priemerná objednávka",
+    speed: "PageSpeed skóre (mobil)",
+    overall: "Celkové skóre webu",
+    totalLoss: "Súčet odhadovanej mesačnej straty",
+    weight: "Váha nálezu",
+    formulaRow: "mesačná strata = návštevy × konverzia × priemerná objednávka × váha",
+    priceLabel: "Jednorazová cena kompletného manuálu",
+    months: "Odhadovaná strata za mesiac",
+    priority: "Riešte najskôr",
+    cta: "Chcem opraviť sám",
+    missing: "Dáta k tomuto odkazu sa nepodarilo načítať. Skúste to o chvíľu, alebo napíšte na info@gofixweb.com.",
+  },
+};
+
+function fmtSurveyCzk(value) {
+  const n = Math.round(Number(value) || 0);
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0");
+}
+
+function surveyPageShell(lang, title, inner) {
+  const htmlLang = lang === "sk" ? "sk" : "cs";
+  const slogan = lang === "sk"
+    ? "Pravidelný sken a optimalizácia vášho e-shopu"
+    : "Pravidelný sken a optimalizace vašeho e-shopu";
+  return `<!DOCTYPE html>
+<html lang="${htmlLang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>${escapeHtml(title)} — GoFixWeb</title>
+</head>
+<body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;background:#ffffff;color:#1a2332;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:#ffffff;">
+    <tr><td style="padding:32px 16px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;border-collapse:collapse;">
+        <tr><td style="padding:0 0 16px 0;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;">
+            <tr><td bgcolor="#1a2332" style="background-color:#1a2332;padding:5px 12px;border-radius:8px;font-size:21px;font-weight:700;line-height:1.05;">
+              <span style="color:#ffffff;">GoFix</span><span style="color:#16a34a;">Web</span>
+            </td></tr>
+            <tr><td style="padding:4px 2px 0 2px;font-size:14px;color:#64748b;">${escapeHtml(slogan)}</td></tr>
+          </table>
+        </td></tr>
+        ${inner}
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+function surveyCtaRow(payload, copy) {
+  const href = escapeHtml(String(payload?.checkout_url || "/checkout?product=manual_fix"));
+  return `<tr><td style="padding:8px 0 0 0;">
+    <a href="${href}" style="display:inline-block;background:#16a34a;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;text-decoration:none;padding:12px 18px;border-radius:8px;">${escapeHtml(copy.cta)}</a>
+  </td></tr>`;
+}
+
+function surveyExplainHtml(reason, payload, lang) {
+  const copy = SURVEY_PAGE_COPY[lang] || SURVEY_PAGE_COPY.cs;
+  const data = payload && typeof payload === "object" ? payload : null;
+  if (!data) {
+    return surveyPageShell(lang, copy.findingsTitle, `<tr><td style="font-size:16px;line-height:1.5;">${escapeHtml(copy.missing)}</td></tr>`);
+  }
+  const findings = Array.isArray(data.findings) ? data.findings : [];
+  if (reason === "findings") {
+    const cards = findings.length
+      ? findings.map((item) => `<tr><td style="padding:0 0 14px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border-left:4px solid #dc2626;background:#f8fafc;">
+            <tr><td style="padding:12px 14px;">
+              <div style="font-weight:700;font-size:16px;margin:0 0 6px 0;">${escapeHtml(item.title || item.issue_type || "")}</div>
+              <div style="font-size:15px;line-height:1.5;color:#1a2332;">${escapeHtml(item.harm || "")}</div>
+              <div style="margin-top:8px;color:#d97706;font-weight:700;">${escapeHtml(copy.impact)}: ${fmtSurveyCzk(item.monthly_loss)} ${escapeHtml(copy.perMonth)}</div>
+            </td></tr>
+          </table>
+        </td></tr>`).join("")
+      : `<tr><td style="font-size:16px;line-height:1.5;">${escapeHtml(copy.emptyFindings)}</td></tr>`;
+    const inner = `<tr><td style="padding:0 0 8px 0;font-size:22px;font-weight:700;">${escapeHtml(copy.findingsTitle)}</td></tr>
+        <tr><td style="padding:0 0 16px 0;font-size:16px;line-height:1.5;color:#334155;">${escapeHtml(copy.findingsLead)}</td></tr>
+        ${cards}
+        ${surveyCtaRow(data, copy)}`;
+    return surveyPageShell(lang, copy.findingsTitle, inner);
+  }
+  if (reason === "loss") {
+    const pct = Math.round(Number(data.conversion_rate || 0) * 1000) / 10;
+    const rows = findings.map((item) => `<tr>
+        <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;">${escapeHtml(item.title || "")}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:#64748b;">${escapeHtml(copy.weight)} ${Number(item.coefficient || 0)}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:#d97706;font-weight:700;text-align:right;">${fmtSurveyCzk(item.monthly_loss)} ${escapeHtml(copy.perMonth)}</td>
+      </tr>`).join("");
+    const inner = `<tr><td style="padding:0 0 8px 0;font-size:22px;font-weight:700;">${escapeHtml(copy.lossTitle)}</td></tr>
+        <tr><td style="padding:0 0 16px 0;font-size:16px;line-height:1.5;color:#334155;">${escapeHtml(copy.lossLead)}</td></tr>
+        <tr><td style="padding:0 0 12px 0;font-size:15px;line-height:1.5;"><strong>${escapeHtml(copy.formulaRow)}</strong></td></tr>
+        <tr><td style="padding:0 0 8px 0;">${escapeHtml(copy.visits)}: <strong>${fmtSurveyCzk(data.monthly_visits)}</strong></td></tr>
+        <tr><td style="padding:0 0 8px 0;">${escapeHtml(copy.conversion)}: <strong>${escapeHtml(String(pct))}\u00a0%</strong></td></tr>
+        <tr><td style="padding:0 0 8px 0;">${escapeHtml(copy.aov)}: <strong>${fmtSurveyCzk(data.avg_order_value)} Kč</strong></td></tr>
+        <tr><td style="padding:0 0 8px 0;">${escapeHtml(copy.speed)}: <strong>${data.speed_score == null ? "—" : escapeHtml(String(data.speed_score))}/100</strong></td></tr>
+        <tr><td style="padding:0 0 16px 0;">${escapeHtml(copy.overall)}: <strong>${data.overall_score == null ? "—" : escapeHtml(String(data.overall_score))}/100</strong></td></tr>
+        <tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows}</table></td></tr>
+        <tr><td style="padding:16px 0 8px 0;color:#d97706;font-size:18px;font-weight:700;">${escapeHtml(copy.totalLoss)}: ${fmtSurveyCzk(data.monthly_loss)} ${escapeHtml(copy.perMonth)}</td></tr>
+        ${surveyCtaRow(data, copy)}`;
+    return surveyPageShell(lang, copy.lossTitle, inner);
+  }
+  const priority = data.priority || findings[0];
+  const inner = `<tr><td style="padding:0 0 8px 0;font-size:22px;font-weight:700;">${escapeHtml(copy.priceTitle)}</td></tr>
+        <tr><td style="padding:0 0 12px 0;font-size:16px;">${escapeHtml(copy.priceLabel)}: <strong style="color:#16a34a;">${fmtSurveyCzk(data.manual_price)} Kč</strong></td></tr>
+        <tr><td style="padding:0 0 16px 0;font-size:16px;">${escapeHtml(copy.months)}: <strong style="color:#d97706;">${fmtSurveyCzk(data.monthly_loss)} ${escapeHtml(copy.perMonth)}</strong></td></tr>
+        ${priority ? `<tr><td style="padding:0 0 16px 0;font-size:16px;line-height:1.5;border-left:4px solid #dc2626;padding-left:12px;"><strong>${escapeHtml(copy.priority)}:</strong> ${escapeHtml(priority.title || "")} (${fmtSurveyCzk(priority.monthly_loss)} ${escapeHtml(copy.perMonth)})</td></tr>` : ""}
+        ${surveyCtaRow(data, copy)}`;
+  return surveyPageShell(lang, copy.priceTitle, inner);
+}
+
+function surveySnoozeFormHtml(actionUrl, lang) {
+  const copy = SURVEY_PAGE_COPY[lang] || SURVEY_PAGE_COPY.cs;
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const inner = `<tr><td style="padding:0 0 8px 0;font-size:22px;font-weight:700;">${escapeHtml(copy.laterTitle)}</td></tr>
+        <tr><td style="padding:0 0 16px 0;font-size:16px;line-height:1.5;">${escapeHtml(copy.laterBody)}</td></tr>
+        <tr><td>
+          <form method="post" action="${escapeHtml(actionUrl)}">
+            <input type="date" name="resume_on" required min="${tomorrow}" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:16px;font-family:Arial,Helvetica,sans-serif;">
+            <p style="margin:12px 0 0 0;">
+              <button type="submit" style="border:0;border-radius:8px;padding:10px 16px;background:#16a34a;color:#fff;font-weight:700;cursor:pointer;">${escapeHtml(copy.laterSubmit)}</button>
+            </p>
+          </form>
+        </td></tr>`;
+  return surveyPageShell(lang, copy.laterTitle, inner);
+}
+
+function surveyDataCacheKey(trackingId) {
+  return `https://survey-data.gofixweb/${String(trackingId || "").trim()}`;
+}
+
+async function fetchSurveyExplain(env, trackingId) {
+  const cache = caches.default;
+  const hit = await cache.match(surveyDataCacheKey(trackingId));
+  if (hit) {
+    try {
+      return await hit.json();
+    } catch {
+      /* fallback GitHub */
+    }
+  }
+  const repo = env.GITHUB_REPO || "gypa70/gofixweb-scanner";
+  const token = env.GITHUB_TOKEN;
+  if (!token) return null;
+  const res = await fetch(
+    `https://api.github.com/repos/${repo}/contents/data/survey_pages/${encodeURIComponent(trackingId)}.json?ref=main`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github.raw",
+        "User-Agent": "gofixweb-report-worker",
+        "Cache-Control": "no-cache",
+      },
+      cf: { cacheTtl: 0, cacheEverything: false },
+    },
+  );
+  if (!res.ok) return null;
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+async function handleSurveyDataPut(request, env) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const url = new URL(request.url);
+  const match = url.pathname.match(/^\/survey-data\/([A-Za-z0-9]{8,64})$/);
+  if (!match) return new Response("Not Found", { status: 404 });
+  const id = match[1];
+  const token = String(url.searchParams.get("t") || "").trim();
+  if (!TRACKING_ID_RE.test(id) || !(await tokenMatchesTracking(env, `survey-data\n${id}`, token))) {
+    return jsonResponse({ ok: false, error: "invalid" }, 401);
+  }
+  let payload = {};
+  try {
+    payload = await request.json();
+  } catch {
+    return jsonResponse({ ok: false, error: "invalid_json" }, 400);
+  }
+  await caches.default.put(
+    surveyDataCacheKey(id),
+    new Response(JSON.stringify(payload), { headers: { "Content-Type": "application/json" } }),
+    { expirationTtl: ENG_CACHE_TTL },
+  );
+  return jsonResponse({ ok: true }, 200);
+}
+
 function surveyCacheKey(trackingId, source) {
   const src = SURVEY_SOURCES.has(source) ? source : "click_48h";
   return `https://survey.gofixweb/${src}/${String(trackingId || "").trim()}`;
@@ -4246,6 +4486,7 @@ async function handleSurvey(request, env) {
   const source = surveySourceFromUrl(url);
   const lang = surveyLang(url);
   const copy = SURVEY_COPY[lang] || SURVEY_COPY.cs;
+  const pageCopy = SURVEY_PAGE_COPY[lang] || SURVEY_PAGE_COPY.cs;
   const invalid = unsubscribeHtml(copy.invalidTitle, copy.invalidBody, lang);
   if (!TRACKING_ID_RE.test(id) || !SURVEY_REASONS.has(reason)) {
     return new Response(invalid, { status: 400, headers: { "Content-Type": "text/html; charset=UTF-8" } });
@@ -4253,24 +4494,21 @@ async function handleSurvey(request, env) {
   if (!(await surveyTokenMatches(env, id, reason, source, token))) {
     return new Response(invalid, { status: 400, headers: { "Content-Type": "text/html; charset=UTF-8" } });
   }
-  const thanks = new Response(surveyThanksHtml(lang), {
-    status: 200,
-    headers: {
-      "Content-Type": "text/html; charset=UTF-8",
-      "Cache-Control": "no-store",
-      "X-Robots-Tag": "noindex, nofollow",
-    },
-  });
-  if (reason === "other" && request.method === "GET") {
-    return new Response(surveyOtherFormHtml(url.toString(), lang), {
-      status: 200,
-      headers: {
-        "Content-Type": "text/html; charset=UTF-8",
-        "Cache-Control": "no-store",
-        "X-Robots-Tag": "noindex, nofollow",
-      },
-    });
+  const htmlHeaders = {
+    "Content-Type": "text/html; charset=UTF-8",
+    "Cache-Control": "no-store",
+    "X-Robots-Tag": "noindex, nofollow",
+  };
+  const thanks = new Response(surveyThanksHtml(lang), { status: 200, headers: htmlHeaders });
+  const openPage = source === "open_2h" && OPEN_PAGE_REASONS.has(reason);
+
+  if (openPage && reason === "later" && request.method === "GET") {
+    return new Response(surveySnoozeFormHtml(url.toString(), lang), { status: 200, headers: htmlHeaders });
   }
+  if (reason === "other" && request.method === "GET") {
+    return new Response(surveyOtherFormHtml(url.toString(), lang), { status: 200, headers: htmlHeaders });
+  }
+
   let note = "";
   if (reason === "other" && request.method === "POST") {
     try {
@@ -4280,10 +4518,28 @@ async function handleSurvey(request, env) {
       note = "";
     }
   }
+  if (openPage && reason === "later" && request.method === "POST") {
+    try {
+      const form = await request.formData();
+      note = String(form.get("resume_on") || "").trim().slice(0, 10);
+    } catch {
+      note = "";
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(note)) {
+      return new Response(surveySnoozeFormHtml(url.toString(), lang), { status: 400, headers: htmlHeaders });
+    }
+  }
   if (request.method === "HEAD") {
     return new Response(null, { status: 200, headers: { "X-Robots-Tag": "noindex, nofollow" } });
   }
   await recordSurveyOnce(env, id, reason, note, source);
+  if (openPage && reason === "later") {
+    return new Response(surveyPageShell(lang, pageCopy.laterTitle, `<tr><td style="font-size:16px;line-height:1.5;">${escapeHtml(pageCopy.laterThanks)}</td></tr>`), { status: 200, headers: htmlHeaders });
+  }
+  if (openPage) {
+    const payload = await fetchSurveyExplain(env, id);
+    return new Response(surveyExplainHtml(reason, payload, lang), { status: 200, headers: htmlHeaders });
+  }
   return thanks;
 }
 
@@ -4401,6 +4657,10 @@ export default {
         return new Response("Method Not Allowed", { status: 405 });
       }
       return handleTrackClick(request, env);
+    }
+
+    if (/^\/survey-data\/[A-Za-z0-9]{8,64}$/.test(url.pathname)) {
+      return handleSurveyDataPut(request, env);
     }
 
     if (/^\/survey\/[A-Za-z0-9]{8,64}$/.test(url.pathname)) {
