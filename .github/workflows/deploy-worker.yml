@@ -43,6 +43,28 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: worker
 
+      - name: Verify live Stripe secret before Worker put
+        id: stripe_key
+        if: steps.cf.outputs.present == 'true'
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          KEY=$(printf '%s' "$STRIPE_SECRET_KEY" | tr -d '\r\n')
+          if [ -z "$KEY" ]; then
+            echo "::error::STRIPE_SECRET_KEY GitHub secret is empty on gofixweb-landing."
+            exit 1
+          fi
+          code=$(curl -sS -o /tmp/stripe-bal.json -w '%{http_code}' \
+            -u "${KEY}:" https://api.stripe.com/v1/balance)
+          echo "stripe_http=$code"
+          if [ "$code" != "200" ]; then
+            echo "::error::STRIPE_SECRET_KEY is invalid (HTTP $code). Refusing to overwrite Worker secret."
+            python -c "import json; d=json.load(open('/tmp/stripe-bal.json',encoding='utf-8')); err=d.get('error') or {}; print('stripe_error', err.get('type'), err.get('code'))"
+            exit 1
+          fi
+          echo "Live Stripe secret is valid."
+
       - name: Put trimmed STRIPE_SECRET_KEY on Worker
         if: steps.cf.outputs.present == 'true'
         working-directory: worker
