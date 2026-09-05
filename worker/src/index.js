@@ -1880,6 +1880,12 @@ const CHECKOUT_COPY = {
     exitTrust: "Nevím, jestli vám můžu důvěřovat",
     exitDismiss: "Zavřít bez odpovědi",
     vopError: "Bez souhlasu s VOP nelze pokračovat k platbě.",
+    findingsAuto: "U tohoto e-shopu vyřešíme automaticky: {auto}.",
+    findingsManualHomepage:
+      "Tento nález budete muset dořešit sami podle návodu: {manual}, protože jde o zásah do vzhledu vaší homepage.",
+    findingsManualOther: "Tyto nálezy budete muset dořešit sami podle návodu: {manual}.",
+    autoSpeedLabel: "komprese obrázků a pluginy",
+    manualHomepageLabel: "úprava vzhledu a rozvržení homepage (slider, sekce)",
     unknownProduct: "Neznámý produkt.",
     stripeMissing: "Stripe Checkout není nakonfigurovaný (STRIPE_SECRET_KEY).",
     vopRecordFailed: "Souhlas se nepodařilo zaznamenat. Zkuste to znovu.",
@@ -1915,6 +1921,12 @@ const CHECKOUT_COPY = {
     exitTrust: "Neviem, či vám môžem dôverovať",
     exitDismiss: "Zavrieť bez odpovede",
     vopError: "Bez súhlasu s VOP nie je možné pokračovať k platbe.",
+    findingsAuto: "U tohto e-shopu vyriešime automaticky: {auto}.",
+    findingsManualHomepage:
+      "Toto zistenie budete musieť dorobiť sami podľa návodu: {manual}, pretože ide o zásah do vzhľadu vašej homepage.",
+    findingsManualOther: "Tieto zistenia budete musieť dorobiť sami podľa návodu: {manual}.",
+    autoSpeedLabel: "kompresia obrázkov a pluginy",
+    manualHomepageLabel: "úprava vzhľadu a rozloženia homepage (slider, sekcie)",
     unknownProduct: "Neznámy produkt.",
     stripeMissing: "Stripe Checkout nie je nakonfigurovaný (STRIPE_SECRET_KEY).",
     vopRecordFailed: "Súhlas sa nepodarilo zaznamenať. Skúste to znova.",
@@ -1935,12 +1947,104 @@ function checkoutCopy(domain, email) {
   return CHECKOUT_COPY[checkoutLocale(domain, email)] || CHECKOUT_COPY.cz;
 }
 
+const AUTO_WRITABLE_ISSUE_TYPES = new Set(["missing_title", "missing_meta"]);
+const SPEED_ISSUE_TYPES = new Set(["speed_critical", "speed_poor", "speed_average"]);
+const KNOWN_CHECKOUT_ISSUE_TYPES = new Set([
+  "missing_title",
+  "missing_meta",
+  "speed_critical",
+  "speed_poor",
+  "speed_average",
+  "broken_link_main",
+  "broken_link_other",
+  "no_mobile",
+  "noindex",
+]);
+const CHECKOUT_ISSUE_LABELS = {
+  cz: {
+    missing_title: "Chybí title tag",
+    missing_meta: "Chybí meta description",
+    speed_critical: "Kritická rychlost načítání",
+    speed_poor: "Pomalá rychlost načítání",
+    speed_average: "Průměrná rychlost načítání",
+    noindex: "Problém s indexací ve vyhledávačích",
+    no_mobile: "Chybí mobilní optimalizace",
+    broken_link_main: "Nefunkční odkazy na hlavní stránce",
+    broken_link_other: "Nefunkční odkazy",
+  },
+  sk: {
+    missing_title: "Chýba title tag",
+    missing_meta: "Chýba meta description",
+    speed_critical: "Kritická rýchlosť načítania",
+    speed_poor: "Pomalá rýchlosť načítania",
+    speed_average: "Priemerná rýchlosť načítania",
+    noindex: "Problém s indexáciou vo vyhľadávačoch",
+    no_mobile: "Chýba mobilná optimalizácia",
+    broken_link_main: "Nefunkčné odkazy na hlavnej stránke",
+    broken_link_other: "Nefunkčné odkazy",
+  },
+};
+
+function parseCheckoutIssueTypes(raw) {
+  const text = String(raw || "").trim();
+  if (!text) return [];
+  const out = [];
+  const seen = new Set();
+  for (const part of text.replace(/;/g, ",").split(",")) {
+    const key = part.trim();
+    if (!KNOWN_CHECKOUT_ISSUE_TYPES.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+  }
+  return out;
+}
+
+function checkoutAutofixSplit(issueTypes) {
+  const types = Array.isArray(issueTypes) ? issueTypes : parseCheckoutIssueTypes(issueTypes);
+  const autoTypes = types.filter((key) => AUTO_WRITABLE_ISSUE_TYPES.has(key));
+  const manualTypes = types.filter((key) => !AUTO_WRITABLE_ISSUE_TYPES.has(key));
+  const hasSpeed = types.some((key) => SPEED_ISSUE_TYPES.has(key));
+  const otherManualTypes = manualTypes.filter((key) => !SPEED_ISSUE_TYPES.has(key));
+  return { show: manualTypes.length > 0, autoTypes, manualTypes, hasSpeed, otherManualTypes };
+}
+
+function checkoutFindingLabels(types, locale) {
+  const pack = CHECKOUT_ISSUE_LABELS[locale] || CHECKOUT_ISSUE_LABELS.cz;
+  return (types || [])
+    .filter((key) => !SPEED_ISSUE_TYPES.has(key))
+    .map((key) => pack[key] || key);
+}
+
+function checkoutFindingsHtml({ product, domain, email, issueTypes } = {}) {
+  if (product !== "wp_autofix") return "";
+  const split = checkoutAutofixSplit(issueTypes);
+  if (!split.show) return "";
+  const locale = checkoutLocale(domain, email);
+  const copy = checkoutCopy(domain, email);
+  const autoLabels = checkoutFindingLabels(split.autoTypes, locale);
+  if (split.hasSpeed) autoLabels.push(copy.autoSpeedLabel);
+  const parts = [];
+  if (autoLabels.length) {
+    parts.push(copy.findingsAuto.replace("{auto}", autoLabels.join(", ")));
+  }
+  if (split.hasSpeed) {
+    parts.push(copy.findingsManualHomepage.replace("{manual}", copy.manualHomepageLabel));
+  }
+  const otherLabels = checkoutFindingLabels(split.otherManualTypes, locale);
+  if (otherLabels.length) {
+    parts.push(copy.findingsManualOther.replace("{manual}", otherLabels.join(", ")));
+  }
+  if (!parts.length) return "";
+  return `<p class="findings-split">${escapeHtml(parts.join(" "))}</p>`;
+}
+
 function checkoutOfferPage({
   product = "manual_fix",
   domain = "",
   email = "",
   trackingId = "",
   errorMessage = "",
+  issueTypes = "",
 } = {}) {
   const isAuto = product === "wp_autofix";
   const copy = checkoutCopy(domain, email);
@@ -1975,6 +2079,18 @@ function checkoutOfferPage({
     })();
   </script>`
     : "";
+  const parsedIssues = parseCheckoutIssueTypes(issueTypes);
+  const encodedIssues = parsedIssues.join(",");
+  const findingsBlock = checkoutFindingsHtml({
+    product,
+    domain,
+    email,
+    issueTypes: parsedIssues,
+  });
+  const issuesHidden =
+    isAuto && encodedIssues
+      ? `<input type="hidden" name="i" value="${escapeHtml(encodedIssues)}">`
+      : "";
   const html = `<!DOCTYPE html>
 <html lang="${escapeHtml(copy.lang)}">
 <head>
@@ -1995,6 +2111,7 @@ function checkoutOfferPage({
     button { margin-top: 1.25rem; width: 100%; border: 0; border-radius: 8px; padding: 0.85rem 1rem; font-weight: 700; font-size: 1rem; background: #16a34a; color: #fff; cursor: pointer; }
     button:disabled { background: #475569; color: #cbd5e1; cursor: not-allowed; }
     .err { color: #fca5a5; margin-bottom: 1rem; }
+    .findings-split { color: #cbd5e1; font-size: 0.92rem; margin: 1rem 0 0; line-height: 1.5; }
     .gfw-exit { position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; padding: 1rem; }
     .gfw-exit[hidden] { display: none !important; }
     .gfw-exit-card { position: relative; width: min(420px, 100%); background: #243044; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 1.5rem 1.25rem 1.15rem; }
@@ -2017,7 +2134,9 @@ function checkoutOfferPage({
       <input type="hidden" name="domain" value="${escapeHtml(domain)}">
       <input type="hidden" name="email" value="${escapeHtml(email)}">
       <input type="hidden" name="tid" value="${escapeHtml(trackingId)}">
+      ${issuesHidden}
       ${vopBlock}
+      ${findingsBlock}
       <button type="submit" id="pay-btn"${payDisabled}>${escapeHtml(copy.pay)}</button>
     </form>
   </div>
@@ -2045,13 +2164,14 @@ function checkoutOfferPage({
   });
 }
 
-function autofixConsentPage({ domain = "", email = "", trackingId = "", errorMessage = "" } = {}) {
+function autofixConsentPage({ domain = "", email = "", trackingId = "", errorMessage = "", issueTypes = "" } = {}) {
   return checkoutOfferPage({
     product: "wp_autofix",
     domain,
     email,
     trackingId,
     errorMessage,
+    issueTypes,
   });
 }
 
@@ -2252,6 +2372,7 @@ async function handleCheckout(request, env) {
   let email = String(url.searchParams.get("email") || "").trim().toLowerCase();
   let consent = "";
   let tid = String(url.searchParams.get("tid") || "").trim();
+  let issues = String(url.searchParams.get("i") || url.searchParams.get("issues") || "").trim();
 
   if (request.method === "POST") {
     const form = await request.formData();
@@ -2260,6 +2381,7 @@ async function handleCheckout(request, env) {
     email = String(form.get("email") || email).trim().toLowerCase();
     consent = String(form.get("vop_consent") || "").trim();
     tid = String(form.get("tid") || tid).trim();
+    issues = String(form.get("i") || form.get("issues") || issues).trim();
   }
   if (tid && !TRACKING_ID_RE.test(tid)) tid = "";
   product = String(product || "").trim();
@@ -2288,6 +2410,7 @@ async function handleCheckout(request, env) {
         domain,
         email,
         trackingId: tid,
+        issueTypes: issues,
         errorMessage:
           request.method === "POST" && !consented
             ? copy.vopError
@@ -2300,6 +2423,7 @@ async function handleCheckout(request, env) {
       domain,
       email,
       trackingId: tid,
+      issueTypes: issues,
     });
   }
 
@@ -3798,6 +3922,8 @@ async function handleTrackClick(request, env) {
   dest.searchParams.set("tid", id);
   if (domain) dest.searchParams.set("domain", domain);
   if (email) dest.searchParams.set("email", email);
+  const issues = String(url.searchParams.get("i") || url.searchParams.get("issues") || "").trim();
+  if (issues) dest.searchParams.set("i", issues);
   return Response.redirect(dest.toString(), 302);
 }
 
