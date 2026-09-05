@@ -1078,6 +1078,9 @@ function renderLandingLeadsBox(snapshot) {
                 data-domain="${escapeHtml(domain)}"
                 data-email="${escapeHtml(email)}"
                 data-lead-id="${escapeHtml(leadId)}">Odeslat report</button>
+              <button type="button" class="lead-delete"
+                data-email="${escapeHtml(email)}"
+                data-lead-id="${escapeHtml(leadId)}">Smazat</button>
             </td>
           </tr>`;
       }).join("")
@@ -1085,7 +1088,7 @@ function renderLandingLeadsBox(snapshot) {
   return `<div class="orders-box" id="landing-leads">
     <h2>Poptávky z landing page</h2>
     <p class="hint">Formulář mimo whitelist. Ukládá se do DB a notifikace jde na audit@gofixweb.com.
-    Posledních 50, nejnovější nahoře. „Odeslat report“ předvyplní testovací scan níže; po odeslání se poptávka označí jako vyřízená (snapshot se obnoví s persistem DB).</p>
+    Posledních 50, nejnovější nahoře. „Odeslat report“ předvyplní testovací scan níže; po odeslání se poptávka označí jako vyřízená (snapshot se obnoví s persistem DB). „Smazat“ záznam z DB odstraní.</p>
     <div class="cards">
       <div class="card"><div class="k">Nové</div><div class="v warn">${escapeHtml(data.newCount)}</div></div>
       <div class="card"><div class="k">Vyřízené</div><div class="v ok">${escapeHtml(data.handledCount)}</div></div>
@@ -3501,6 +3504,7 @@ function renderAdminHtml(snapshot, {
     .orders-box .cards { margin-top: 0.75rem; }
     .orders-box .card .v { font-size: 1.05rem; font-weight: 700; }
     .orders-box button.launch { margin-top: 0; padding: 0.45rem 0.75rem; font-size: 0.8rem; }
+    .orders-box button.lead-delete { margin-top: 0; margin-left: 0.35rem; padding: 0.45rem 0.75rem; font-size: 0.8rem; }
     .orders-match-details { margin-top: 0.85rem; }
     .orders-match-details > summary { cursor: pointer; color: var(--green); font-weight: 600; }
     .orders-match-table { overflow-x: auto; margin-top: 0.55rem; }
@@ -3653,6 +3657,33 @@ function renderAdminHtml(snapshot, {
         if (shopInput && shopInput.focus) shopInput.focus();
       });
     });
+    document.querySelectorAll("button.lead-delete").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var email = btn.getAttribute("data-email") || "";
+        var id = btn.getAttribute("data-lead-id") || "";
+        if (!id) return;
+        if (!window.confirm("Opravdu smazat poptávku od " + email + "?")) return;
+        btn.disabled = true;
+        var body = new URLSearchParams();
+        body.set("id", id);
+        fetch("/admin/landing-leads/delete", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: body.toString(),
+        }).then(function (res) {
+          if (!res.ok) throw new Error("delete failed");
+          var row = btn.closest("tr");
+          if (row) row.remove();
+        }).catch(function () {
+          btn.disabled = false;
+          window.alert("Poptávku se nepodařilo smazat. Zkuste to znovu.");
+        });
+      });
+    });
     setTimeout(function () { location.reload(); }, ${refreshSec}000);
   </script>
 </body>
@@ -3703,6 +3734,7 @@ async function handleAdminPage(request, env) {
     error = "Snapshot z DB se nepodařilo načíst: " + String(err && err.message ? err.message : err);
     snapshot = { stats: {}, halt: {}, rows: [], series: {} };
   }
+  snapshot = await applyDeletedLandingLeads(snapshot);
   if (runResult.status === "fulfilled") {
     runState = runResult.value;
   } else {
@@ -4084,6 +4116,79 @@ async function handleAdminDevScan(request, env) {
   next.searchParams.set("to", email);
   if (landingLeadId) next.searchParams.set("lead", "1");
   return Response.redirect(next.toString(), 303);
+}
+
+const DELETED_LEADS_CACHE = "https://admin.gofixweb/deleted-landing-leads";
+const DELETED_LEADS_TTL = 3600;
+
+async function listDeletedLeadIds() {
+  try {
+    const hit = await caches.default.match(DELETED_LEADS_CACHE);
+    if (!hit) return [];
+    const data = await hit.json();
+    return Array.isArray(data.ids) ? data.ids.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function rememberDeletedLeadId(id) {
+  const sid = String(id || "").trim();
+  if (!sid) return;
+  const ids = await listDeletedLeadIds();
+  if (!ids.includes(sid)) ids.push(sid);
+  await caches.default.put(
+    DELETED_LEADS_CACHE,
+    new Response(JSON.stringify({ ids }), {
+      headers: { "Content-Type": "application/json" },
+    }),
+    { expirationTtl: DELETED_LEADS_TTL },
+  );
+}
+
+async function applyDeletedLandingLeads(snapshot) {
+  const ids = new Set(await listDeletedLeadIds());
+  const raw = snapshot && snapshot.landing_leads;
+  if (!raw || !Array.isArray(raw.rows) || !ids.size) return snapshot;
+  snapshot.landing_leads = {
+    ...raw,
+    rows: raw.rows.filter((row) => !ids.has(String(row.id || ""))),
+  };
+  return snapshot;
+}
+
+async function handleAdminLandingLeadDelete(request, env) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const denied = await requireAdminAuth(request, env);
+  if (denied) return denied;
+
+  const fail = (message, status = 400) => jsonResponse({ ok: false, error: message }, status);
+
+  let leadId = "";
+  try {
+    const form = await request.formData();
+    leadId = String(form.get("id") || form.get("lead_id") || "").trim();
+  } catch {
+    return fail("Neplatný formulář.");
+  }
+  if (!/^\d+$/.test(leadId)) {
+    return fail("Chybí ID poptávky.");
+  }
+
+  try {
+    await dispatchGithubEvent(env, "landing-lead-delete", {
+      source: "admin",
+      landing_lead_id: leadId,
+      at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("admin_landing_lead_delete_failed", err);
+    return fail("Poptávku se nepodařilo smazat v GitHub Actions.", 502);
+  }
+  await rememberDeletedLeadId(leadId);
+  return jsonResponse({ ok: true, id: leadId });
 }
 
 const UNSUB_CACHE_TTL = 31536000;
@@ -5093,6 +5198,10 @@ export default {
 
     if (url.pathname === "/admin/dev-scan") {
       return handleAdminDevScan(request, env);
+    }
+
+    if (url.pathname === "/admin/landing-leads/delete") {
+      return handleAdminLandingLeadDelete(request, env);
     }
 
     if (url.pathname === "/unsubscribe") {
