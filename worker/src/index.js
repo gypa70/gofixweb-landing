@@ -4208,7 +4208,11 @@ const SURVEY_PAGE_COPY = {
     lossLead: "Vzorec je stejný pro každý e-shop. Čísla níže jsou z měření vašeho webu a z odhadu návštěvnosti, který report používá.",
     priceTitle: "Cena vedle odhadované ztráty",
     laterTitle: "Kdy se ozvat",
-    laterBody: "Vyberte den. Do té doby vám další obchodní e-mail nepošleme. Přesně v ten den se ozveme s připomenutím reportu.",
+    laterBody: "Zvolte, kdy se ozvat. Do té doby vám další obchodní e-mail nepošleme. Přesně v ten den se ozveme s připomenutím reportu.",
+    laterWeek: "Za týden",
+    laterTwoWeeks: "Za 2 týdny",
+    laterMonth: "Za měsíc",
+    laterCustom: "Nebo zvolte konkrétní den",
     laterSubmit: "Uložit termín",
     laterThanks: "Termín jsme uložili. Ozveme se v ten den, dřív vás obchodně kontaktovat nebudeme.",
     emptyFindings: "U tohoto e-shopu teď nemáme uložený seznam nálezů. Ozvěte se na info@gofixweb.com — doplníme to ručně.",
@@ -4235,7 +4239,11 @@ const SURVEY_PAGE_COPY = {
     lossLead: "Vzorec je rovnaký pre každý e-shop. Čísla nižšie sú z merania vášho webu a z odhadu návštevnosti, ktorý report používa.",
     priceTitle: "Cena vedľa odhadovanej straty",
     laterTitle: "Kedy sa ozvať",
-    laterBody: "Vyberte deň. Dovtedy vám ďalší obchodný e-mail nepošleme. Presne v ten deň sa ozveme s pripomenutím reportu.",
+    laterBody: "Zvoľte, kedy sa ozvať. Dovtedy vám ďalší obchodný e-mail nepošleme. Presne v ten deň sa ozveme s pripomenutím reportu.",
+    laterWeek: "Za týždeň",
+    laterTwoWeeks: "Za 2 týždne",
+    laterMonth: "Za mesiac",
+    laterCustom: "Alebo zvoľte konkrétny deň",
     laterSubmit: "Uložiť termín",
     laterThanks: "Termín sme uložili. Ozveme sa v ten deň, skôr vás obchodne kontaktovať nebudeme.",
     emptyFindings: "Pri tomto e-shope teraz nemáme uložený zoznam nálezov. Napíšte na info@gofixweb.com — doplníme to ručne.",
@@ -4356,11 +4364,40 @@ function surveyExplainHtml(reason, payload, lang) {
   return surveyPageShell(lang, copy.priceTitle, inner);
 }
 
+function surveyIsoDatePlusDays(days) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function surveyIsoDatePlusMonths(months) {
+  const d = new Date();
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+
+function surveySnoozePresetButton(actionUrl, label, isoDate) {
+  const safeAction = escapeHtml(actionUrl);
+  return `<form method="post" action="${safeAction}" style="margin:0 0 8px 0;">
+            <input type="hidden" name="resume_on" value="${escapeHtml(isoDate)}">
+            <button type="submit" style="display:block;width:100%;border:0;border-radius:8px;padding:12px 18px;background:#1a2332;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;cursor:pointer;">${escapeHtml(label)}</button>
+          </form>`;
+}
+
 function surveySnoozeFormHtml(actionUrl, lang) {
   const copy = SURVEY_PAGE_COPY[lang] || SURVEY_PAGE_COPY.cs;
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const tomorrow = surveyIsoDatePlusDays(1);
+  const week = surveyIsoDatePlusDays(7);
+  const twoWeeks = surveyIsoDatePlusDays(14);
+  const month = surveyIsoDatePlusMonths(1);
   const inner = `<tr><td style="padding:0 0 8px 0;font-size:22px;font-weight:700;">${escapeHtml(copy.laterTitle)}</td></tr>
         <tr><td style="padding:0 0 16px 0;font-size:16px;line-height:1.5;">${escapeHtml(copy.laterBody)}</td></tr>
+        <tr><td style="padding:0 0 8px 0;">
+          ${surveySnoozePresetButton(actionUrl, copy.laterWeek, week)}
+          ${surveySnoozePresetButton(actionUrl, copy.laterTwoWeeks, twoWeeks)}
+          ${surveySnoozePresetButton(actionUrl, copy.laterMonth, month)}
+        </td></tr>
+        <tr><td style="padding:12px 0 8px 0;font-size:14px;color:#64748b;">${escapeHtml(copy.laterCustom)}</td></tr>
         <tr><td>
           <form method="post" action="${escapeHtml(actionUrl)}">
             <input type="date" name="resume_on" required min="${tomorrow}" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:16px;font-family:Arial,Helvetica,sans-serif;">
