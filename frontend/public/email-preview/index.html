@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GoFixWeb — e-mailové šablony podle fáze objednávky</title>
+<style>
+  body { margin:0; padding:32px 20px; background:#f1f5f9; font-family:Arial,Helvetica,sans-serif; color:#0f172a; }
+  .wrap { max-width:920px; margin:0 auto; }
+  h1 { font-size:26px; margin:0 0 6px; }
+  .lead { font-size:14px; line-height:22px; color:#334155; margin:0 0 26px; max-width:70ch; }
+  .roles { border:1px solid #cbd5e1; background:#fff; padding:0; margin:0 0 28px; border-collapse:collapse; width:100%; }
+  .roles th, .roles td { border-bottom:1px solid #e2e8f0; padding:9px 12px; font-size:13px; text-align:left; }
+  .roles th { background:#f1f5f9; font-size:11px; letter-spacing:.4px; }
+  .sw { display:inline-block; width:12px; height:12px; border:1px solid #cbd5e1; vertical-align:-2px; margin-right:6px; }
+  .card { display:block; background:#fff; border:1px solid #cbd5e1; padding:16px 18px; margin-bottom:12px; text-decoration:none; color:inherit; }
+  .card:hover { border-color:#15803d; }
+  .num { font-size:11px; font-weight:bold; letter-spacing:.6px; color:#475569; }
+  .ttl { font-size:17px; font-weight:bold; margin:4px 0 4px; }
+  .ttl span { color:#15803d; }
+  .meta { font-size:12px; line-height:19px; color:#64748b; }
+  .phase { display:inline-block; font-size:10px; font-weight:bold; letter-spacing:.5px; padding:3px 7px; border:1px solid #cbd5e1; background:#f1f5f9; color:#475569; }
+  .phase.paid { background:#f0fdf4; border-color:#86efac; color:#166534; }
+  .phase.amber { background:#fffbeb; border-color:#fcd34d; color:#b45309; }
+  .note { font-size:12px; line-height:20px; color:#475569; background:#fff; border:1px solid #cbd5e1; padding:14px 16px; margin-top:22px; }
+  code { background:#f1f5f9; padding:1px 4px; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>GoFix<span style="color:#15803d;">Web</span> — e-mailové šablony</h1>
+  <p class="lead">Sedm samostatných šablon, jedna pro každou fázi cesty zákazníka; fáze 7 existuje jen pro variantu MANUÁL a má k sobě slovenskou verzi. U jednorázového nákupu AUTO se sedmý e-mail neposílá — AUTO má jediný doručovací e-mail (šablona 5), do kterého se výsledek Před / Po podmíněně doplňuje. Design (hlavička s logem, zelená dělicí linka, fázový pruh, skóre indikátor, CTA tlačítko, patička) je jednotný napříč všemi; mění se tón a obsah. Table-based layout, inline CSS, žádné CSS proměnné, žádný flexbox ani grid. Typografie Arial/Helvetica — stejně jako v PDF, aby vzhled držel i tam, kde klient blokuje web fonty.</p>
+
+  <table class="roles">
+    <tr><th>Barevná role</th><th>Hex</th><th>Použití</th></tr>
+    <tr><td><span class="sw" style="background:#15803d;"></span>Oprava</td><td><code>#15803d</code> / bg <code>#f0fdf4</code> / rám <code>#86efac</code></td><td>Návod, provedený zásah, CTA tlačítka, potvrzení</td></tr>
+    <tr><td><span class="sw" style="background:#b45309;"></span>Částka v Kč</td><td><code>#b45309</code> / bg <code>#fffbeb</code> / rám <code>#fcd34d</code></td><td>Jediná barva pro <strong>všechny</strong> peněžní částky (ztráta i cena), ve všech šesti šablonách. Nikdy červená.</td></tr>
+    <tr><td><span class="sw" style="background:#b91c1c;"></span>Chybový stav</td><td><code>#b91c1c</code> / bg <code>#fef2f2</code> / rám <code>#fca5a5</code></td><td>Výhradně zjištěná vada. Nikdy peníze.</td></tr>
+    <tr><td><span class="sw" style="background:#475569;"></span>Bez stavu</td><td><code>#475569</code> / bg <code>#f1f5f9</code> / rám <code>#cbd5e1</code></td><td>Meta, mřížka, <code>neovereno</code>. Není čtvrtá role.</td></tr>
+  </table>
+
+  <a class="card" href="01-teaser.html">
+    <div class="num">ŠABLONA 1</div>
+    <div class="ttl">Bezplatný teaser</div>
+    <div><span class="phase amber">FÁZE: PŘED ROZHODNUTÍM</span></div>
+    <div class="meta">Úkol: prodat. Skóre, hlavní nález, vyčíslená ztráta, dvě CTA (MANUÁL / AUTO, 1 990 Kč). Zbytek nálezů zakrytý. Nálezy bez <code>stav</code>.</div>
+  </a>
+
+  <a class="card" href="02-followup-2h.html">
+    <div class="num">ŠABLONA 2</div>
+    <div class="ttl">Follow-up 2 h</div>
+    <div><span class="phase">FÁZE: OTEVŘEL, JEŠTĚ NEKLIKL</span></div>
+    <div class="meta">Úkol: odstranit překážku, ne prodávat podruhé. Dotazník důvodu váhání se čtyřmi jednoklikovými odpověďmi.</div>
+  </a>
+
+  <a class="card" href="03-followup-48h.html">
+    <div class="num">ŠABLONA 3</div>
+    <div class="ttl">Follow-up 48 h</div>
+    <div><span class="phase">FÁZE: KLIKL, NEZAPLATIL</span></div>
+    <div class="meta">Úkol: obnovit rozdělanou objednávku. Rekapitulace výběru, návrat do checkoutu, dotazník důvodu nekoupení.</div>
+  </a>
+
+  <a class="card" href="04-potvrzeni-platby.html">
+    <div class="num">ŠABLONA 4 — v původním zadání chyběla</div>
+    <div class="ttl">Potvrzení platby / zahájení opravy</div>
+    <div><span class="phase paid">FÁZE: ZAPLACENO, ČEKÁ SE NA ZPRACOVÁNÍ</span></div>
+    <div class="meta">Úkol: ujistit. Doklad o platbě, čtyřkrokový plán, potvrzený rozsah. Žádný výsledek nálezů — v tento okamžik „po“ neexistuje, takže ani skóre po opravě.</div>
+  </a>
+
+  <a class="card" href="05-audit-trail-auto.html">
+    <div class="num">ŠABLONA 5</div>
+    <div class="ttl">Audit trail po dokončení opravy (AUTO)</div>
+    <div><span class="phase paid">FÁZE: HOTOVO — AUTO</span></div>
+    <div class="meta">Úkol: předat výsledek s dokladem. Stavy <code>opraveno</code> / <code>nelze_automaticky</code> / <code>neovereno</code> ve stejných formulacích a barvách jako PDF, aby si e-mail a příloha neodporovaly.</div>
+  </a>
+
+  <a class="card" href="06-report-manual.html">
+    <div class="num">ŠABLONA 6</div>
+    <div class="ttl">Kompletní placený report (MANUÁL)</div>
+    <div><span class="phase paid">FÁZE: HOTOVO — MANUÁL</span></div>
+    <div class="meta">Úkol: doručit PDF a snížit bariéru začátku. Doporučené pořadí tří nálezů s časem, ukázka návodu. MANUÁL nepoužívá <code>stav</code> — žádné štítky.</div>
+  </a>
+
+  <a class="card" href="07-final-report-manual.html">
+    <div class="num">ŠABLONA 7 — VARIANTA MANUÁL</div>
+    <div class="ttl">Check-in 7 dní po dodání návodu</div>
+    <div><span class="phase">FÁZE: NEVÍME, JAK TO DOPADLO</span></div>
+    <div class="meta">
+      Úkol: zjistit výsledek a nabídnout bezplatný kontrolní sken („Chci vidět výsledek“).
+      <strong>Bez Před/Po</strong> — opravy provádí zákazník ve svém tempu, druhé měření neproběhlo, takže hodnota „Po“ neexistuje a jakékoli srovnání by bylo vymyšlené.
+      Druhá cesta pro ty, kdo návod ještě nezkoušeli, nesmí vyznít jako upomínka.
+      <br><a href="07-final-report-manual-sk.html">Slovenská verze</a>
+    </div>
+  </a>
+
+  <div class="note">
+    <strong>Napojení na generátor:</strong> šablony jsou statické HTML s placeholdery ve složených závorkách (<code>{{ unsubscribe_url }}</code>, <code>{{ survey_url }}</code>, <code>{{ resume_checkout_url }}</code>, <code>{{ report_pdf_url }}</code>). Ukázková data jsou na <code>example.cz</code>. Datový kontrakt a mapování polí je v <code>README.md</code> v této složce.
+  </div>
+</div>
+</body>
+</html>

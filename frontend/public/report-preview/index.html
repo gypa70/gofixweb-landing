@@ -58,7 +58,7 @@
         <td class="loss-cell">
           <p class="cap">Odhad měsíční ztráty</p>
           <p class="loss-big">7 700 Kč</p>
-          <p class="loss-sub">za 12 měsíců 92 400 Kč</p>
+          <p class="loss-sub">Opakuje se každý měsíc, dokud chyby trvají.</p>
         </td>
         <td class="score-cell">
           <p class="cap">Skóre webu při skenu</p>
@@ -78,14 +78,13 @@
         <tr class="masked"><td>■ ■ ■ ■ ■ ■  Nález č. 3</td><td class="amt">900 Kč</td></tr>
       </tbody>
     </table>
-    <p class="tnote">Zakryté nálezy odemkne kompletní report. Částky jsou uvedené i u zakrytých položek.</p>
+    <p class="tnote">Zakryté nálezy odemkne kompletní report — částky zůstávají viditelné i u nich.</p>
 
     <table class="fin">
       <tr>
         <td class="left">
           <div class="head">Bez opravy</div>
-          Měsíční ztráta 7 700 Kč<br>
-          × 12 měsíců<br>
+          Měsíční ztráta × 12 měsíců<br>
           <span class="big">Ročně 92 400 Kč</span>
         </td>
         <td class="right">
@@ -98,19 +97,23 @@
     </table>
 
     <h2 class="sec">Dvě varianty stejného reportu</h2>
+    <!-- Box drží jen tři věci: nadpis varianty, rozlišující .cdesc a cenu.
+         ŽÁDNÁ roční ztráta, čistá úspora ani návratnost — ta čísla stojí výš v table.fin
+         a jejich opakování zde dělalo z obou variant vizuální kopie.
+         Rozhodovací rozdíl nese .cdesc a stojí PŘED cenou. -->
     <table class="cta-row">
       <tr>
         <td>
-          <div class="vlabel">Manuál</div>
+          <div class="vlabel">Manuální oprava</div>
+          <div class="cdesc">Dostanete přesný návod krok za krokem. Opravu provedete sami, ve svém tempu.</div>
           <div class="price">1 990 Kč</div>
-          Přesný návod k vložení, krok za krokem.<br>
-          Opravíte sami, na jakékoli platformě.
+          Funguje na jakékoli platformě.
         </td>
         <td>
-          <div class="vlabel">Auto</div>
+          <div class="vlabel">Automatická oprava</div>
+          <div class="cdesc">V administraci nemusíte nic měnit. Přístup uložíme šifrovaně, kdykoliv jej můžete odebrat.</div>
           <div class="price">4 990 Kč</div>
-          WooCommerce — zásah provedeme za vás.<br>
-          Součástí je i report Před / Po.
+          WooCommerce · včetně reportu Před / Po.
         </td>
       </tr>
     </table>
@@ -191,9 +194,7 @@
       <tr>
         <td class="card-body" colspan="3">
           <table class="kv">
-            <tr><td class="k">Kde</td><td class="v">Homepage — https://example.cz</td></tr>
-            <tr><td class="k">Zjištěno</td><td class="v"><span class="err">Titulek je „Domů“</span> — bez názvu e-shopu a bez klíčového slova.</td></tr>
-            <tr><td class="k">Platforma</td><td class="v">WooCommerce (WordPress 6.5, plugin Yoast SEO)</td></tr>
+            <tr><td class="k">Proč to škodí</td><td class="v">Titulek bez názvu e-shopu a klíčového slova <span class="err">snižuje míru prokliku z Google</span> i u pozic, které už máte.</td></tr>
           </table>
           <div class="box b-fix">
             <div class="bh">Text k vložení</div>
@@ -226,9 +227,7 @@
       <tr>
         <td class="card-body" colspan="3">
           <table class="kv">
-            <tr><td class="k">Kde</td><td class="v">Homepage — https://example.cz</td></tr>
-            <tr><td class="k">Zjištěno</td><td class="v"><span class="err">Značka description v hlavičce chybí</span>, Google si popisek skládá sám.</td></tr>
-            <tr><td class="k">Platforma</td><td class="v">WooCommerce (plugin Yoast SEO)</td></tr>
+            <tr><td class="k">Proč to škodí</td><td class="v">Popisek složený Googlem <span class="err">často vytrhne věty z patičky nebo cookie lišty</span>, takže ve výsledcích hledání nedáváte žádný důvod ke kliknutí.</td></tr>
           </table>
           <div class="box b-fix">
             <div class="bh">Text k vložení</div>
@@ -281,7 +280,7 @@
           <div class="box b-loss">
             <div class="bh">Proč to stojí peníze</div>
             Při načítání nad 3 sekundy odchází část návštěvníků ještě před zobrazením produktů.
-            Na vašem objemu návštěvnosti to odpovídá 5 100 Kč měsíčně.
+            Částka v hlavičce nálezu vychází z vaší návštěvnosti a podílu mobilních zařízení.
           </div>
           <div class="box b-fix">
             <div class="bh">Kde a jak to opravit</div>
@@ -356,7 +355,7 @@
           <p class="cap">Celkové skóre webu</p>
           <p class="score-big">62 / 100</p>
           <table class="bar"><tr><td class="f-bad" style="width:62%"></td><td class="rest"></td></tr></table>
-          <p class="score-sub">Stav při skenu — hodnota po opravě bude v reportu Před / Po</p>
+          <p class="score-sub">Měřeno 04.09.2026</p>
         </td>
       </tr>
     </table>
@@ -370,7 +369,7 @@
         <tr><td>Sekce homepage</td><td>Homepage</td><td><span class="s-manual">Nelze automaticky</span></td><td class="amt">5 100</td></tr>
       </tbody>
     </table>
-    <p class="tnote">Stav „zařazeno k opravě“ znamená, že zásah zatím nemá záznam v auditním logu. Potvrzení najdete v reportu Před / Po.</p>
+    <p class="tnote">Stav „zařazeno k opravě“ znamená, že zásah zatím nemá záznam v auditním logu.</p>
 
     <table class="card">
       <tr class="card-head">
@@ -381,8 +380,6 @@
       <tr>
         <td class="card-body" colspan="3">
           <table class="kv">
-            <tr><td class="k">Kde</td><td class="v">Homepage — https://example.cz</td></tr>
-            <tr><td class="k">Zjištěno</td><td class="v"><span class="err">Titulek byl „Domů“</span> — bez názvu e-shopu a bez klíčového slova.</td></tr>
             <tr><td class="k">Stav</td><td class="v"><span class="pill p-fix">OPRAVENO 04.09.2026 09:14</span></td></tr>
           </table>
           <div class="box b-fix">
@@ -392,7 +389,7 @@
             Zapsáno přes WooCommerce REST API do pole Yoast SEO Title. Původní hodnota „Domů“ uložena pro případný návrat.
           </div>
           <table class="kv">
-            <tr><td class="k">Doklad</td><td class="v">Záznam v auditním logu: status <span class="fix">applied</span>, 04.09.2026 09:14.</td></tr>
+            <tr><td class="k">Doklad</td><td class="v">Záznam v auditním logu: status <span class="fix">applied</span>.</td></tr>
             <tr><td class="k">Vaše akce</td><td class="v">Žádná. Oprava je nasazená.</td></tr>
           </table>
         </td>
@@ -408,8 +405,6 @@
       <tr>
         <td class="card-body" colspan="3">
           <table class="kv">
-            <tr><td class="k">Kde</td><td class="v">Homepage — https://example.cz</td></tr>
-            <tr><td class="k">Zjištěno</td><td class="v"><span class="err">Značka description v hlavičce chybí</span>, Google si popisek skládá sám.</td></tr>
             <tr><td class="k">Stav</td><td class="v"><span class="pill p-pending">ZAŘAZENO K OPRAVĚ</span></td></tr>
           </table>
           <div class="box b-pending">
@@ -417,7 +412,6 @@
             Doplníme meta popis:
             <span class="snippet">Vitamíny a doplňky stravy s dopravou zdarma nad 799 Kč. Odesíláme do 24 hodin, vracení zboží do 30 dnů.</span>
             Tento report vznikl před zápisem změny, proto zatím nepotvrzujeme, že je nasazená.
-            Nasazení doložíme v reportu Před / Po.
           </div>
           <table class="kv">
             <tr><td class="k">Doklad</td><td class="v">Bude doplněn po zápisu — v tuto chvíli žádný záznam v auditním logu neexistuje.</td></tr>
@@ -436,8 +430,7 @@
       <tr>
         <td class="card-body" colspan="3">
           <table class="kv">
-            <tr><td class="k">Kde</td><td class="v">Homepage — 11 sekcí nad patičkou</td></tr>
-            <tr><td class="k">Zjištěno</td><td class="v"><span class="err">Návštěvník musí projít 11 sekcí</span>, než dojde k výpisu produktů.</td></tr>
+            <tr><td class="k">Zjištěno</td><td class="v"><span class="err">Nad výpisem produktů je 11 sekcí</span> — návštěvník je musí projít, než uvidí zboží.</td></tr>
             <tr><td class="k">Stav</td><td class="v"><span class="pill p-manual">NELZE AUTOMATICKY</span></td></tr>
           </table>
           <div class="box b-fix">
@@ -518,7 +511,6 @@
     <table class="data">
       <thead><tr><th>Metrika</th><th style="width:24mm">Před</th><th style="width:24mm">Po</th><th style="width:26mm">Změna</th></tr></thead>
       <tbody>
-        <tr><td>Celkové skóre</td><td class="before">62</td><td class="after">88</td><td class="delta">+26</td></tr>
         <tr><td>Rychlost (mobil)</td><td class="before">48</td><td class="after">81</td><td class="delta">+33</td></tr>
         <tr><td>SEO</td><td class="before">71</td><td class="after">94</td><td class="delta">+23</td></tr>
         <tr><td>Mobilní zobrazení</td><td class="before">68</td><td class="after">90</td><td class="delta">+22</td></tr>
@@ -542,8 +534,7 @@
         <td class="left">
           <div class="head">Zbývající ztráta</div>
           Nález, který automaticky vyřešit nelze:<br>
-          <span class="big">5 100 Kč / měsíc</span><br>
-          Návod k opravě najdete v kompletním reportu.
+          <span class="big">5 100 Kč / měsíc</span>
         </td>
         <td class="right">
           <div class="head">Odstraněná ztráta</div>
@@ -551,6 +542,25 @@
           <span class="big">2 600 Kč / měsíc</span><br>
           Ročně 31 200 Kč.
         </td>
+      </tr>
+    </table>
+
+    <!-- CTA k zbývající ztrátě. Vykresluje se POUZE v typu 3 a pouze tehdy, když
+         v reportu zůstal alespoň jeden nález se stavem nelze_automaticky; jinak by nabízel
+         řešení neexistujícího problému. Nahrazuje dřívější pasivní větu „Návod k opravě
+         najdete v kompletním reportu“ v boxu vlevo, takže čistý přírůstek je jeden řádek.
+         NÁVOD JE BEZPLATNÝ (od 8. 9. 2026 součást varianty AUTO bez příplatku). Dřív se
+         účtoval 1 990 Kč; cena byla odstraněna, aby PDF neodporovalo AUTO e-mailu a poslední
+         nabídce ve finálním reportu, kde je návod také bez platby. Nevracet sem cenu.
+         Pozor: cena 1 990 Kč u varianty MANUÁL v `table.cta-row` zůstává — to je nákup
+         celého reportu s návody, ne dodatečný návod k jednomu neopravenému nálezu. -->
+    <table class="cta-solve">
+      <tr>
+        <td>
+          <b>Zbývající ztrátu lze odstranit ručně.</b> K tomuto konkrétnímu nálezu pošleme návod
+          krok za krokem, včetně cesty v administraci — <span class="pnote">bez platby</span>.
+        </td>
+        <td class="act"><a class="btn" href="https://example.cz">Vyřešit ihned</a></td>
       </tr>
     </table>
 

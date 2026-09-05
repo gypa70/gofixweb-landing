@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GoFixWeb — Audit trail po dokončení opravy (fáze 5: hotovo, AUTO)</title>
+<!--
+  ŠABLONA 5 / 6 — AUDIT TRAIL / STAVOVÝ E-MAIL PO DOKONČENÍ OPRAVY (AUTO)
+  Fáze zákazníka: HOTOVO. Oprava proběhla, zákazník chce doklad o tom, co se stalo.
+  Úkol e-mailu: PŘEDAT VÝSLEDEK, ne prodávat. Stav u každého nálezu + doklad z auditního logu.
+  Subject:  Oprava example.cz dokončena — stav 7 nálezů
+  Preheader: 5 opraveno, 1 nelze automaticky, 1 zatím neověřeno. Detail v přiloženém PDF.
+
+  STAVOVÁ LOGIKA JE SHODNÁ S PDF (report-preview/README.md) — e-mail a PDF si nesmí odporovat:
+    opraveno           ZELENÁ   (#166534 / #f0fdf4 / #86efac)  "Provedená oprava" + doklad z auditního logu + "Vaše akce: žádná"
+    nelze_automaticky  ČERVENÁ  (#b91c1c / #fef2f2 / #fca5a5)  "Kde a jak to opravit" + řádek "Proč ručně" — vada trvá, proto chybová barva
+    neovereno          ŠEDÁ     (#475569 / #f1f5f9 / #cbd5e1)  "Zatím neověřeno" — BEZ příslibu budoucí akce, jen stav v okamžiku odeslání
+  Tři stavy musí být na první pohled odlišitelné. Zelená se nesmí použít pro `nelze_automaticky` —
+  nález zůstal neopravený, takže vizuálně nesmí splývat s dokončenou opravou.
+  Řádek zjištěné vady zůstává vždy červený — vada existovala nezávisle na stavu opravy.
+  Pozn.: `neovereno` je legitimní jen v typu 1 AUTO. U typu 3 (Před/Po) se nesmí objevit a report se negeneruje.
+
+  CTA "Vyřešit ihned" se pod kartu nálezu vkládá VÝHRADNĚ u stavu `nelze_automaticky`.
+  U `opraveno` není co řešit, u `neovereno` nemáme potvrzený problém, takže by nabídka odporovala
+  neutrálnímu vyznění stavu. Jde o e-mailový ekvivalent komponenty `table.cta-solve` z PDF Před/Po.
+
+  NÁVOD JE BEZPLATNÝ (od 8. 9. 2026 součást varianty AUTO bez příplatku). Dřív se účtoval
+  1 990 Kč jednorázově; cena byla odstraněna, aby si kanály neodporovaly s poslední nabídkou
+  v šabloně 7, která je také bezplatná. Nevracet sem cenu ani objednávkový odkaz —
+  placené CTA po bezplatné poslední nabídce působí jako zdražení zpětně.
+-->
+</head>
+<body style="margin:0; padding:0; width:100%; background-color:#f1f5f9; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
+
+<div style="display:none; font-size:1px; color:#f1f5f9; line-height:1px; max-height:0; max-width:0; opacity:0; overflow:hidden;">5 opraveno, 1 nelze automaticky, 1 zat&iacute;m neov&#283;&#345;eno. Detail v p&#345;ilo&#382;en&eacute;m PDF.</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9;">
+<tr>
+<td align="center" style="padding:24px 12px;">
+
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px; background-color:#ffffff; border:1px solid #cbd5e1;">
+
+  <tr>
+    <td style="padding:22px 28px 14px 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td align="left" style="font-family:Arial,Helvetica,sans-serif; font-size:19px; font-weight:bold; letter-spacing:-0.3px; color:#0f172a;">GoFix<span style="color:#15803d;">Web</span></td>
+          <td align="right" style="font-family:Arial,Helvetica,sans-serif; font-size:10px; color:#64748b;">Stavov&yacute; e-mail k oprav&#283;</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr><td style="padding:0 28px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="3" bgcolor="#16a34a" style="background-color:#16a34a; line-height:3px; font-size:0;">&nbsp;</td></tr></table></td></tr>
+
+  <tr>
+    <td style="padding:16px 28px 0 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #86efac;">
+        <tr>
+          <td width="128" bgcolor="#f0fdf4" align="center" style="background-color:#f0fdf4; padding:9px 6px; font-family:Arial,Helvetica,sans-serif; font-size:10px; font-weight:bold; letter-spacing:0.6px; color:#166534;">OPRAVA DOKON&#268;ENA</td>
+          <td bgcolor="#ffffff" style="background-color:#ffffff; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:11px; color:#334155;">AUTO &middot; <strong style="color:#0f172a;">example.cz</strong> &middot; objedn&aacute;vka GFW-2026-0914 &middot; 4.&nbsp;9.&nbsp;2026</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="padding:22px 28px 0 28px; font-family:Arial,Helvetica,sans-serif;">
+      <h1 style="margin:0 0 10px 0; font-family:Arial,Helvetica,sans-serif; font-size:22px; line-height:29px; font-weight:bold; color:#0f172a;">Oprava prob&#283;hla &mdash; tady je stav ka&#382;d&eacute;ho n&aacute;lezu</h1>
+      <p style="margin:0 0 18px 0; font-family:Arial,Helvetica,sans-serif; font-size:14px; line-height:22px; color:#334155;">Automatick&eacute; z&aacute;sahy na <strong style="color:#0f172a;">example.cz</strong> jsou hotov&eacute;. N&iacute;&#382;e je doklad o tom, co jsme zm&#283;nili a co z&#367;stalo na v&aacute;s. Stejn&eacute; &uacute;daje najdete i v p&#345;ilo&#382;en&eacute;m PDF reportu.</p>
+    </td>
+  </tr>
+
+  <!-- Souhrn stavů — barvy odpovídají rolím z PDF -->
+  <tr>
+    <td style="padding:0 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #cbd5e1;">
+        <tr>
+          <td width="33%" valign="top" bgcolor="#f0fdf4" align="center" style="width:33%; background-color:#f0fdf4; border-right:1px solid #cbd5e1; padding:13px 8px; font-family:Arial,Helvetica,sans-serif;">
+            <div style="font-size:22px; font-weight:bold; color:#15803d;">5</div>
+            <div style="font-size:10px; letter-spacing:0.4px; color:#166534; padding-top:3px;">OPRAVENO</div>
+          </td>
+          <td width="34%" valign="top" bgcolor="#fef2f2" align="center" style="width:34%; background-color:#fef2f2; border-right:1px solid #cbd5e1; padding:13px 8px; font-family:Arial,Helvetica,sans-serif;">
+            <div style="font-size:22px; font-weight:bold; color:#b91c1c;">1</div>
+            <div style="font-size:10px; letter-spacing:0.4px; color:#991b1b; padding-top:3px;">NELZE AUTOMATICKY</div>
+          </td>
+          <td width="33%" valign="top" bgcolor="#f1f5f9" align="center" style="width:33%; background-color:#f1f5f9; padding:13px 8px; font-family:Arial,Helvetica,sans-serif;">
+            <div style="font-size:22px; font-weight:bold; color:#475569;">1</div>
+            <div style="font-size:10px; letter-spacing:0.4px; color:#475569; padding-top:3px;">ZAT&Iacute;M NEOV&#282;&#344;ENO</div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Nález 1: opraveno -->
+  <tr>
+    <td style="padding:18px 28px 0 28px;">
+      <h2 style="margin:0 0 8px 0; font-family:Arial,Helvetica,sans-serif; font-size:13px; font-weight:bold; letter-spacing:0.3px; color:#0f172a; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">STAV JEDNOTLIV&Yacute;CH N&Aacute;LEZ&#366;</h2>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #cbd5e1;">
+        <tr>
+          <td bgcolor="#ffffff" style="background-color:#ffffff; border-bottom:1px solid #e2e8f0; padding:12px 14px; font-family:Arial,Helvetica,sans-serif;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td valign="top" style="font-family:Arial,Helvetica,sans-serif; font-size:14px; font-weight:bold; color:#b91c1c;">Chyb&#283;lo meta description u 14 kategori&iacute;</td>
+                <td valign="top" align="right" width="96" style="font-family:Arial,Helvetica,sans-serif; font-size:10px; font-weight:bold; color:#166534; background-color:#f0fdf4; border:1px solid #86efac; padding:4px 6px;">OPRAVENO</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td bgcolor="#f0fdf4" style="background-color:#f0fdf4; border-bottom:1px solid #cbd5e1; padding:12px 14px; font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:19px; color:#334155;">
+            <div style="font-weight:bold; color:#166534; padding-bottom:4px;">Proveden&aacute; oprava</div>
+            Ke v&scaron;em 14 kategori&iacute;m jsme vygenerovali a zapsali popisek do 155 znak&#367; s n&aacute;zvem kategorie a v&yacute;hodou n&aacute;kupu.<br>
+            <span style="color:#64748b;">Doklad: auditn&iacute; log <strong style="color:#334155;">wp_autofix_log</strong>, status <strong style="color:#334155;">applied</strong>, 14 z&aacute;pis&#367;.</span><br>
+            <strong style="color:#166534;">Va&scaron;e akce: &#382;&aacute;dn&aacute;.</strong>
+          </td>
+        </tr>
+
+        <!-- Nález 2: nelze automaticky -->
+        <tr>
+          <td bgcolor="#ffffff" style="background-color:#ffffff; border-bottom:1px solid #e2e8f0; padding:12px 14px; font-family:Arial,Helvetica,sans-serif;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td valign="top" style="font-family:Arial,Helvetica,sans-serif; font-size:14px; font-weight:bold; color:#b91c1c;">LCP na mobilu 4,8&nbsp;s (limit 2,5&nbsp;s)</td>
+                <td valign="top" align="right" width="96" style="font-family:Arial,Helvetica,sans-serif; font-size:10px; font-weight:bold; color:#b91c1c; background-color:#fef2f2; border:1px solid #fca5a5; padding:4px 6px;">NELZE AUTOMATICKY</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td bgcolor="#fef2f2" style="background-color:#fef2f2; border-bottom:1px solid #cbd5e1; padding:12px 14px; font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:19px; color:#334155;">
+            <div style="font-weight:bold; color:#b91c1c; padding-bottom:4px;">Kde a jak to opravit</div>
+            1. V administraci otev&#345;ete <strong style="color:#0f172a;">Vzhled &rarr; P&#345;izp&#367;sobit &rarr; Dom&#367;</strong>.<br>
+            2. U hlavn&iacute;ho banneru zapn&#283;te p&#345;ednostn&iacute; na&#269;&iacute;t&aacute;n&iacute; a vypn&#283;te odlo&#382;en&eacute; na&#269;&iacute;t&aacute;n&iacute; prvn&iacute;ho obr&aacute;zku.<br>
+            3. Zm&#283;nu ov&#283;&#345;te opakovan&yacute;m m&#283;&#345;en&iacute;m v PageSpeed Insights.<br>
+            <span style="color:#64748b;"><strong style="color:#334155;">Pro&#269; ru&#269;n&#283;:</strong> z&aacute;sah m&#283;n&iacute; &scaron;ablonu &uacute;vodn&iacute; strany. Automatick&yacute; z&aacute;pis by mohl p&#345;epsat va&scaron;e vlastn&iacute; &uacute;pravy, proto ho neprov&aacute;d&iacute;me bez va&scaron;eho v&#283;dom&iacute;.</span>
+          </td>
+        </tr>
+        <!--
+          CTA k n&aacute;lezu — e-mailov&yacute; ekvivalent komponenty `table.cta-solve` z PDF Před/Po.
+          PODM&Iacute;NKA: renderuje se POUZE u n&aacute;lezu se stavem `nelze_automaticky`, nikdy u `opraveno`
+          ani `neovereno` — u opraven&eacute;ho n&aacute;lezu nen&iacute; co &#345;e&scaron;it a u neov&#283;&#345;en&eacute;ho by nab&iacute;zel
+          &#345;e&scaron;en&iacute; probl&eacute;mu, kter&yacute; nem&aacute;me potvrzen&yacute;.
+          Design shodn&yacute; s PDF: zelen&yacute; podklad #f0fdf4 / r&aacute;mec #86efac (role zelen&aacute; = oprava/CTA),
+          jednoř&aacute;dkov&yacute; text nad pln&#283; zelen&yacute;m tla&#269;&iacute;tkem #15803d s b&iacute;l&yacute;m bold textem.
+          N&aacute;vod je BEZPLATN&Yacute;, proto zde nen&iacute; &#382;&aacute;dn&aacute; &#269;&aacute;stka a odkaz je `{{ manual_fix_url }}`.
+          &#381;&aacute;dn&aacute; jantarov&aacute; barva — ta pat&#345;&iacute; pen&#283;&#382;n&iacute;m &#269;&aacute;stk&aacute;m, kter&eacute; tu u&#382; nejsou.
+          Tla&#269;&iacute;tko je table-based (bgcolor + <a>), aby fungovalo v Outlooku bez podpory paddingu na odkazu.
+        -->
+        <tr>
+          <td bgcolor="#f0fdf4" style="background-color:#f0fdf4; border-bottom:1px solid #cbd5e1; padding:12px 14px; font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:19px; color:#166534;">
+            Tento n&aacute;lez lze odstranit ru&#269;n&#283;. Po&scaron;leme v&aacute;m n&aacute;vod krok za krokem, v&#269;etn&#283; cesty v administraci &mdash; <strong style="color:#166534;">bez platby</strong>.
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:9px;">
+              <tr>
+                <td bgcolor="#15803d" align="center" style="background-color:#15803d; padding:9px 18px;">
+                  <a href="{{ manual_fix_url }}" style="font-family:Arial,Helvetica,sans-serif; font-size:13px; font-weight:bold; color:#ffffff; text-decoration:none; display:inline-block;">Vy&#345;e&scaron;it ihned</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Nález 3: zatím neověřeno — neutrální, bez příslibu budoucí akce a BEZ upsell CTA -->
+        <tr>
+          <td bgcolor="#ffffff" style="background-color:#ffffff; border-bottom:1px solid #e2e8f0; padding:12px 14px; font-family:Arial,Helvetica,sans-serif;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td valign="top" style="font-family:Arial,Helvetica,sans-serif; font-size:14px; font-weight:bold; color:#b91c1c;">38 obr&aacute;zk&#367; bez komprese</td>
+                <td valign="top" align="right" width="96" style="font-family:Arial,Helvetica,sans-serif; font-size:10px; font-weight:bold; color:#475569; background-color:#f1f5f9; border:1px solid #cbd5e1; padding:4px 6px;">ZAT&Iacute;M NEOV&#282;&#344;ENO</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td bgcolor="#f1f5f9" style="background-color:#f1f5f9; padding:12px 14px; font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:19px; color:#334155;">
+            <div style="font-weight:bold; color:#475569; padding-bottom:4px;">Zat&iacute;m neov&#283;&#345;eno</div>
+            V okam&#382;iku odesl&aacute;n&iacute; tohoto e-mailu nev&iacute;me, jestli je komprese 38 obr&aacute;zk&#367; nasazen&aacute;. Auditn&iacute; log k tomuto n&aacute;lezu neobsahuje &#382;&aacute;dn&yacute; z&aacute;pis, tak&#382;e nem&aacute;me doklad ani o proveden&iacute;, ani o neproveden&iacute;.<br>
+            <span style="color:#64748b;">Neov&#283;&#345;ujeme budouc&iacute; z&aacute;sah, jen stav v okam&#382;iku odesl&aacute;n&iacute;. Ov&#283;&#345;en&yacute; stav uvid&iacute;te a&#382; v reportu P&#345;ed/Po, kde se m&#283;&#345;&iacute; kontroln&iacute;m m&#283;&#345;en&iacute;m.</span>
+          </td>
+        </tr>
+      </table>
+      <p style="margin:8px 0 0 0; font-family:Arial,Helvetica,sans-serif; font-size:11px; line-height:17px; color:#64748b;">Zobrazeny 3 ze 7 n&aacute;lez&#367;. &Uacute;pln&yacute; seznam v&#269;etn&#283; doklad&#367; z auditn&iacute;ho logu je v p&#345;ilo&#382;en&eacute;m PDF.</p>
+    </td>
+  </tr>
+
+  <!--
+    Skóre. Blok má dvě vzájemně výlučné větve, protože fáze 7 pro AUTO neexistuje a tento e-mail
+    je posledním doručovacím krokem varianty AUTO:
+      a) kontrolní měření proběhlo (`control_scan_done`) → renderovat řádek "Po opravě" a rozdíl,
+         jak je ukázáno níže; jde o jediné místo, kde AUTO e-mail smí uvést Před/Po,
+      b) kontrolní měření zatím neproběhlo → řádek "Po opravě" i rozdíl vynechat a ponechat
+         jen vstupní skóre s neutrální větou "Nové skóre zde neuvádíme…". Hodnotu "Po"
+         nikdy nedopočítávat ani neodhadovat — bez měření neexistuje.
+  -->
+  <tr>
+    <td style="padding:18px 28px 0 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #cbd5e1;">
+        <tr>
+          <td bgcolor="#f8fafc" style="background-color:#f8fafc; padding:13px 16px; font-family:Arial,Helvetica,sans-serif;">
+            <div style="font-size:10px; letter-spacing:0.5px; color:#64748b;">SK&Oacute;RE P&#344;I VSTUPN&Iacute;M SKENU</div>
+            <div style="font-size:22px; font-weight:bold; color:#0f172a; padding-top:3px;">62<span style="font-size:13px; font-weight:normal; color:#64748b;">&thinsp;/&thinsp;100</span></div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;">
+              <tr>
+                <td width="62%" height="6" bgcolor="#475569" style="width:62%; background-color:#475569; line-height:6px; font-size:0;">&nbsp;</td>
+                <td width="38%" height="6" bgcolor="#e2e8f0" style="width:38%; background-color:#e2e8f0; line-height:6px; font-size:0;">&nbsp;</td>
+              </tr>
+            </table>
+            <!-- Podmíněná větev a): renderovat jen když control_scan_done -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:11px; border-top:1px solid #e2e8f0;">
+              <tr>
+                <td style="padding-top:10px; font-family:Arial,Helvetica,sans-serif;">
+                  <div style="font-size:10px; letter-spacing:0.5px; color:#64748b;">SK&Oacute;RE PO OPRAV&#282; &mdash; KONTROLN&Iacute; M&#282;&#344;EN&Iacute; 21.&nbsp;9.&nbsp;2026</div>
+                  <div style="font-size:22px; font-weight:bold; color:#166534; padding-top:3px;">84<span style="font-size:13px; font-weight:normal; color:#64748b;">&thinsp;/&thinsp;100</span> <span style="font-size:12px; font-weight:bold; color:#15803d;">(+22)</span></div>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;">
+                    <tr>
+                      <td width="84%" height="6" bgcolor="#15803d" style="width:84%; background-color:#15803d; line-height:6px; font-size:0;">&nbsp;</td>
+                      <td width="16%" height="6" bgcolor="#e2e8f0" style="width:16%; background-color:#e2e8f0; line-height:6px; font-size:0;">&nbsp;</td>
+                    </tr>
+                  </table>
+                  <div style="font-size:11px; line-height:17px; color:#64748b; padding-top:8px;">Srovn&aacute;n&iacute; m&aacute; oporu v kontroln&iacute;m m&#283;&#345;en&iacute;; shodn&aacute; &#269;&iacute;sla najdete i v p&#345;ilo&#382;en&eacute;m reportu P&#345;ed/Po.</div>
+                </td>
+              </tr>
+            </table>
+            <!-- Podmíněná větev b): pokud kontrolní měření neproběhlo, blok výše vynechat a renderovat pouze tuto větu
+            <div style="font-size:11px; line-height:17px; color:#64748b; padding-top:8px;">Nov&eacute; sk&oacute;re zde neuv&aacute;d&iacute;me &mdash; kontroln&iacute; m&#283;&#345;en&iacute; zat&iacute;m neprob&#283;hlo, tak&#382;e hodnota &bdquo;po&ldquo; neexistuje.</div>
+            -->
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <tr>
+    <td align="left" style="padding:18px 28px 0 28px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+        <tr><td align="center" bgcolor="#15803d" style="background-color:#15803d; padding:13px 26px;">
+          <a href="{{ report_pdf_url }}" style="display:inline-block; font-family:Arial,Helvetica,sans-serif; font-size:14px; font-weight:bold; color:#ffffff; text-decoration:none;">Otev&#345;&iacute;t PDF report</a>
+        </td></tr>
+      </table>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="padding:16px 28px 24px 28px; font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:20px; color:#64748b;">
+      Nesouhlas&iacute; n&#283;co s t&iacute;m, co vid&iacute;te na e-shopu? Odpov&#283;zte na tento e-mail s &#269;&iacute;slem <strong style="color:#334155;">GFW-2026-0914</strong> a prov&#283;&#345;&iacute;me z&aacute;pis v auditn&iacute;m logu.
+    </td>
+  </tr>
+
+  <!-- Bez osobního podpisu — stavový e-mail nese jen institucionální patičku -->
+  <tr>
+    <td bgcolor="#f8fafc" style="background-color:#f8fafc; border-top:1px solid #cbd5e1; padding:16px 28px 18px 28px; font-family:Arial,Helvetica,sans-serif; font-size:11px; line-height:18px; color:#64748b;">
+      <strong style="color:#334155;">GoFixWeb</strong> &middot; FinalEdge s.r.o. &middot; <a href="mailto:info@gofixweb.com" style="color:#15803d; text-decoration:underline;">info@gofixweb.com</a><br>
+      <a href="https://gofixweb.com/vop" style="color:#64748b; text-decoration:underline;">Obchodn&iacute; podm&iacute;nky</a> &middot; <a href="https://gofixweb.com/ochrana-osobnich-udaju" style="color:#64748b; text-decoration:underline;">Ochrana osobn&iacute;ch &uacute;daj&#367;</a> &middot; <a href="{{ unsubscribe_url }}" style="color:#64748b; text-decoration:underline;">Odhl&aacute;sit odb&#283;r</a><br>
+      Transak&#269;n&iacute; e-mail k dokon&#269;en&eacute; oprav&#283; objedn&aacute;vky GFW-2026-0914.
+    </td>
+  </tr>
+
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>

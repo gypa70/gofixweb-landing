@@ -41,7 +41,7 @@ export default function LossCalculator() {
         <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-16">
           <div className="lg:col-span-5">
             <span className="text-xs font-bold uppercase tracking-wider text-accent">Ztrátová kalkulačka</span>
-            <h2 className="mt-4">Kolik vás jen pomalý e-shop stojí každý měsíc?</h2>
+            <h2 className="mt-4">Kolik vás pomalý e-shop stojí každý měsíc?</h2>
             <p className="mt-5 text-muted-foreground">
               Posuňte dva jezdce podle svých čísel. Výpočet vychází z korelace mezi dobou načtení a konverzním
               poměrem — každá sekunda nad dvě sekundy odkrajuje přibližně 7 % konverzí.

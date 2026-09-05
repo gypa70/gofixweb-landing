@@ -108,7 +108,10 @@ Dvousloupcové bloky, které měl export jako `display: grid` (finanční box, C
 | `table.steps` | `Table(colWidths=[6*mm, zbytek])`, bez mřížky |
 | `.pill` | krátká `Table` s plným `BACKGROUND` a `BOX` 0.5, `hAlign='LEFT'` |
 | `table.fin` | `Table([[left, right]], colWidths=[85*mm, 85*mm])` |
-| `table.cta-row` | `Table([[a, b]], colWidths=[83*mm, 83*mm])`, mezera přes `LEFTPADDING`/`RIGHTPADDING` |
+| `table.cta-row` | `Table([[a, b]], colWidths=[83*mm, 83*mm])`, mezera přes `LEFTPADDING`/`RIGHTPADDING`; obsah cely je `[Paragraph(vlabel), Paragraph(cdesc), Paragraph(price), Paragraph(trailing)]` v tomto pořadí |
+| `table.cta-row .cdesc` | `Paragraph` se stylem `fontSize=8.5, leading=11.7, textColor=--ink-soft, spaceBefore=2, spaceAfter=3`; vkládá se **před** cenu |
+| `table.cta-solve` | `Table([[text, button]], colWidths=[128*mm, 42*mm])`, `VALIGN='MIDDLE'`, `BOX` 0.5 `--fix-border`, `BACKGROUND --fix-bg` |
+| `table.cta-solve .btn` | vnořená jednocelová `Table` s `BACKGROUND --fix`, bílým bold textem, `hAlign='RIGHT'`; odkaz přes `<a href="...">` v `Paragraph` |
 | `.source` | `Table` na 170 mm, `BOX` 0.5 `--hairline`, `BACKGROUND --surface-1` |
 | `td.delta` | `BACKGROUND --fix-bg` + `TEXTCOLOR --fix-strong` |
 
@@ -117,6 +120,87 @@ Pokud se nevejde, `CondPageBreak` před ní. Totéž platí pro KPI pás, aby se
 
 Ukazatel plnění (`table.bar`) je jediná komponenta, kde náhled používá procenta v `style` atributu.
 V ReportLab se místo toho spočítá `colWidths` — procenta jsou v HTML jen zástupné vyjádření.
+
+## CTA nabídky v teaseru — popisný řádek varianty
+
+V CTA boxech **nesmí být roční ztráta, čistá úspora ani návratnost** — tato čísla už stojí výš
+v boxu „Bez opravy / S opravou“ a jejich opakování dělalo z obou variant vizuálně tutéž kartu.
+Box drží jen tři věci: nadpis varianty, rozlišující `.cdesc` a cenu. Rozhodovací rozdíl nese
+`.cdesc` — jeden krátký popisný řádek **pod nadpisem varianty a před cenou**, aby zákazník věděl,
+co kupuje, ještě než uvidí částku.
+
+Nadpis varianty (`.vlabel`) je **černý tučný `#000000`** — ne `--ink`, ne zelená, ne šedá. Je to
+popisek volby, kterou si zákazník vybírá, ne signál stavu opravy. Odlišení variant nese rámeček
+boxu a cena; obarvení nadpisu dělalo z jedné varianty vizuálně „doporučenou“ a z druhé potlačenou.
+Stejné pravidlo platí pro `MANUÁLNÍ OPRAVA` / `AUTOMATICKÁ OPRAVA` v teaser e-mailu. Neplatí pro
+tmavé vizuální exporty v `uploads/report-template*/visual-spec.html` — jsou to archivní reference,
+ne aktivně používaný produkt, a nesjednocují se (potvrzeno zadavatelem 2026-09-04).
+
+| Varianta | Text `.cdesc` |
+| --- | --- |
+| Automatická oprava | „V administraci nemusíte nic měnit. Přístup uložíme šifrovaně, kdykoliv jej můžete odebrat.“ |
+| Manuální oprava | „Dostanete přesný návod krok za krokem. Opravu provedete sami, ve svém tempu.“ |
+
+Teaser je kompaktní layout na jedné A4 straně, takže přírůstek výšky je kompenzován: `.cdesc` má
+zmenšený stupeň `8.5pt` se stahovaným prokládáním `1.38`, `.price` má zmenšené vnější mezery
+(`1px 0 3px`) a doprovodný text pod cenou byl zkrácen ze dvou řádků na jeden. Text nesmí být
+rozšiřován — každý další řádek posouvá patičku a hrozí zlom na druhou stranu.
+
+Realizace v ReportLabu zůstává tabulková: `.cdesc` je jen další `Paragraph` v téže cele
+`table.cta-row`, žádný grid, stín ani zaoblení.
+
+## CTA k zbývající ztrátě (`table.cta-solve`)
+
+Box „Zbývající ztráta“ v typu 3 uváděl jen částku bez jakékoli akce, přitom jde o zákazníka,
+který už za AUTO zaplatil a vidí, že část ztráty trvá. Pod boxem proto stojí jednořádkové CTA
+nabízející ruční opravu právě tohoto nálezu.
+
+Pravidla:
+
+- **Vykresluje se pouze v typu 3** a pouze tehdy, když v reportu zůstal alespoň jeden nález se
+  stavem `nelze_automaticky`. Pokud je vše ve stavu `opraveno`, komponenta se vynechá celá —
+  jinak by nabízela řešení neexistujícího problému.
+- **Návod je bezplatný** (od 8. 9. 2026 součást varianty AUTO bez příplatku). Dřív se účtoval
+  `cena_manual` (1 990 Kč); cena byla odstraněna, aby PDF neodporovalo AUTO e-mailu a poslední
+  nabídce ve finálním reportu, kde je návod také bez platby. Do této komponenty cenu nevracet.
+- Cena 1 990 Kč u varianty MANUÁL v `table.cta-row` **zůstává** — to je nákup celého reportu
+  s návody ke všem nálezům, ne dodatečný návod k jednomu nálezu, který zůstal neopravený.
+- Text CTA nese konkrétní nález, ne obecnou nabídku — proto „k tomuto konkrétnímu nálezu“.
+- Barevná role je zelená (oprava / CTA). Částka ztráty zůstává jantarová v boxu nad CTA, takže
+  se role nemíchají. Tlačítko je bílý bold text na plné zelené — dostatečný kontrast pro tisk.
+
+Dopad na kompaktní layout: v boxu „Zbývající ztráta“ byla odstraněna pasivní věta „Návod k opravě
+najdete v kompletním reportu“, kterou CTA nahrazuje věcně i funkčně. Čistý přírůstek je proto
+jeden řádek. CTA musí zůstat na jednom řádku — delší text posouvá patičku.
+
+Realizace v ReportLabu je tabulková: vnější `Table` o dvou celách a tlačítko jako vnořená
+jednocelová `Table` s plným zeleným `BACKGROUND`. Žádný grid, stín ani zaoblení; odkaz se řeší
+značkou `<a href="...">` uvnitř `Paragraph`, aby byl v PDF klikatelný.
+
+## Audit duplicit napříč čtyřmi typy
+
+Pravidlo: **jedna informace = jedno místo na stránce.** Souhrn a detail duplicita nejsou (KPI skóre
+vs. rozpad po metrikách zůstává), ale identická hodnota ve dvou blocích ano. Nalezeno a sjednoceno:
+
+| Typ | Duplicita | Řešení |
+| --- | --- | --- |
+| Teaser | `loss-sub` „za 12 měsíců 92 400 Kč“ vs. box „Bez opravy → Ročně 92 400 Kč“ | `loss-sub` nese místo čísla důvod opakování ztráty; roční částka zůstává jen v boxu |
+| Teaser | „Měsíční ztráta 7 700 Kč“ v boxu vs. `loss-big` v KPI | v boxu zbyl jen vzorec „Měsíční ztráta × 12 měsíců“ |
+| MANUÁL | `Kde` + `Zjištěno` v kartě = kopie sloupců tabulky souhrnu | v kartě je nahradil řádek `Proč to škodí`, který přidává obchodní důvod |
+| MANUÁL | `Platforma` v kartě vs. platforma v hlavičce stránky | v kartě ponechána jen tam, kde se od hlavičky liší (ukázka Shoptetu) |
+| MANUÁL | „odpovídá 5 100 Kč měsíčně“ v boxu vs. částka v hlavičce karty | box odkazuje na částku v hlavičce a vysvětluje její výpočet |
+| AUTO | `score-sub` „hodnota po opravě bude v reportu Před / Po“ vs. `variant` popis a `tnote` | `score-sub` zkrácen na datum měření |
+| AUTO | `Kde` / `Zjištěno` v kartách = kopie tabulky stavů; datum a čas v `Stav` i v `Doklad` | odstraněno z karet, `Doklad` drží jen status z auditního logu |
+| AUTO | „Nasazení doložíme v reportu Před / Po“ třikrát na stránce | ponecháno jen v `Vaše akce` |
+| Před / Po | řádek „Celkové skóre 62 → 88 (+26)“ vs. KPI pás se stejnými čísly a „+26 bodů“ | řádek z tabulky odstraněn, tabulka drží rozpad po metrikách |
+
+Dopad na layout: kompaktnější karty a o jeden řádek nižší tabulka Před / Po, takže úprava snižuje
+riziko zlomu na další stranu. V ReportLabu jde jen o méně řádků v `table.kv` a `table.data` —
+struktura komponent se nemění.
+
+**Nezasahováno** (podobné, ale jiná informace): KPI skóre vs. `table.metrics`, částka v hlavičce
+karty vs. sloupec `Kč/měs.` v souhrnu (identifikace karty), `Stav` v tabulce vs. `pill` v kartě
+(stručný vs. plný časový záznam), sloupce `Před` / `Po` vs. `Změna`.
 
 ## Hraniční případy pro generátor
 

@@ -168,7 +168,7 @@ function Hero() {
             <p className="mt-6 max-w-xl text-lg text-muted-foreground">
               Najdeme technické chyby ve vašem e-shopu, přepočítáme je na{' '}
               <span className="font-semibold text-accent">konkrétní měsíční ztrátu v korunách</span> a opravíme je.
-              První analýzu dostanete do hodiny zdarma.
+              První analýzu dostanete do 10 minut zdarma.
             </p>
 
             <dl className="mt-9 grid max-w-md grid-cols-2 gap-6 border-t border-border pt-7">

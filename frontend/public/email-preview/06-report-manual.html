@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GoFixWeb — Kompletní placený report (fáze 6: hotovo, MANUÁL)</title>
+<!--
+  ŠABLONA 6 / 6 — DORUČENÍ KOMPLETNÍHO REPORTU (MANUÁL)
+  Fáze zákazníka: HOTOVO. Zaplatil návod, teď potřebuje PDF a jasný první krok.
+  Úkol e-mailu: PŘEDAT VÝSLEDEK a snížit bariéru začátku. Ne prodej, ne follow-up.
+  Subject:  Kompletní report pro example.cz je připravený
+  Preheader: 7 nálezů s návodem krok za krokem pro WooCommerce. PDF v příloze.
+
+  MANUÁL NEMÁ `stav` — žádné štítky opraveno / nelze automaticky / zatím neověřeno (viz report-preview/README.md).
+  Nálezy se popisují jen jako zjištěná vada (červená) + návod k opravě (zelená).
+-->
+</head>
+<body style="margin:0; padding:0; width:100%; background-color:#f1f5f9; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
+
+<div style="display:none; font-size:1px; color:#f1f5f9; line-height:1px; max-height:0; max-width:0; opacity:0; overflow:hidden;">7 n&aacute;lez&#367; s n&aacute;vodem krok za krokem pro WooCommerce. PDF v p&#345;&iacute;loze.</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9;">
+<tr>
+<td align="center" style="padding:24px 12px;">
+
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px; background-color:#ffffff; border:1px solid #cbd5e1;">
+
+  <tr>
+    <td style="padding:22px 28px 14px 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td align="left" style="font-family:Arial,Helvetica,sans-serif; font-size:19px; font-weight:bold; letter-spacing:-0.3px; color:#0f172a;">GoFix<span style="color:#15803d;">Web</span></td>
+          <td align="right" style="font-family:Arial,Helvetica,sans-serif; font-size:10px; color:#64748b;">Dodan&yacute; report</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr><td style="padding:0 28px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="3" bgcolor="#16a34a" style="background-color:#16a34a; line-height:3px; font-size:0;">&nbsp;</td></tr></table></td></tr>
+
+  <tr>
+    <td style="padding:16px 28px 0 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #86efac;">
+        <tr>
+          <td width="128" bgcolor="#f0fdf4" align="center" style="background-color:#f0fdf4; padding:9px 6px; font-family:Arial,Helvetica,sans-serif; font-size:10px; font-weight:bold; letter-spacing:0.6px; color:#166534;">REPORT DODAN&Yacute;</td>
+          <td bgcolor="#ffffff" style="background-color:#ffffff; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:11px; color:#334155;">MANU&Aacute;L &middot; <strong style="color:#0f172a;">example.cz</strong> &middot; WooCommerce &middot; objedn&aacute;vka GFW-2026-0915</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="padding:22px 28px 0 28px; font-family:Arial,Helvetica,sans-serif;">
+      <h1 style="margin:0 0 10px 0; font-family:Arial,Helvetica,sans-serif; font-size:22px; line-height:29px; font-weight:bold; color:#0f172a;">V&aacute;&scaron; kompletn&iacute; report je p&#345;ipraven&yacute;</h1>
+      <p style="margin:0 0 18px 0; font-family:Arial,Helvetica,sans-serif; font-size:14px; line-height:22px; color:#334155;">V p&#345;&iacute;loze najdete PDF se v&scaron;emi 7 n&aacute;lezy pro <strong style="color:#0f172a;">example.cz</strong>. U ka&#382;d&eacute;ho je cesta v administraci WooCommerce, konkr&eacute;tn&iacute; text k vlo&#382;en&iacute;, zp&#367;sob ov&#283;&#345;en&iacute; a odhad &#269;asu.</p>
+    </td>
+  </tr>
+
+  <tr>
+    <td align="left" style="padding:0 28px 0 28px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+        <tr><td align="center" bgcolor="#15803d" style="background-color:#15803d; padding:14px 28px;">
+          <a href="{{ report_pdf_url }}" style="display:inline-block; font-family:Arial,Helvetica,sans-serif; font-size:15px; font-weight:bold; color:#ffffff; text-decoration:none;">Otev&#345;&iacute;t kompletn&iacute; report</a>
+        </td></tr>
+      </table>
+      <p style="margin:9px 0 0 0; font-family:Arial,Helvetica,sans-serif; font-size:11px; line-height:17px; color:#64748b;">Odkaz je platn&yacute; 90 dn&iacute;. PDF m&aacute;te z&aacute;rove&#328; p&#345;ilo&#382;en&eacute; k tomuto e-mailu.</p>
+    </td>
+  </tr>
+
+  <!-- KPI pás -->
+  <tr>
+    <td style="padding:18px 28px 0 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td width="49%" valign="top" bgcolor="#fffbeb" style="width:49%; background-color:#fffbeb; border:1px solid #fcd34d; padding:14px 16px;">
+            <div style="font-family:Arial,Helvetica,sans-serif; font-size:10px; letter-spacing:0.5px; color:#b45309;">ODHADOVAN&Aacute; M&#282;S&Iacute;&#268;N&Iacute; ZTR&Aacute;TA</div>
+            <div style="font-family:Arial,Helvetica,sans-serif; font-size:24px; font-weight:bold; line-height:30px; color:#b45309; padding-top:4px;">18&nbsp;400 K&#269;</div>
+          </td>
+          <td width="2%" style="width:2%; font-size:0; line-height:0;">&nbsp;</td>
+          <td width="49%" valign="top" bgcolor="#f8fafc" style="width:49%; background-color:#f8fafc; border:1px solid #cbd5e1; padding:14px 16px;">
+            <div style="font-family:Arial,Helvetica,sans-serif; font-size:10px; letter-spacing:0.5px; color:#64748b;">SK&Oacute;RE P&#344;I SKENU</div>
+            <div style="font-family:Arial,Helvetica,sans-serif; font-size:24px; font-weight:bold; line-height:30px; color:#0f172a; padding-top:4px;">62<span style="font-size:13px; font-weight:normal; color:#64748b;">&thinsp;/&thinsp;100</span></div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;">
+              <tr>
+                <td width="62%" height="6" bgcolor="#475569" style="width:62%; background-color:#475569; line-height:6px; font-size:0;">&nbsp;</td>
+                <td width="38%" height="6" bgcolor="#e2e8f0" style="width:38%; background-color:#e2e8f0; line-height:6px; font-size:0;">&nbsp;</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Doporučené pořadí — bez štítků stavu, MANUÁL stav nepoužívá -->
+  <tr>
+    <td style="padding:18px 28px 0 28px;">
+      <h2 style="margin:0 0 8px 0; font-family:Arial,Helvetica,sans-serif; font-size:13px; font-weight:bold; letter-spacing:0.3px; color:#0f172a; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">ZA&#268;N&#282;TE T&#282;MITO T&#344;EMI</h2>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #cbd5e1;">
+        <tr>
+          <td bgcolor="#f1f5f9" style="background-color:#f1f5f9; border-bottom:1px solid #cbd5e1; padding:8px 12px; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:bold; color:#0f172a;">Zji&scaron;t&#283;n&aacute; chyba</td>
+          <td bgcolor="#f1f5f9" align="right" width="88" style="background-color:#f1f5f9; border-bottom:1px solid #cbd5e1; padding:8px 12px; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:bold; color:#0f172a;">K&#269;/m&#283;s.</td>
+          <td bgcolor="#f1f5f9" align="right" width="62" style="background-color:#f1f5f9; border-bottom:1px solid #cbd5e1; padding:8px 12px; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:bold; color:#0f172a;">&#268;as</td>
+        </tr>
+        <tr>
+          <td bgcolor="#ffffff" style="background-color:#ffffff; border-bottom:1px solid #e2e8f0; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; color:#b91c1c;">Chyb&iacute; meta description u 14 kategori&iacute;</td>
+          <td bgcolor="#ffffff" align="right" style="background-color:#ffffff; border-bottom:1px solid #e2e8f0; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; color:#b45309;">7&nbsp;100 K&#269;</td>
+          <td bgcolor="#ffffff" align="right" style="background-color:#ffffff; border-bottom:1px solid #e2e8f0; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; color:#334155;">40 min</td>
+        </tr>
+        <tr>
+          <td bgcolor="#f8fafc" style="background-color:#f8fafc; border-bottom:1px solid #e2e8f0; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; color:#b91c1c;">LCP na mobilu 4,8&nbsp;s</td>
+          <td bgcolor="#f8fafc" align="right" style="background-color:#f8fafc; border-bottom:1px solid #e2e8f0; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; color:#b45309;">5&nbsp;900 K&#269;</td>
+          <td bgcolor="#f8fafc" align="right" style="background-color:#f8fafc; border-bottom:1px solid #e2e8f0; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; color:#334155;">25 min</td>
+        </tr>
+        <tr>
+          <td bgcolor="#ffffff" style="background-color:#ffffff; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; color:#b91c1c;">38 obr&aacute;zk&#367; bez komprese</td>
+          <td bgcolor="#ffffff" align="right" style="background-color:#ffffff; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; color:#b45309;">3&nbsp;100 K&#269;</td>
+          <td bgcolor="#ffffff" align="right" style="background-color:#ffffff; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; color:#334155;">15 min</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Ukázka návodu — zelená = oprava -->
+  <tr>
+    <td style="padding:18px 28px 0 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #86efac;">
+        <tr>
+          <td bgcolor="#f0fdf4" style="background-color:#f0fdf4; padding:14px 16px; font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:19px; color:#334155;">
+            <div style="font-size:13px; font-weight:bold; color:#166534; padding-bottom:6px;">Uk&aacute;zka n&aacute;vodu &mdash; meta description</div>
+            1. Otev&#345;ete <strong style="color:#0f172a;">Produkty &rarr; Kategorie</strong> a zvolte kategorii.<br>
+            2. V sekci SEO vlo&#382;te popisek do 155 znak&#367; s n&aacute;zvem kategorie a v&yacute;hodou n&aacute;kupu.<br>
+            3. Ulo&#382;te a ov&#283;&#345;te v PageSpeed Insights nebo p&#345;es n&aacute;hled ve vyhled&aacute;v&aacute;n&iacute;.<br>
+            <span style="color:#64748b;">Kompletn&iacute; kroky pro v&scaron;ech 7 n&aacute;lez&#367; v&#269;etn&#283; text&#367; k vlo&#382;en&iacute; jsou v PDF.</span>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Nabídka AUTO jako doplněk, ne hlavní CTA fáze -->
+  <tr>
+    <td style="padding:18px 28px 0 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #cbd5e1;">
+        <tr>
+          <td bgcolor="#f8fafc" style="background-color:#f8fafc; padding:14px 16px; font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:19px; color:#334155;">
+            Nem&aacute;te na opravy &#269;as? Stejn&eacute; n&aacute;lezy um&iacute;me na WooCommerce opravit za v&aacute;s v r&aacute;mci automatick&eacute; opravy &mdash; <a href="https://gofixweb.com/#ceny" style="color:#15803d; font-weight:bold; text-decoration:underline;">zobrazit variantu AUTO</a>.
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="padding:16px 28px 24px 28px; font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:20px; color:#64748b;">
+      Nen&iacute; v n&aacute;vodu n&#283;co jasn&eacute;? Odpov&#283;zte na tento e-mail s &#269;&iacute;slem <strong style="color:#334155;">GFW-2026-0915</strong> a doplníme konkr&eacute;tn&iacute; postup pro v&aacute;&scaron; e-shop.
+    </td>
+  </tr>
+
+  <!-- Bez osobního podpisu — e-mail s reportem nese jen institucionální patičku -->
+  <tr>
+    <td bgcolor="#f8fafc" style="background-color:#f8fafc; border-top:1px solid #cbd5e1; padding:16px 28px 18px 28px; font-family:Arial,Helvetica,sans-serif; font-size:11px; line-height:18px; color:#64748b;">
+      <strong style="color:#334155;">GoFixWeb</strong> &middot; FinalEdge s.r.o. &middot; <a href="mailto:info@gofixweb.com" style="color:#15803d; text-decoration:underline;">info@gofixweb.com</a><br>
+      <a href="https://gofixweb.com/vop" style="color:#64748b; text-decoration:underline;">Obchodn&iacute; podm&iacute;nky</a> &middot; <a href="https://gofixweb.com/ochrana-osobnich-udaju" style="color:#64748b; text-decoration:underline;">Ochrana osobn&iacute;ch &uacute;daj&#367;</a> &middot; <a href="{{ unsubscribe_url }}" style="color:#64748b; text-decoration:underline;">Odhl&aacute;sit odb&#283;r</a><br>
+      Transak&#269;n&iacute; e-mail k dodan&eacute;mu reportu objedn&aacute;vky GFW-2026-0915.
+    </td>
+  </tr>
+
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>

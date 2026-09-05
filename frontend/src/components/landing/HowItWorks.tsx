@@ -74,7 +74,10 @@ export default function HowItWorks() {
               {problems.map((item) => (
                 <li key={item} className="flex gap-3 text-sm">
                   <X className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
-                  <span className="text-muted-foreground">{item}</span>
+                  {/* Text položek je v obou sloupcích shodně `text-foreground`. Ztlumená
+                      levá strana dělala z problémů méně čitelný text než z výhod. Rozdíl
+                      mezi sloupci nese ikona, rámeček a podbarvení, ne barva textu. */}
+                  <span className="text-foreground">{item}</span>
                 </li>
               ))}
             </ul>
@@ -86,7 +89,7 @@ export default function HowItWorks() {
               {answers.map((item) => (
                 <li key={item} className="flex gap-3 text-sm">
                   <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                  <span className="text-foreground/90">{item}</span>
+                  <span className="text-foreground">{item}</span>
                 </li>
               ))}
             </ul>

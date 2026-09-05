@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GoFixWeb — Potvrzení platby a zahájení opravy (fáze 4: zaplaceno, čeká se na zpracování)</title>
+<!--
+  ŠABLONA 4 / 6 — POTVRZENÍ PLATBY / ZAHÁJENÍ OPRAVY
+  Fáze zákazníka: ZAPLACENO, oprava ještě neproběhla. Tento typ v původním zadání chyběl.
+  Trigger: úspěšná platba (Stripe webhook), odesílá se ihned.
+  Úkol e-mailu: UJISTIT. Doklad o platbě, co se stane dál, kdy přijde výsledek. Žádný prodej, žádné CTA na koupi.
+  Subject:  Platba přijata — opravu example.cz zahajujeme
+  Preheader: Objednávka GFW-2026-0914 je potvrzená. Výsledek pošleme do 48 hodin.
+
+  DŮLEŽITÉ: tento e-mail NESMÍ tvrdit nic o výsledku nálezů. V tento okamžik žádné "po" neexistuje
+  (stejné pravidlo jako u PDF typu 1 AUTO — bez skóre po opravě, bez srovnání 62 -> 88).
+  Nálezy se proto vypisují bez stavu, jen jako potvrzený rozsah práce.
+-->
+</head>
+<body style="margin:0; padding:0; width:100%; background-color:#f1f5f9; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
+
+<div style="display:none; font-size:1px; color:#f1f5f9; line-height:1px; max-height:0; max-width:0; opacity:0; overflow:hidden;">Objedn&aacute;vka GFW-2026-0914 je potvrzen&aacute;. V&yacute;sledek po&scaron;leme do 48 hodin.</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9;">
+<tr>
+<td align="center" style="padding:24px 12px;">
+
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px; background-color:#ffffff; border:1px solid #cbd5e1;">
+
+  <tr>
+    <td style="padding:22px 28px 14px 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td align="left" style="font-family:Arial,Helvetica,sans-serif; font-size:19px; font-weight:bold; letter-spacing:-0.3px; color:#0f172a;">GoFix<span style="color:#15803d;">Web</span></td>
+          <td align="right" style="font-family:Arial,Helvetica,sans-serif; font-size:10px; color:#64748b;">Potvrzen&iacute; objedn&aacute;vky</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr><td style="padding:0 28px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="3" bgcolor="#16a34a" style="background-color:#16a34a; line-height:3px; font-size:0;">&nbsp;</td></tr></table></td></tr>
+
+  <tr>
+    <td style="padding:16px 28px 0 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #86efac;">
+        <tr>
+          <td width="128" bgcolor="#f0fdf4" align="center" style="background-color:#f0fdf4; padding:9px 6px; font-family:Arial,Helvetica,sans-serif; font-size:10px; font-weight:bold; letter-spacing:0.6px; color:#166534;">PLATBA P&#344;IJATA</td>
+          <td bgcolor="#ffffff" style="background-color:#ffffff; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:11px; color:#334155;">Objedn&aacute;vka <strong style="color:#0f172a;">GFW-2026-0914</strong> &middot; automatick&aacute; oprava (AUTO) &middot; 4.&nbsp;9.&nbsp;2026</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="padding:22px 28px 0 28px; font-family:Arial,Helvetica,sans-serif;">
+      <h1 style="margin:0 0 10px 0; font-family:Arial,Helvetica,sans-serif; font-size:22px; line-height:29px; font-weight:bold; color:#0f172a;">Platba pro&scaron;la, opravu <strong style="color:#0f172a;">example.cz</strong> zahajujeme</h1>
+      <p style="margin:0 0 18px 0; font-family:Arial,Helvetica,sans-serif; font-size:14px; line-height:22px; color:#334155;">D&#283;kujeme. V&scaron;e prob&#283;hlo v po&#345;&aacute;dku a nic dal&scaron;&iacute;ho od v&aacute;s te&#271; nepot&#345;ebujeme. N&iacute;&#382;e je doklad o platb&#283;, potvrzen&yacute; rozsah pr&aacute;ce a &#269;asov&yacute; pl&aacute;n.</p>
+    </td>
+  </tr>
+
+  <!-- Doklad o platbě — jantarová výhradně u částky -->
+  <tr>
+    <td style="padding:0 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #cbd5e1;">
+        <tr>
+          <td bgcolor="#f1f5f9" style="background-color:#f1f5f9; border-bottom:1px solid #cbd5e1; padding:9px 14px; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:bold; letter-spacing:0.4px; color:#0f172a;">DOKLAD O PLATB&#282;</td>
+        </tr>
+        <tr>
+          <td bgcolor="#ffffff" style="background-color:#ffffff; padding:14px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,Helvetica,sans-serif; font-size:13px; line-height:20px;">
+              <tr>
+                <td width="150" valign="top" style="padding:0 0 8px 0; color:#64748b;">&#268;&iacute;slo objedn&aacute;vky</td>
+                <td valign="top" style="padding:0 0 8px 0; color:#0f172a; font-weight:bold;">GFW-2026-0914</td>
+              </tr>
+              <tr>
+                <td width="150" valign="top" style="padding:0 0 8px 0; color:#64748b;">Slu&#382;ba</td>
+                <td valign="top" style="padding:0 0 8px 0; color:#334155;">Automatick&aacute; oprava (AUTO) &middot; WooCommerce</td>
+              </tr>
+              <tr>
+                <td width="150" valign="top" style="padding:0 0 8px 0; color:#64748b;">E-shop</td>
+                <td valign="top" style="padding:0 0 8px 0; color:#334155;">example.cz</td>
+              </tr>
+              <tr>
+                <td width="150" valign="top" style="padding:0 0 8px 0; color:#64748b;">Zp&#367;sob platby</td>
+                <td valign="top" style="padding:0 0 8px 0; color:#334155;">Platebn&iacute; kartou p&#345;es Stripe</td>
+              </tr>
+              <tr>
+                <td width="150" valign="top" style="padding:0 0 0 0; color:#64748b;">Zaplacen&aacute; &#269;&aacute;stka</td>
+                <td valign="top" style="padding:0; font-size:17px; font-weight:bold; color:#b45309;">1&nbsp;990 K&#269;</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+      <p style="margin:8px 0 0 0; font-family:Arial,Helvetica,sans-serif; font-size:11px; line-height:17px; color:#64748b;">FinalEdge s.r.o. nen&iacute; pl&aacute;tcem DPH. Da&#328;ov&yacute; doklad je p&#345;ilo&#382;en&yacute; k tomuto e-mailu.</p>
+    </td>
+  </tr>
+
+  <!-- Časový plán — zelená = probíhající zásah, neutrální = ještě nezahájeno -->
+  <tr>
+    <td style="padding:18px 28px 0 28px;">
+      <h2 style="margin:0 0 8px 0; font-family:Arial,Helvetica,sans-serif; font-size:13px; font-weight:bold; letter-spacing:0.3px; color:#0f172a; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">CO BUDE N&Aacute;SLEDOVAT</h2>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #cbd5e1;">
+        <tr>
+          <td width="34" bgcolor="#f0fdf4" align="center" valign="top" style="background-color:#f0fdf4; border-bottom:1px solid #e2e8f0; padding:12px 0; font-family:Arial,Helvetica,sans-serif; font-size:13px; font-weight:bold; color:#166534;">1</td>
+          <td bgcolor="#f0fdf4" style="background-color:#f0fdf4; border-bottom:1px solid #e2e8f0; padding:12px 14px; font-family:Arial,Helvetica,sans-serif; font-size:13px; line-height:20px; color:#334155;">
+            <strong style="color:#166534;">Prob&iacute;h&aacute; te&#271;</strong> &mdash; napojen&iacute; na v&aacute;&scaron; e-shop a p&#345;&iacute;prava z&aacute;sah&#367; podle 7 potvrzen&yacute;ch n&aacute;lez&#367;.
+          </td>
+        </tr>
+        <tr>
+          <td width="34" bgcolor="#ffffff" align="center" valign="top" style="background-color:#ffffff; border-bottom:1px solid #e2e8f0; padding:12px 0; font-family:Arial,Helvetica,sans-serif; font-size:13px; font-weight:bold; color:#475569;">2</td>
+          <td bgcolor="#ffffff" style="background-color:#ffffff; border-bottom:1px solid #e2e8f0; padding:12px 14px; font-family:Arial,Helvetica,sans-serif; font-size:13px; line-height:20px; color:#334155;">
+            Proveden&iacute; automatick&yacute;ch oprav. Ka&#382;d&yacute; z&aacute;sah se zapisuje do auditn&iacute;ho logu, aby byl dohledateln&yacute;.
+          </td>
+        </tr>
+        <tr>
+          <td width="34" bgcolor="#f8fafc" align="center" valign="top" style="background-color:#f8fafc; border-bottom:1px solid #e2e8f0; padding:12px 0; font-family:Arial,Helvetica,sans-serif; font-size:13px; font-weight:bold; color:#475569;">3</td>
+          <td bgcolor="#f8fafc" style="background-color:#f8fafc; border-bottom:1px solid #e2e8f0; padding:12px 14px; font-family:Arial,Helvetica,sans-serif; font-size:13px; line-height:20px; color:#334155;">
+            Kontroln&iacute; m&#283;&#345;en&iacute; proti Google PageSpeed API po dokon&#269;en&iacute; z&aacute;sah&#367;.
+          </td>
+        </tr>
+        <tr>
+          <td width="34" bgcolor="#ffffff" align="center" valign="top" style="background-color:#ffffff; padding:12px 0; font-family:Arial,Helvetica,sans-serif; font-size:13px; font-weight:bold; color:#475569;">4</td>
+          <td bgcolor="#ffffff" style="background-color:#ffffff; padding:12px 14px; font-family:Arial,Helvetica,sans-serif; font-size:13px; line-height:20px; color:#334155;">
+            <strong style="color:#0f172a;">Do 48 hodin</strong> od platby v&aacute;m po&scaron;leme stavov&yacute; e-mail s v&yacute;sledkem u ka&#382;d&eacute;ho n&aacute;lezu a PDF report.
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Potvrzený rozsah — bez stavu, protože výsledek zatím neexistuje -->
+  <tr>
+    <td style="padding:18px 28px 0 28px;">
+      <h2 style="margin:0 0 8px 0; font-family:Arial,Helvetica,sans-serif; font-size:13px; font-weight:bold; letter-spacing:0.3px; color:#0f172a; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">POTVRZEN&Yacute; ROZSAH &mdash; 7 N&Aacute;LEZ&#366;</h2>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #cbd5e1;">
+        <tr>
+          <td bgcolor="#ffffff" style="background-color:#ffffff; border-bottom:1px solid #e2e8f0; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; color:#334155;">Chyb&iacute; meta description u 14 kategori&iacute;</td>
+        </tr>
+        <tr>
+          <td bgcolor="#f8fafc" style="background-color:#f8fafc; border-bottom:1px solid #e2e8f0; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; color:#334155;">LCP na mobilu 4,8&nbsp;s</td>
+        </tr>
+        <tr>
+          <td bgcolor="#ffffff" style="background-color:#ffffff; border-bottom:1px solid #e2e8f0; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; color:#334155;">38 obr&aacute;zk&#367; bez komprese</td>
+        </tr>
+        <tr>
+          <td bgcolor="#f8fafc" style="background-color:#f8fafc; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; color:#64748b;">&hellip; a dal&scaron;&iacute;ch 4 n&aacute;lez&#367; z kompletn&iacute;ho seznamu</td>
+        </tr>
+      </table>
+      <p style="margin:8px 0 0 0; font-family:Arial,Helvetica,sans-serif; font-size:11px; line-height:17px; color:#64748b;">V&yacute;sledek u jednotliv&yacute;ch n&aacute;lez&#367; zde je&scaron;t&#283; neuv&aacute;d&iacute;me &mdash; oprava zat&iacute;m neprob&#283;hla. Stav ka&#382;d&eacute;ho n&aacute;lezu najdete a&#382; ve stavov&eacute;m e-mailu a v PDF reportu.</p>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="padding:18px 28px 24px 28px; font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:20px; color:#64748b;">
+      M&aacute;te dotaz k objedn&aacute;vce? Odpov&#283;zte na tento e-mail a uve&#271;te &#269;&iacute;slo <strong style="color:#334155;">GFW-2026-0914</strong>.
+    </td>
+  </tr>
+
+  <!-- Bez osobního podpisu — transakční e-mail nese jen institucionální patičku -->
+  <tr>
+    <td bgcolor="#f8fafc" style="background-color:#f8fafc; border-top:1px solid #cbd5e1; padding:16px 28px 18px 28px; font-family:Arial,Helvetica,sans-serif; font-size:11px; line-height:18px; color:#64748b;">
+      <strong style="color:#334155;">GoFixWeb</strong> &middot; FinalEdge s.r.o. &middot; <a href="mailto:info@gofixweb.com" style="color:#15803d; text-decoration:underline;">info@gofixweb.com</a><br>
+      <a href="https://gofixweb.com/vop" style="color:#64748b; text-decoration:underline;">Obchodn&iacute; podm&iacute;nky</a> &middot; <a href="https://gofixweb.com/ochrana-osobnich-udaju" style="color:#64748b; text-decoration:underline;">Ochrana osobn&iacute;ch &uacute;daj&#367;</a> &middot; <a href="{{ unsubscribe_url }}" style="color:#64748b; text-decoration:underline;">Odhl&aacute;sit odb&#283;r</a><br>
+      Transak&#269;n&iacute; e-mail k objedn&aacute;vce GFW-2026-0914. Odhl&aacute;&scaron;en&iacute; se net&yacute;k&aacute; e-mail&#367; k prob&iacute;haj&iacute;c&iacute; objedn&aacute;vce.
+    </td>
+  </tr>
+
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>

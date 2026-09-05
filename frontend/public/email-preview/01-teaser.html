@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GoFixWeb — Bezplatný teaser (fáze 1: před rozhodnutím)</title>
+<!--
+  ŠABLONA 1 / 6 — BEZPLATNÝ TEASER
+  Fáze zákazníka: PŘED ROZHODNUTÍM. První kontakt, zákazník o nás nic neví.
+  Úkol e-mailu: PRODAT. Ukázat nález, vyčíslit ztrátu, nabídnout dvě opravy.
+  Subject:  Váš e-shop {{ domain }} ztrácí {{ monthly_loss_czk }} Kč měsíčně
+  Preheader: Skóre {{ score }}/100, {{ findings_total }} nalezených chyb. Opravu zvládneme za {{ price_czk }} Kč.
+  Bez `stav` u nálezů — v teaseru se stav nepoužívá (viz report-preview/README.md).
+-->
+</head>
+<body style="margin:0; padding:0; width:100%; background-color:#f1f5f9; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
+
+<div style="display:none; font-size:1px; color:#f1f5f9; line-height:1px; max-height:0; max-width:0; opacity:0; overflow:hidden;">Skóre 62/100, 7 nalezených chyb. Opravu zvládneme za 1&nbsp;990 Kč.</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9;">
+<tr>
+<td align="center" style="padding:24px 12px;">
+
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px; background-color:#ffffff; border:1px solid #cbd5e1;">
+
+  <!-- ============ HLAVIČKA (jednotná ve všech 6 šablonách) ============ -->
+  <tr>
+    <td style="padding:22px 28px 14px 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td align="left" style="font-family:Arial,Helvetica,sans-serif; font-size:19px; font-weight:bold; letter-spacing:-0.3px; color:#0f172a;">GoFix<span style="color:#15803d;">Web</span></td>
+          <td align="right" style="font-family:Arial,Helvetica,sans-serif; font-size:10px; color:#64748b;">Technick&yacute; sken e-shopu</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr><td style="padding:0 28px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="3" bgcolor="#16a34a" style="background-color:#16a34a; line-height:3px; font-size:0;">&nbsp;</td></tr></table></td></tr>
+
+  <!-- ============ FÁZOVÝ PRUH — mění se podle okamžiku v cestě zákazníka ============ -->
+  <tr>
+    <td style="padding:16px 28px 0 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #cbd5e1;">
+        <tr>
+          <td width="128" bgcolor="#f1f5f9" align="center" style="background-color:#f1f5f9; padding:9px 6px; font-family:Arial,Helvetica,sans-serif; font-size:10px; font-weight:bold; letter-spacing:0.6px; color:#475569;">BEZPLATN&Yacute; SKEN</td>
+          <td bgcolor="#ffffff" style="background-color:#ffffff; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:11px; color:#334155;">V&yacute;sledek automatick&eacute;ho skenu <strong style="color:#0f172a;">example.cz</strong> &middot; 4.&nbsp;9.&nbsp;2026</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- ============ TĚLO — prodejní tón ============ -->
+  <tr>
+    <td style="padding:22px 28px 0 28px; font-family:Arial,Helvetica,sans-serif;">
+      <h1 style="margin:0 0 10px 0; font-family:Arial,Helvetica,sans-serif; font-size:22px; line-height:29px; font-weight:bold; color:#0f172a;">Na&scaron;li jsme 7 technick&yacute;ch chyb, kter&eacute; v&aacute;s st&aacute;le stoj&iacute; pen&iacute;ze</h1>
+      <p style="margin:0 0 18px 0; font-family:Arial,Helvetica,sans-serif; font-size:14px; line-height:22px; color:#334155;">Dobr&yacute; den, prov&#283;&#345;ili jsme <strong style="color:#0f172a;">example.cz</strong> proti dat&#367;m Google PageSpeed API. N&iacute;&#382;e je souhrn &mdash; kompletn&iacute; report s n&aacute;vodem v&aacute;m po&scaron;leme hned po objedn&aacute;vce opravy.</p>
+    </td>
+  </tr>
+
+  <!-- KPI pás: ztráta (jantarová = výhradně Kč) + skóre (neutrální / červená, nikdy jantarová) -->
+  <tr>
+    <td style="padding:0 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td width="49%" valign="top" bgcolor="#fffbeb" style="width:49%; background-color:#fffbeb; border:1px solid #fcd34d; padding:14px 16px;">
+            <div style="font-family:Arial,Helvetica,sans-serif; font-size:10px; letter-spacing:0.5px; color:#b45309;">ODHADOVAN&Aacute; M&#282;S&Iacute;&#268;N&Iacute; ZTR&Aacute;TA</div>
+            <div style="font-family:Arial,Helvetica,sans-serif; font-size:26px; font-weight:bold; line-height:32px; color:#b45309; padding-top:4px;">18&nbsp;400 K&#269;</div>
+            <div style="font-family:Arial,Helvetica,sans-serif; font-size:11px; color:#b45309; padding-top:2px;">220&nbsp;800 K&#269; za rok</div>
+          </td>
+          <td width="2%" style="width:2%; font-size:0; line-height:0;">&nbsp;</td>
+          <td width="49%" valign="top" bgcolor="#f8fafc" style="width:49%; background-color:#f8fafc; border:1px solid #cbd5e1; padding:14px 16px;">
+            <div style="font-family:Arial,Helvetica,sans-serif; font-size:10px; letter-spacing:0.5px; color:#64748b;">SK&Oacute;RE P&#344;I SKENU</div>
+            <div style="font-family:Arial,Helvetica,sans-serif; font-size:26px; font-weight:bold; line-height:32px; color:#0f172a; padding-top:4px;">62<span style="font-size:14px; font-weight:normal; color:#64748b;">&thinsp;/&thinsp;100</span></div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;">
+              <tr>
+                <td width="62%" height="6" bgcolor="#475569" style="width:62%; background-color:#475569; line-height:6px; font-size:0;">&nbsp;</td>
+                <td width="38%" height="6" bgcolor="#e2e8f0" style="width:38%; background-color:#e2e8f0; line-height:6px; font-size:0;">&nbsp;</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Hlavní nález — červená = chybový stav, nikdy peníze -->
+  <tr>
+    <td style="padding:18px 28px 0 28px;">
+      <h2 style="margin:0 0 8px 0; font-family:Arial,Helvetica,sans-serif; font-size:13px; font-weight:bold; letter-spacing:0.3px; color:#0f172a; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">HLAVN&Iacute; N&Aacute;LEZ</h2>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #fca5a5;">
+        <tr>
+          <td bgcolor="#fef2f2" style="background-color:#fef2f2; padding:14px 16px; font-family:Arial,Helvetica,sans-serif;">
+            <div style="font-size:14px; font-weight:bold; color:#b91c1c;">Chyb&iacute; meta description u 14 kategori&iacute;</div>
+            <div style="font-size:13px; line-height:20px; color:#334155; padding-top:6px;">Google si popisek dopl&#328;uje s&aacute;m z t&#283;la str&aacute;nky. Ve v&yacute;sledc&iacute;ch vyhled&aacute;v&aacute;n&iacute; se zobrazuje &uacute;ryvek z navigace, ne prodejn&iacute; text &mdash; proto na v&aacute;&scaron; odkaz klikne m&eacute;n&#283; lid&iacute;, ne&#382; kdy&#382; popisek existuje.</div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Tabulka nálezů: 3 odkryté + zbytek zakrytý (teaser) -->
+  <tr>
+    <td style="padding:18px 28px 0 28px;">
+      <h2 style="margin:0 0 8px 0; font-family:Arial,Helvetica,sans-serif; font-size:13px; font-weight:bold; letter-spacing:0.3px; color:#0f172a; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">P&#344;EHLED N&Aacute;LEZ&#366;</h2>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #cbd5e1;">
+        <tr>
+          <td bgcolor="#f1f5f9" style="background-color:#f1f5f9; border-bottom:1px solid #cbd5e1; padding:8px 12px; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:bold; color:#0f172a;">Zji&scaron;t&#283;n&aacute; chyba</td>
+          <td bgcolor="#f1f5f9" align="right" width="110" style="background-color:#f1f5f9; border-bottom:1px solid #cbd5e1; padding:8px 12px; font-family:Arial,Helvetica,sans-serif; font-size:11px; font-weight:bold; color:#0f172a;">K&#269;/m&#283;s.</td>
+        </tr>
+        <tr>
+          <td bgcolor="#ffffff" style="background-color:#ffffff; border-bottom:1px solid #e2e8f0; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; color:#b91c1c;">Chyb&iacute; meta description u 14 kategori&iacute;</td>
+          <td bgcolor="#ffffff" align="right" style="background-color:#ffffff; border-bottom:1px solid #e2e8f0; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; color:#b45309;">7&nbsp;100 K&#269;</td>
+        </tr>
+        <tr>
+          <td bgcolor="#f8fafc" style="background-color:#f8fafc; border-bottom:1px solid #e2e8f0; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; color:#b91c1c;">LCP na mobilu 4,8&nbsp;s (limit 2,5&nbsp;s)</td>
+          <td bgcolor="#f8fafc" align="right" style="background-color:#f8fafc; border-bottom:1px solid #e2e8f0; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; color:#b45309;">5&nbsp;900 K&#269;</td>
+        </tr>
+        <tr>
+          <td bgcolor="#ffffff" style="background-color:#ffffff; border-bottom:1px solid #e2e8f0; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; color:#b91c1c;">38 obr&aacute;zk&#367; bez komprese (3,2&nbsp;MB navrch)</td>
+          <td bgcolor="#ffffff" align="right" style="background-color:#ffffff; border-bottom:1px solid #e2e8f0; padding:9px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; color:#b45309;">3&nbsp;100 K&#269;</td>
+        </tr>
+        <tr>
+          <td bgcolor="#e8edf3" style="background-color:#e8edf3; padding:11px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; color:#64748b;">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&nbsp;&nbsp;dal&scaron;&iacute;ch 4 n&aacute;lezy v kompletn&iacute;m reportu</td>
+          <td bgcolor="#e8edf3" align="right" style="background-color:#e8edf3; padding:11px 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; color:#64748b;">&bull;&bull;&bull;&bull;&nbsp;K&#269;</td>
+        </tr>
+      </table>
+      <p style="margin:8px 0 0 0; font-family:Arial,Helvetica,sans-serif; font-size:11px; line-height:17px; color:#64748b;">&#268;&aacute;stky jsou modelov&yacute; odhad z m&#283;&#345;en&yacute;ch dat Google PageSpeed API a obvykl&yacute;ch konverzn&iacute;ch pom&#283;r&#367; v e-commerce. Nejde o garantovan&yacute; v&yacute;nos.</p>
+    </td>
+  </tr>
+
+  <!-- Dvě CTA — zelená = oprava -->
+  <tr>
+    <td style="padding:20px 28px 0 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #86efac;">
+        <tr>
+          <td bgcolor="#f0fdf4" style="background-color:#f0fdf4; padding:16px 16px 6px 16px; font-family:Arial,Helvetica,sans-serif;">
+            <div style="font-size:14px; font-weight:bold; color:#166534;">Chcete to m&iacute;t opraven&eacute;?</div>
+            <div style="font-size:12px; line-height:19px; color:#334155; padding-top:5px;">Vyberte jednu ze dvou cest. Cena je jednor&aacute;zov&aacute;, bez p&#345;edplatn&eacute;ho a bez skryt&yacute;ch polo&#382;ek.</div>
+          </td>
+        </tr>
+        <tr>
+          <td bgcolor="#f0fdf4" style="background-color:#f0fdf4; padding:8px 16px 18px 16px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td width="49%" valign="top" style="width:49%;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff; border:1px solid #cbd5e1;">
+                    <tr><td style="padding:12px 12px 14px 12px; font-family:Arial,Helvetica,sans-serif;">
+                      <div style="font-size:11px; font-weight:bold; letter-spacing:0.5px; color:#000000;">MANU&Aacute;LN&Iacute; OPRAVA</div>
+                      <div style="font-size:12px; line-height:18px; color:#334155; padding:6px 0 8px 0;">Dostanete PDF s n&aacute;vodem krok za krokem pro va&scaron;i platformu. Opravu provedete sami.</div>
+                      <div style="font-family:Arial,Helvetica,sans-serif; font-size:17px; font-weight:bold; color:#b45309; padding-bottom:10px;">1&nbsp;990 K&#269;</div>
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                        <tr><td align="center" bgcolor="#15803d" style="background-color:#15803d; padding:11px 14px;">
+                          <a href="https://gofixweb.com/#ceny" style="display:inline-block; font-family:Arial,Helvetica,sans-serif; font-size:13px; font-weight:bold; color:#ffffff; text-decoration:none;">Chci n&aacute;vod</a>
+                        </td></tr>
+                      </table>
+                    </td></tr>
+                  </table>
+                </td>
+                <td width="2%" style="width:2%; font-size:0; line-height:0;">&nbsp;</td>
+                <td width="49%" valign="top" style="width:49%;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff; border:1px solid #86efac;">
+                    <tr><td style="padding:12px 12px 14px 12px; font-family:Arial,Helvetica,sans-serif;">
+                      <div style="font-size:11px; font-weight:bold; letter-spacing:0.5px; color:#000000;">AUTOMATICK&Aacute; OPRAVA</div>
+                      <div style="font-size:12px; line-height:18px; color:#334155; padding:6px 0 8px 0;">Opravu provedeme za v&aacute;s. Dostanete stavov&yacute; e-mail s dokladem o ka&#382;d&eacute;m z&aacute;sahu.</div>
+                      <div style="font-family:Arial,Helvetica,sans-serif; font-size:17px; font-weight:bold; color:#b45309; padding-bottom:10px;">1&nbsp;990 K&#269;</div>
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                        <tr><td align="center" bgcolor="#15803d" style="background-color:#15803d; padding:11px 14px;">
+                          <a href="https://gofixweb.com/#ceny" style="display:inline-block; font-family:Arial,Helvetica,sans-serif; font-size:13px; font-weight:bold; color:#ffffff; text-decoration:none;">Opravte to za m&#283;</a>
+                        </td></tr>
+                      </table>
+                    </td></tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="padding:18px 28px 24px 28px; font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:20px; color:#64748b;">
+      Nen&iacute; to pro v&aacute;s? Sta&#269;&iacute; neodpov&iacute;dat &mdash; report si m&#367;&#382;ete nechat a chyby opravit sami. Pokud m&aacute;te dotaz k n&aacute;lez&#367;m, odpov&#283;zte p&#345;&iacute;mo na tento e-mail.
+    </td>
+  </tr>
+
+  <!-- ============ OSOBNÍ PODPIS ZAKLADATELE (prodejní varianta: s osobní větou) ============ -->
+  <tr>
+    <td style="padding:20px 28px 0 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #e2e8f0;">
+        <tr>
+          <td style="padding:15px 0 0 0; font-family:Arial,Helvetica,sans-serif; font-size:13px; line-height:21px; color:#334155;">
+            Na tento e-mail odpov&iacute;d&aacute;m osobn&#283;. Pokud v&aacute;m &#269;&iacute;sla v&yacute;&scaron;e nebudou d&aacute;vat smysl nebo budete cht&iacute;t v&#283;d&#283;t, jak jsme k nim do&scaron;li, napi&scaron;te mi p&#345;&iacute;mo &mdash; nebudete se prokous&aacute;vat podporou.
+            <div style="padding-top:14px;">
+              <strong style="font-size:14px; color:#0f172a;">Libor Sup</strong><br>
+              <span style="font-size:12px; color:#64748b;">zakladatel GoFixWeb &middot; <a href="mailto:info@gofixweb.com" style="color:#15803d; text-decoration:underline;">info@gofixweb.com</a></span>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- ============ PATIČKA (jednotná ve všech 6 šablonách) ============ -->
+  <tr>
+    <td bgcolor="#f8fafc" style="background-color:#f8fafc; border-top:1px solid #cbd5e1; padding:16px 28px 18px 28px; font-family:Arial,Helvetica,sans-serif; font-size:11px; line-height:18px; color:#64748b;">
+      <strong style="color:#334155;">GoFixWeb</strong> &middot; FinalEdge s.r.o. &middot; <a href="mailto:info@gofixweb.com" style="color:#15803d; text-decoration:underline;">info@gofixweb.com</a><br>
+      <a href="https://gofixweb.com/vop" style="color:#64748b; text-decoration:underline;">Obchodn&iacute; podm&iacute;nky</a> &middot; <a href="https://gofixweb.com/ochrana-osobnich-udaju" style="color:#64748b; text-decoration:underline;">Ochrana osobn&iacute;ch &uacute;daj&#367;</a> &middot; <a href="{{ unsubscribe_url }}" style="color:#64748b; text-decoration:underline;">Odhl&aacute;sit odb&#283;r</a><br>
+      Tento e-mail jste dostali, proto&#382; jste na gofixweb.com po&#382;&aacute;dali o bezplatn&yacute; sken adresy example.cz.
+    </td>
+  </tr>
+
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>

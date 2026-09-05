@@ -205,11 +205,26 @@ table.fin td.right { background: var(--fix-bg); border-color: var(--fix-border);
 table.fin .head { font-weight: 700; margin-bottom: 6px; font-size: 10pt; }
 table.fin .big { font-size: 14pt; font-weight: 700; }
 
+/* Upsell CTA pod boxem „Zbývající ztráta“ — jen typ 3 (Před / Po) a jen když v reportu
+   zůstal nález ve stavu nelze_automaticky. Jeden řádek, dvě cely: text vlevo, tlačítko
+   vpravo. Zelená = oprava/CTA, takže role barev zůstávají nesmíchané. Vertikální
+   zarovnání middle, aby tlačítko sedělo na účaří textu bez dalšího řádku. */
+table.cta-solve { width: var(--table-w); border-collapse: collapse; font-size: var(--body-size); margin: 2px 0 10px; }
+table.cta-solve td { padding: 7px 10px; vertical-align: middle; background: var(--fix-bg); border: .5px solid var(--fix-border); color: var(--fix-strong); line-height: 1.4; }
+table.cta-solve td.act { width: 42mm; text-align: right; white-space: nowrap; }
+table.cta-solve .btn { background: var(--fix); color: #ffffff; font-weight: 700; font-size: 10pt; padding: 5px 12px; text-decoration: none; }
+table.cta-solve .pnote { font-weight: 700; }
+
 /* ---------- CTA nabídky -> Table([[a, b]], 83mm/83mm) ---------- */
 table.cta-row { width: var(--table-w); border-collapse: separate; border-spacing: 8px 0; font-size: var(--body-size); }
 table.cta-row td { width: 50%; padding: 10px; vertical-align: top; background: var(--surface-1); border: .5px solid var(--hairline); line-height: 1.45; }
-table.cta-row .vlabel { font-weight: 700; font-size: 10pt; color: var(--ink); }
-table.cta-row .price { color: var(--fix); font-weight: 700; font-size: 13pt; margin: 3px 0 5px; }
+/* Nadpis varianty je černý tučný, ne var(--ink) ani stavová barva. Jde o popisek volby,
+   ne o signál stavu — barevné odlišení variant nese rámeček a cena, nikdy nadpis. */
+table.cta-row .vlabel { font-weight: 700; font-size: 10pt; color: #000000; }
+/* Popisný řádek varianty — jediný rozlišovací prvek mezi boxy, proto stojí PŘED cenou.
+   Zmenšený stupeň a stažené prokládání drží výšku boxu v kompaktním layoutu. */
+table.cta-row .cdesc { font-size: 8.5pt; line-height: 1.38; color: var(--ink-soft); margin: 2px 0 3px; }
+table.cta-row .price { color: var(--fix); font-weight: 700; font-size: 13pt; margin: 1px 0 3px; }
 
 /* ---------- Box zdroje dat -> Table na 170mm ---------- */
 .source {
