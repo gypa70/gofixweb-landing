@@ -132,6 +132,29 @@ jobs:
           KEY=$(printf '%s' "$STRIPE_WEBHOOK_SECRET" | tr -d '\r\n')
           printf '%s' "$KEY" | npx wrangler secret put STRIPE_WEBHOOK_SECRET --name gofixweb-report-trigger
 
+      - name: Put BANK_ACCOUNT on Worker
+        if: steps.cf.outputs.present == 'true'
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          BANK_ACCOUNT: ${{ secrets.BANK_ACCOUNT }}
+          BANK_IBAN: ${{ secrets.BANK_IBAN }}
+          BANK_BENEFICIARY: ${{ secrets.BANK_BENEFICIARY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BANK_ACCOUNT}" ]; then
+            echo "::warning::BANK_ACCOUNT GitHub secret is empty; leaving existing Worker bank details unchanged."
+            exit 0
+          fi
+          KEY=$(printf '%s' "$BANK_ACCOUNT" | tr -d '\r\n')
+          printf '%s' "$KEY" | npx wrangler secret put BANK_ACCOUNT --name gofixweb-report-trigger
+          if [ -n "${BANK_IBAN}" ]; then
+            printf '%s' "$(printf '%s' "$BANK_IBAN" | tr -d '\r\n')" | npx wrangler secret put BANK_IBAN --name gofixweb-report-trigger
+          fi
+          if [ -n "${BANK_BENEFICIARY}" ]; then
+            printf '%s' "$(printf '%s' "$BANK_BENEFICIARY" | tr -d '\r\n')" | npx wrangler secret put BANK_BENEFICIARY --name gofixweb-report-trigger
+          fi
+
       - name: Put STRIPE_WEBHOOK_SECRET_TEST on Worker
         if: steps.cf.outputs.present == 'true'
         working-directory: worker

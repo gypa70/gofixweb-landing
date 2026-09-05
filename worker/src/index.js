@@ -12,6 +12,9 @@
  *   ADMIN_BASIC_PASSWORD — heslo Basic Auth pro GET /admin
  *   ADMIN_BASIC_USER     — volitelně (default gofixweb)
  *   UNSUBSCRIBE_SECRET   — HMAC pro /unsubscribe a /unsub-status
+ *   BANK_ACCOUNT         — číslo účtu FinalEdge s.r.o. (48h payfail převod)
+ *   BANK_IBAN            — volitelně IBAN
+ *   BANK_BENEFICIARY     — volitelně příjemce (default FinalEdge s.r.o.)
  *
  * GET /checkout — nabídka (manual_fix / wp_autofix jednorázově; basic/pro/premium
  *   měsíčně). POST spustí Stripe Checkout Session.
@@ -74,6 +77,7 @@ const ONBOARDING_URL = "https://gofixweb.com/wordpress-autofix";
 const VOP_VERSION = "2026-09-04";
 const VOP_TERMS_URL = "https://gofixweb.com/terms.html";
 const VOP_AUTOFIX_SECTION_URL = `${VOP_TERMS_URL}#vop-autofix-section`;
+const MONEY_AMBER = "#b45309";
 
 const SUBSCRIPTION_PLANS = {
   basic: {
@@ -2238,7 +2242,7 @@ function checkoutOfferPage({
     h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 0.75rem; }
     p { color: #cbd5e1; margin-bottom: 1rem; }
     a { color: #16a34a; }
-    .price { font-size: 1.35rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem; }
+    .price { font-size: 1.35rem; font-weight: 800; color: #b45309; margin-bottom: 0.5rem; }
     .card { border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.25rem; background: #243044; }
     label { display: flex; gap: 0.7rem; align-items: flex-start; color: #e2e8f0; font-size: 0.95rem; cursor: pointer; }
     input[type="checkbox"] { margin-top: 0.3rem; width: 1.1rem; height: 1.1rem; flex-shrink: 0; }
@@ -2341,7 +2345,7 @@ function subscriptionOfferPage({
     h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 0.75rem; }
     p { color: #cbd5e1; margin-bottom: 1rem; }
     a { color: #16a34a; }
-    .price { font-size: 1.35rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem; }
+    .price { font-size: 1.35rem; font-weight: 800; color: #b45309; margin-bottom: 0.5rem; }
     .card { border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.25rem; background: #243044; }
     label { display: flex; gap: 0.7rem; align-items: flex-start; color: #e2e8f0; font-size: 0.95rem; cursor: pointer; }
     label.field { flex-direction: column; gap: 0.35rem; margin-bottom: 0.85rem; cursor: default; }
@@ -2609,11 +2613,6 @@ async function handleCheckout(request, env) {
   const amount = ONE_TIME_FIX_AMOUNT;
   const name = product === "manual_fix" ? copy.manualName : copy.autoName;
   const description = product === "manual_fix" ? copy.manualBlurb : copy.autoBlurb;
-  const priceId = String(
-    product === "manual_fix"
-      ? env.STRIPE_MANUAL_FIX_PRICE_ID || STRIPE_MANUAL_FIX_PRICE_ID
-      : env.STRIPE_AUTO_FIX_PRICE_ID || STRIPE_AUTO_FIX_PRICE_ID,
-  ).trim();
   let successUrl = "https://gofixweb.com/";
   if (product === "wp_autofix") {
     const next = new URL(ONBOARDING_URL);
@@ -2639,15 +2638,11 @@ async function handleCheckout(request, env) {
   if (issues) body.set("metadata[issues]", parseCheckoutIssueTypes(issues).join(","));
   if (email && EMAIL_RE.test(email)) body.set("customer_email", email);
   body.set("line_items[0][quantity]", "1");
-  if (priceId) {
-    body.set("line_items[0][price]", priceId);
-  } else {
-    body.set("line_items[0][price_data][currency]", COMPLETE_AUDIT_CURRENCY);
-    body.set("line_items[0][price_data][unit_amount]", String(amount));
-    body.set("line_items[0][price_data][product_data][name]", name);
-    body.set("line_items[0][price_data][product_data][description]", description);
-    body.set("line_items[0][price_data][product_data][tax_code]", "txcd_10000000");
-  }
+  body.set("line_items[0][price_data][currency]", COMPLETE_AUDIT_CURRENCY);
+  body.set("line_items[0][price_data][unit_amount]", String(amount));
+  body.set("line_items[0][price_data][product_data][name]", name);
+  body.set("line_items[0][price_data][product_data][description]", description);
+  body.set("line_items[0][price_data][product_data][tax_code]", "txcd_10000000");
   body.set("managed_payments[enabled]", "false");
   body.set("locale", copy.stripeLocale);
 
@@ -4551,7 +4546,7 @@ function surveyExplainHtml(reason, payload, lang) {
             <tr><td style="padding:12px 14px;">
               <div style="font-weight:700;font-size:16px;margin:0 0 6px 0;">${escapeHtml(item.title || item.issue_type || "")}</div>
               <div style="font-size:15px;line-height:1.5;color:#1a2332;">${escapeHtml(item.harm || "")}</div>
-              <div style="margin-top:8px;color:#d97706;font-weight:700;">${escapeHtml(copy.impact)}: ${fmtSurveyCzk(item.monthly_loss)} ${escapeHtml(copy.perMonth)}</div>
+              <div style="margin-top:8px;color:${MONEY_AMBER};font-weight:700;">${escapeHtml(copy.impact)}: ${fmtSurveyCzk(item.monthly_loss)} ${escapeHtml(copy.perMonth)}</div>
             </td></tr>
           </table>
         </td></tr>`).join("")
@@ -4567,7 +4562,7 @@ function surveyExplainHtml(reason, payload, lang) {
     const rows = findings.map((item) => `<tr>
         <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;">${escapeHtml(item.title || "")}</td>
         <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:#64748b;">${escapeHtml(copy.weight)} ${Number(item.coefficient || 0)}</td>
-        <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:#d97706;font-weight:700;text-align:right;">${fmtSurveyCzk(item.monthly_loss)} ${escapeHtml(copy.perMonth)}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:${MONEY_AMBER};font-weight:700;text-align:right;">${fmtSurveyCzk(item.monthly_loss)} ${escapeHtml(copy.perMonth)}</td>
       </tr>`).join("");
     const inner = `<tr><td style="padding:0 0 8px 0;font-size:22px;font-weight:700;">${escapeHtml(copy.lossTitle)}</td></tr>
         <tr><td style="padding:0 0 16px 0;font-size:16px;line-height:1.5;color:#334155;">${escapeHtml(copy.lossLead)}</td></tr>
@@ -4578,14 +4573,14 @@ function surveyExplainHtml(reason, payload, lang) {
         <tr><td style="padding:0 0 8px 0;">${escapeHtml(copy.speed)}: <strong>${data.speed_score == null ? "—" : escapeHtml(String(data.speed_score))}/100</strong></td></tr>
         <tr><td style="padding:0 0 16px 0;">${escapeHtml(copy.overall)}: <strong>${data.overall_score == null ? "—" : escapeHtml(String(data.overall_score))}/100</strong></td></tr>
         <tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows}</table></td></tr>
-        <tr><td style="padding:16px 0 8px 0;color:#d97706;font-size:18px;font-weight:700;">${escapeHtml(copy.totalLoss)}: ${fmtSurveyCzk(data.monthly_loss)} ${escapeHtml(copy.perMonth)}</td></tr>
+        <tr><td style="padding:16px 0 8px 0;color:${MONEY_AMBER};font-size:18px;font-weight:700;">${escapeHtml(copy.totalLoss)}: ${fmtSurveyCzk(data.monthly_loss)} ${escapeHtml(copy.perMonth)}</td></tr>
         ${surveyCtaRow(data, copy)}`;
     return surveyPageShell(lang, copy.lossTitle, inner);
   }
   const priority = data.priority || findings[0];
   const inner = `<tr><td style="padding:0 0 8px 0;font-size:22px;font-weight:700;">${escapeHtml(copy.priceTitle)}</td></tr>
-        <tr><td style="padding:0 0 12px 0;font-size:16px;">${escapeHtml(copy.priceLabel)}: <strong style="color:#16a34a;">${fmtSurveyCzk(data.manual_price)} Kč</strong></td></tr>
-        <tr><td style="padding:0 0 16px 0;font-size:16px;">${escapeHtml(copy.months)}: <strong style="color:#d97706;">${fmtSurveyCzk(data.monthly_loss)} ${escapeHtml(copy.perMonth)}</strong></td></tr>
+        <tr><td style="padding:0 0 12px 0;font-size:16px;">${escapeHtml(copy.priceLabel)}: <strong style="color:${MONEY_AMBER};">${fmtSurveyCzk(data.manual_price)} Kč</strong></td></tr>
+        <tr><td style="padding:0 0 16px 0;font-size:16px;">${escapeHtml(copy.months)}: <strong style="color:${MONEY_AMBER};">${fmtSurveyCzk(data.monthly_loss)} ${escapeHtml(copy.perMonth)}</strong></td></tr>
         ${priority ? `<tr><td style="padding:0 0 16px 0;font-size:16px;line-height:1.5;border-left:4px solid #dc2626;padding-left:12px;"><strong>${escapeHtml(copy.priority)}:</strong> ${escapeHtml(priority.title || "")} (${fmtSurveyCzk(priority.monthly_loss)} ${escapeHtml(copy.perMonth)})</td></tr>` : ""}
         ${surveyCtaRow(data, copy)}`;
   return surveyPageShell(lang, copy.priceTitle, inner);
@@ -4646,7 +4641,7 @@ function surveyClickPageHtml(reason, payload, lang, trackingId) {
   const domain = String(data.domain || "");
   const tid = String(trackingId || data.tracking_id || "");
   const manualUrl = String(data.checkout_url || `/checkout?product=manual_fix&domain=${encodeURIComponent(domain)}&tid=${encodeURIComponent(tid)}`);
-  const autoUrl = String(data.auto_checkout_url || "");
+  const autoUrl = surveyAutoCheckoutUrl(data, domain, tid);
   const transfer = data.transfer && typeof data.transfer === "object" ? data.transfer : {};
   const findings = Array.isArray(data.findings) ? data.findings : [];
 
@@ -4658,8 +4653,8 @@ function surveyClickPageHtml(reason, payload, lang, trackingId) {
         <tr><td style="padding:0 0 16px 0;font-size:16px;line-height:1.5;">${escapeHtml(copy.payfailLead)}</td></tr>
         <tr><td style="padding:0 0 12px 0;">${surveyCheckoutButton(manualUrl, copy.payfailCard, "#16a34a")}</td></tr>
         ${autoUrl ? `<tr><td style="padding:0 0 16px 0;">${surveyCheckoutButton(autoUrl, copy.payfailAuto, "#1a2332")}</td></tr>` : ""}
-        <tr><td style="padding:8px 0 8px 0;font-size:18px;font-weight:700;color:#d97706;">${escapeHtml(copy.payfailTransfer)}</td></tr>
-        <tr><td style="padding:0 0 6px 0;">${escapeHtml(copy.payfailAmount)}: <strong>${fmtSurveyCzk(transfer.amount || 1990)} Kč</strong></td></tr>
+        <tr><td style="padding:8px 0 8px 0;font-size:18px;font-weight:700;color:${MONEY_AMBER};">${escapeHtml(copy.payfailTransfer)}</td></tr>
+        <tr><td style="padding:0 0 6px 0;">${escapeHtml(copy.payfailAmount)}: <strong style="color:${MONEY_AMBER};">${fmtSurveyCzk(transfer.amount || 1990)} Kč</strong></td></tr>
         <tr><td style="padding:0 0 6px 0;">${escapeHtml(copy.payfailName)}: <strong>${escapeHtml(transfer.beneficiary || "FinalEdge s.r.o.")}</strong></td></tr>
         <tr><td style="padding:0 0 6px 0;">${escapeHtml(copy.payfailVs)}: <strong>${escapeHtml(vs)}</strong></td></tr>
         <tr><td style="padding:0 0 6px 0;">${escapeHtml(copy.payfailAccount)}: <strong>${account ? escapeHtml(account) : escapeHtml(copy.payfailMissingAccount)}</strong></td></tr>
@@ -4716,17 +4711,46 @@ function surveyClickPageHtml(reason, payload, lang, trackingId) {
 
   const rows = findings.map((item) => `<tr>
         <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;">${escapeHtml(item.title || "")}</td>
-        <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:#d97706;font-weight:700;text-align:right;">${fmtSurveyCzk(item.monthly_loss)} ${escapeHtml(copy.perMonth)}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:${MONEY_AMBER};font-weight:700;text-align:right;">${fmtSurveyCzk(item.monthly_loss)} ${escapeHtml(copy.perMonth)}</td>
       </tr>`).join("");
   const inner = `<tr><td style="padding:0 0 8px 0;font-size:22px;font-weight:700;">${escapeHtml(copy.shareTitle)}</td></tr>
         <tr><td style="padding:0 0 12px 0;font-size:16px;line-height:1.5;">${escapeHtml(copy.shareLead)}</td></tr>
         <tr><td style="padding:0 0 16px 0;"><button type="button" onclick="window.print()" style="border:0;border-radius:8px;padding:10px 16px;background:#1a2332;color:#fff;font-weight:700;cursor:pointer;">${escapeHtml(copy.sharePrint)}</button></td></tr>
         <tr><td style="padding:0 0 8px 0;">${escapeHtml(domain)}</td></tr>
-        <tr><td style="padding:0 0 8px 0;color:#d97706;font-weight:700;">${escapeHtml(copy.months)}: ${fmtSurveyCzk(data.monthly_loss)} Kč</td></tr>
-        <tr><td style="padding:0 0 16px 0;color:#16a34a;font-weight:700;">${escapeHtml(copy.sharePrice)}: ${fmtSurveyCzk(data.manual_price || 1990)} Kč</td></tr>
+        <tr><td style="padding:0 0 8px 0;color:${MONEY_AMBER};font-weight:700;">${escapeHtml(copy.months)}: ${fmtSurveyCzk(data.monthly_loss)} Kč</td></tr>
+        <tr><td style="padding:0 0 16px 0;color:${MONEY_AMBER};font-weight:700;">${escapeHtml(copy.sharePrice)}: ${fmtSurveyCzk(data.manual_price || 1990)} Kč</td></tr>
         <tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows}</table></td></tr>
         ${surveyCtaRow(data, copy)}`;
   return surveyPageShell(lang, copy.shareTitle, inner);
+}
+
+function isWooPlatform(platform) {
+  const raw = String(platform || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  return raw === "woocommerce" || raw.endsWith("woocommerce");
+}
+
+function surveyAutoCheckoutUrl(data, domain, tid) {
+  const existing = String(data?.auto_checkout_url || "").trim();
+  if (existing) return existing;
+  if (!isWooPlatform(data?.platform)) return "";
+  const params = new URLSearchParams({ product: "wp_autofix" });
+  if (domain) params.set("domain", domain);
+  if (tid) params.set("tid", tid);
+  return `/checkout?${params.toString()}`;
+}
+
+function applyBankEnv(data, env) {
+  const base = data && typeof data === "object" ? data : {};
+  const transfer = { ...(base.transfer || {}) };
+  const account = String((env && env.BANK_ACCOUNT) || "").trim();
+  const iban = String((env && env.BANK_IBAN) || "").trim();
+  const beneficiary = String((env && env.BANK_BENEFICIARY) || "").trim();
+  if (!String(transfer.account || "").trim() && account) transfer.account = account;
+  if (!String(transfer.iban || "").trim() && iban) transfer.iban = iban;
+  if (!String(transfer.beneficiary || "").trim() && beneficiary) {
+    transfer.beneficiary = beneficiary;
+  }
+  return { ...base, transfer };
 }
 
 function surveyDataCacheKey(trackingId) {
@@ -4899,7 +4923,7 @@ async function handleSurvey(request, env) {
     return new Response(surveyExplainHtml(reason, payload, lang), { status: 200, headers: htmlHeaders });
   }
   if (clickPage) {
-    const payload = await fetchSurveyExplain(env, id);
+    const payload = applyBankEnv(await fetchSurveyExplain(env, id), env);
     return new Response(surveyClickPageHtml(reason, payload, lang, id), { status: 200, headers: htmlHeaders });
   }
   return thanks;
