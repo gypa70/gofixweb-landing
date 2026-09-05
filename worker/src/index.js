@@ -999,7 +999,7 @@ function emptyWhyNotBuyStats() {
     sent_emails: 0,
     by_source: {
       exit_intent: { label: "Exit-intent popup", price: 0, trust: 0, other: 0, dismiss: 0, total: 0 },
-      click_48h: { label: "48h e-mail po kliku", price: 0, trust: 0, other: 0, pending: 0, sent: 0 },
+      click_48h: { label: "48h e-mail po kliku", payfail: 0, variant: 0, fear: 0, share: 0, price: 0, trust: 0, other: 0, pending: 0, sent: 0 },
       open_2h: { label: "2h e-mail po otevření", price: 0, trust: 0, other: 0, findings: 0, loss: 0, later: 0, pending: 0, sent: 0 },
     },
   };
@@ -1034,7 +1034,7 @@ function renderWhyNotBuyBox(why) {
     <p class="hint">Odpovědí celkem: ${escapeHtml(data.answered ?? 0)}. Odesláno e-mailů: ${escapeHtml(data.sent_emails ?? 0)}.</p>
     <h3 style="font-size:0.95rem;margin:1rem 0 0.4rem;">Rozpad podle zdroje</h3>
     ${sourceLine(src.exit_intent, [["price", "Cena"], ["trust", "Důvěra"], ["dismiss", "Zavřeno"], ["total", "Celkem"]])}
-    ${sourceLine(src.click_48h, [["price", "Cena"], ["trust", "Důvěra"], ["other", "Jiné"], ["pending", "Bez odpovědi"], ["sent", "Odesláno"]])}
+    ${sourceLine(src.click_48h, [["payfail", "Platba"], ["variant", "Varianta"], ["fear", "Zásah"], ["share", "Schválení"], ["pending", "Bez odpovědi"], ["sent", "Odesláno"]])}
     ${sourceLine(src.open_2h, [["findings", "Nálezy"], ["loss", "Ztráta"], ["price", "Cena"], ["later", "Později"], ["pending", "Bez odpovědi"], ["sent", "Odesláno"]])}
   </div>`;
 }
@@ -4049,8 +4049,9 @@ async function cacheHasUnsub(email) {
 const ENG_CACHE_TTL = 31536000;
 const TRACKING_ID_RE = /^[A-Za-z0-9]{8,64}$/;
 const CLICK_PRODUCTS = new Set(["manual_fix", "wp_autofix"]);
-const SURVEY_REASONS = new Set(["price", "trust", "other", "findings", "loss", "later"]);
+const SURVEY_REASONS = new Set(["price", "trust", "other", "findings", "loss", "later", "payfail", "variant", "fear", "share"]);
 const OPEN_PAGE_REASONS = new Set(["findings", "loss", "price", "later"]);
+const CLICK_PAGE_REASONS = new Set(["payfail", "variant", "fear", "share"]);
 const SURVEY_SOURCES = new Set(["click_48h", "open_2h"]);
 const EXIT_INTENT_REASONS = new Set(["price", "trust", "dismiss"]);
 const PIXEL_GIF = Uint8Array.from([
@@ -4231,6 +4232,39 @@ const SURVEY_PAGE_COPY = {
     priority: "Řešte nejdřív",
     cta: "Chci opravit sám",
     missing: "Data k tomuto odkazu se nepodařilo načíst. Zkuste to za chvíli, nebo napište na info@gofixweb.com.",
+    payfailTitle: "Platba se nepodařila dokončit",
+    payfailLead: "Otevřete znovu platbu — odkaz vygeneruje novou Stripe session na stejnou objednávku 1 990 Kč. Alternativně můžete zaplatit převodem.",
+    payfailCard: "Zaplatit kartou (MANUÁL)",
+    payfailAuto: "Zaplatit kartou (AUTO)",
+    payfailTransfer: "Podklady pro převod",
+    payfailAmount: "Částka",
+    payfailVs: "Variabilní symbol",
+    payfailAccount: "Číslo účtu",
+    payfailIban: "IBAN",
+    payfailName: "Příjemce",
+    payfailMissingAccount: "Číslo účtu pošleme na info@gofixweb.com — do zprávy uveďte variabilní symbol.",
+    variantTitle: "Vybrat správnou variantu",
+    variantLead: "Obě varianty stojí 1 990 Kč. Přepnutí je bez příplatku — dokončíte novou platbu na zvolenou variantu.",
+    variantManual: "MANUÁL — návod provedete sami",
+    variantAuto: "AUTO — zapíšeme opravy do WordPressu",
+    variantConfirm: "Dokončit platbu této varianty",
+    variantNoAuto: "Automatická oprava je jen pro WooCommerce. Tento e-shop proto nabízí MANUÁL.",
+    fearTitle: "Co automatická oprava mění",
+    fearLead: "Zásah je omezený a vratný. Neměníme ceny, produkty ani vzhled homepage.",
+    fearTitleSeo: "Titulek a popisek pro Google",
+    fearSeo: "Upravíme titulek stránky a krátký popisek ve výsledcích vyhledávání, pokud v auditu chybí nebo jsou slabé.",
+    fearImages: "Komprese obrázků",
+    fearImagesBody: "Zmenšíme soubory obrázků, aby se e-shop načítal rychleji. Vzhled fotek zůstává stejný.",
+    fearPlugins: "Pluginy pro rychlost",
+    fearPluginsBody: "Zapneme nebo nastavíme pluginy, které zrychlují načítání. Neinstalujeme marketingové nástroje ani neměníme sortiment.",
+    fearLog: "Auditní záznam",
+    fearLogBody: "Každý zápis uložíme: co se změnilo, původní hodnota a čas. Máte doklad, co na e-shopu proběhlo.",
+    fearRollback: "Návrat zpět",
+    fearRollbackBody: "Poslední automatický zápis lze vrátit. Odkaz na vrácení posíláme v e-mailu po zásahu.",
+    shareTitle: "Podklad ke schválení",
+    shareLead: "Tuto stránku můžete přeposlat kolegovi, nebo ji vytisknout / uložit jako PDF.",
+    sharePrint: "Tisk / uložit PDF",
+    sharePrice: "Jednorázová cena",
   },
   sk: {
     findingsTitle: "Čo nálezy znamenajú",
@@ -4262,6 +4296,39 @@ const SURVEY_PAGE_COPY = {
     priority: "Riešte najskôr",
     cta: "Chcem opraviť sám",
     missing: "Dáta k tomuto odkazu sa nepodarilo načítať. Skúste to o chvíľu, alebo napíšte na info@gofixweb.com.",
+    payfailTitle: "Platba sa nepodarila dokončiť",
+    payfailLead: "Otvorte znova platbu — odkaz vygeneruje novú Stripe session na rovnakú objednávku 1 990 Kč. Alternatívne môžete zaplatiť prevodom.",
+    payfailCard: "Zaplatiť kartou (MANUÁL)",
+    payfailAuto: "Zaplatiť kartou (AUTO)",
+    payfailTransfer: "Podklady na prevod",
+    payfailAmount: "Suma",
+    payfailVs: "Variabilný symbol",
+    payfailAccount: "Číslo účtu",
+    payfailIban: "IBAN",
+    payfailName: "Príjemca",
+    payfailMissingAccount: "Číslo účtu pošleme na info@gofixweb.com — do správy uveďte variabilný symbol.",
+    variantTitle: "Vybrať správnu variantu",
+    variantLead: "Obe varianty stoja 1 990 Kč. Prepnutie je bez príplatku — dokončíte novú platbu na zvolenú variantu.",
+    variantManual: "MANUÁL — návod urobíte sami",
+    variantAuto: "AUTO — zapíšeme opravy do WordPressu",
+    variantConfirm: "Dokončiť platbu tejto varianty",
+    variantNoAuto: "Automatická oprava je len pre WooCommerce. Tento e-shop preto ponúka MANUÁL.",
+    fearTitle: "Čo automatická oprava mení",
+    fearLead: "Zásah je obmedzený a vratný. Nemeníme ceny, produkty ani vzhľad homepage.",
+    fearTitleSeo: "Titulok a popis pre Google",
+    fearSeo: "Upravíme titulok stránky a krátky popis vo výsledkoch vyhľadávania, ak v audite chýbajú alebo sú slabé.",
+    fearImages: "Kompresia obrázkov",
+    fearImagesBody: "Zmenšíme súbory obrázkov, aby sa e-shop načítal rýchlejšie. Vzhľad fotiek ostáva rovnaký.",
+    fearPlugins: "Pluginy pre rýchlosť",
+    fearPluginsBody: "Zapneme alebo nastavíme pluginy, ktoré zrýchľujú načítanie. Neinštalujeme marketingové nástroje ani nemeníme sortiment.",
+    fearLog: "Auditný záznam",
+    fearLogBody: "Každý zápis uložíme: čo sa zmenilo, pôvodná hodnota a čas. Máte doklad, čo na e-shope prebehlo.",
+    fearRollback: "Návrat späť",
+    fearRollbackBody: "Posledný automatický zápis možno vrátiť. Odkaz na vrátenie posielame v e-maile po zásahu.",
+    shareTitle: "Podklad na schválenie",
+    shareLead: "Túto stránku môžete preposlať kolegovi, alebo ju vytlačiť / uložiť ako PDF.",
+    sharePrint: "Tlač / uložiť PDF",
+    sharePrice: "Jednorazová cena",
   },
 };
 
@@ -4409,6 +4476,99 @@ function surveySnoozeFormHtml(actionUrl, lang) {
   return surveyPageShell(lang, copy.laterTitle, inner);
 }
 
+function surveyCheckoutButton(href, label, bg) {
+  return `<a href="${escapeHtml(href)}" style="display:inline-block;background:${bg};color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;text-decoration:none;padding:12px 18px;border-radius:8px;">${escapeHtml(label)}</a>`;
+}
+
+function surveyClickPageHtml(reason, payload, lang, trackingId) {
+  const copy = SURVEY_PAGE_COPY[lang] || SURVEY_PAGE_COPY.cs;
+  const data = payload && typeof payload === "object" ? payload : {};
+  const domain = String(data.domain || "");
+  const tid = String(trackingId || data.tracking_id || "");
+  const manualUrl = String(data.checkout_url || `/checkout?product=manual_fix&domain=${encodeURIComponent(domain)}&tid=${encodeURIComponent(tid)}`);
+  const autoUrl = String(data.auto_checkout_url || "");
+  const transfer = data.transfer && typeof data.transfer === "object" ? data.transfer : {};
+  const findings = Array.isArray(data.findings) ? data.findings : [];
+
+  if (reason === "payfail") {
+    const account = String(transfer.account || "").trim();
+    const iban = String(transfer.iban || "").trim();
+    const vs = String(transfer.variable_symbol || "");
+    const inner = `<tr><td style="padding:0 0 8px 0;font-size:22px;font-weight:700;">${escapeHtml(copy.payfailTitle)}</td></tr>
+        <tr><td style="padding:0 0 16px 0;font-size:16px;line-height:1.5;">${escapeHtml(copy.payfailLead)}</td></tr>
+        <tr><td style="padding:0 0 12px 0;">${surveyCheckoutButton(manualUrl, copy.payfailCard, "#16a34a")}</td></tr>
+        ${autoUrl ? `<tr><td style="padding:0 0 16px 0;">${surveyCheckoutButton(autoUrl, copy.payfailAuto, "#1a2332")}</td></tr>` : ""}
+        <tr><td style="padding:8px 0 8px 0;font-size:18px;font-weight:700;color:#d97706;">${escapeHtml(copy.payfailTransfer)}</td></tr>
+        <tr><td style="padding:0 0 6px 0;">${escapeHtml(copy.payfailAmount)}: <strong>${fmtSurveyCzk(transfer.amount || 1990)} Kč</strong></td></tr>
+        <tr><td style="padding:0 0 6px 0;">${escapeHtml(copy.payfailName)}: <strong>${escapeHtml(transfer.beneficiary || "FinalEdge s.r.o.")}</strong></td></tr>
+        <tr><td style="padding:0 0 6px 0;">${escapeHtml(copy.payfailVs)}: <strong>${escapeHtml(vs)}</strong></td></tr>
+        <tr><td style="padding:0 0 6px 0;">${escapeHtml(copy.payfailAccount)}: <strong>${account ? escapeHtml(account) : escapeHtml(copy.payfailMissingAccount)}</strong></td></tr>
+        ${iban ? `<tr><td style="padding:0 0 16px 0;">${escapeHtml(copy.payfailIban)}: <strong>${escapeHtml(iban)}</strong></td></tr>` : ""}`;
+    return surveyPageShell(lang, copy.payfailTitle, inner);
+  }
+
+  if (reason === "variant") {
+    const vopBlock = autoUrl
+      ? `<label style="display:flex;gap:8px;align-items:flex-start;margin:0 0 10px 0;font-size:14px;line-height:1.4;">
+            <input type="checkbox" name="vop_consent" value="1" required style="margin-top:3px;">
+            <span>${escapeHtml(lang === "sk" ? "Súhlasím s" : "Souhlasím s")}
+              <a href="${VOP_TERMS_URL}" target="_blank" rel="noopener">VOP</a>
+              ${escapeHtml(lang === "sk" ? "a so zásahom do webu." : "a se zásahem do webu.")}
+            </span>
+          </label>`
+      : "";
+    const autoCard = autoUrl
+      ? `<form method="post" action="/checkout" style="margin:0 0 16px 0;padding:14px;border:1px solid #e2e8f0;border-radius:8px;">
+            <input type="hidden" name="product" value="wp_autofix">
+            <input type="hidden" name="domain" value="${escapeHtml(domain)}">
+            <input type="hidden" name="tid" value="${escapeHtml(tid)}">
+            <div style="font-weight:700;margin:0 0 8px 0;color:#16a34a;">${escapeHtml(copy.variantAuto)}</div>
+            ${vopBlock}
+            <button type="submit" style="border:0;border-radius:8px;padding:10px 16px;background:#16a34a;color:#fff;font-weight:700;cursor:pointer;">${escapeHtml(copy.variantConfirm)}</button>
+          </form>`
+      : `<div style="margin:0 0 16px 0;font-size:15px;color:#64748b;">${escapeHtml(copy.variantNoAuto)}</div>`;
+    const inner = `<tr><td style="padding:0 0 8px 0;font-size:22px;font-weight:700;">${escapeHtml(copy.variantTitle)}</td></tr>
+        <tr><td style="padding:0 0 16px 0;font-size:16px;line-height:1.5;">${escapeHtml(copy.variantLead)}</td></tr>
+        <tr><td>
+          <form method="post" action="/checkout" style="margin:0 0 16px 0;padding:14px;border:1px solid #e2e8f0;border-radius:8px;">
+            <input type="hidden" name="product" value="manual_fix">
+            <input type="hidden" name="domain" value="${escapeHtml(domain)}">
+            <input type="hidden" name="tid" value="${escapeHtml(tid)}">
+            <div style="font-weight:700;margin:0 0 8px 0;color:#16a34a;">${escapeHtml(copy.variantManual)}</div>
+            <button type="submit" style="border:0;border-radius:8px;padding:10px 16px;background:#16a34a;color:#fff;font-weight:700;cursor:pointer;">${escapeHtml(copy.variantConfirm)}</button>
+          </form>
+          ${autoCard}
+        </td></tr>`;
+    return surveyPageShell(lang, copy.variantTitle, inner);
+  }
+
+  if (reason === "fear") {
+    const inner = `<tr><td style="padding:0 0 8px 0;font-size:22px;font-weight:700;">${escapeHtml(copy.fearTitle)}</td></tr>
+        <tr><td style="padding:0 0 16px 0;font-size:16px;line-height:1.5;">${escapeHtml(copy.fearLead)}</td></tr>
+        <tr><td style="padding:0 0 12px 0;border-left:4px solid #16a34a;padding-left:12px;"><strong>${escapeHtml(copy.fearTitleSeo)}</strong><div>${escapeHtml(copy.fearSeo)}</div></td></tr>
+        <tr><td style="padding:0 0 12px 0;border-left:4px solid #16a34a;padding-left:12px;"><strong>${escapeHtml(copy.fearImages)}</strong><div>${escapeHtml(copy.fearImagesBody)}</div></td></tr>
+        <tr><td style="padding:0 0 12px 0;border-left:4px solid #16a34a;padding-left:12px;"><strong>${escapeHtml(copy.fearPlugins)}</strong><div>${escapeHtml(copy.fearPluginsBody)}</div></td></tr>
+        <tr><td style="padding:0 0 12px 0;border-left:4px solid #d97706;padding-left:12px;"><strong>${escapeHtml(copy.fearLog)}</strong><div>${escapeHtml(copy.fearLogBody)}</div></td></tr>
+        <tr><td style="padding:0 0 16px 0;border-left:4px solid #d97706;padding-left:12px;"><strong>${escapeHtml(copy.fearRollback)}</strong><div>${escapeHtml(copy.fearRollbackBody)}</div></td></tr>
+        ${surveyCtaRow(data, copy)}`;
+    return surveyPageShell(lang, copy.fearTitle, inner);
+  }
+
+  const rows = findings.map((item) => `<tr>
+        <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;">${escapeHtml(item.title || "")}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:#d97706;font-weight:700;text-align:right;">${fmtSurveyCzk(item.monthly_loss)} ${escapeHtml(copy.perMonth)}</td>
+      </tr>`).join("");
+  const inner = `<tr><td style="padding:0 0 8px 0;font-size:22px;font-weight:700;">${escapeHtml(copy.shareTitle)}</td></tr>
+        <tr><td style="padding:0 0 12px 0;font-size:16px;line-height:1.5;">${escapeHtml(copy.shareLead)}</td></tr>
+        <tr><td style="padding:0 0 16px 0;"><button type="button" onclick="window.print()" style="border:0;border-radius:8px;padding:10px 16px;background:#1a2332;color:#fff;font-weight:700;cursor:pointer;">${escapeHtml(copy.sharePrint)}</button></td></tr>
+        <tr><td style="padding:0 0 8px 0;">${escapeHtml(domain)}</td></tr>
+        <tr><td style="padding:0 0 8px 0;color:#d97706;font-weight:700;">${escapeHtml(copy.months)}: ${fmtSurveyCzk(data.monthly_loss)} Kč</td></tr>
+        <tr><td style="padding:0 0 16px 0;color:#16a34a;font-weight:700;">${escapeHtml(copy.sharePrice)}: ${fmtSurveyCzk(data.manual_price || 1990)} Kč</td></tr>
+        <tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows}</table></td></tr>
+        ${surveyCtaRow(data, copy)}`;
+  return surveyPageShell(lang, copy.shareTitle, inner);
+}
+
 function surveyDataCacheKey(trackingId) {
   return `https://survey-data.gofixweb/${String(trackingId || "").trim()}`;
 }
@@ -4538,6 +4698,7 @@ async function handleSurvey(request, env) {
   };
   const thanks = new Response(surveyThanksHtml(lang), { status: 200, headers: htmlHeaders });
   const openPage = source === "open_2h" && OPEN_PAGE_REASONS.has(reason);
+  const clickPage = source === "click_48h" && CLICK_PAGE_REASONS.has(reason);
 
   if (openPage && reason === "later" && request.method === "GET") {
     return new Response(surveySnoozeFormHtml(url.toString(), lang), { status: 200, headers: htmlHeaders });
@@ -4576,6 +4737,10 @@ async function handleSurvey(request, env) {
   if (openPage) {
     const payload = await fetchSurveyExplain(env, id);
     return new Response(surveyExplainHtml(reason, payload, lang), { status: 200, headers: htmlHeaders });
+  }
+  if (clickPage) {
+    const payload = await fetchSurveyExplain(env, id);
+    return new Response(surveyClickPageHtml(reason, payload, lang, id), { status: 200, headers: htmlHeaders });
   }
   return thanks;
 }
