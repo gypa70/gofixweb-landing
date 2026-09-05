@@ -3663,11 +3663,12 @@ function unsubCacheKey(email) {
   return `https://unsub.gofixweb/e/${String(email || "").trim().toLowerCase()}`;
 }
 
-function unsubscribeHtml(title, message) {
+function unsubscribeHtml(title, message, lang) {
   const safeTitle = String(title || "");
   const safeMessage = String(message || "");
+  const htmlLang = lang === "sk" ? "sk" : "cs";
   return `<!DOCTYPE html>
-<html lang="cs">
+<html lang="${htmlLang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -3800,32 +3801,57 @@ async function handleTrackClick(request, env) {
   return Response.redirect(dest.toString(), 302);
 }
 
-function surveyThanksHtml() {
-  return unsubscribeHtml(
-    "Díky za zpětnou vazbu",
-    "Odpověď jsme zaznamenali. Už vás tímto dotazníkem znovu obtěžovat nebudeme.",
-  );
+function surveyLang(url) {
+  return String(url.searchParams.get("lang") || "").trim().toLowerCase() === "sk" ? "sk" : "cs";
 }
 
-function surveyOtherFormHtml(actionUrl) {
+const SURVEY_COPY = {
+  cs: {
+    otherTitle: "Jiný důvod",
+    otherBody: "Napište nám krátce, co rozhodlo. Pole je volitelné — můžete odeslat i prázdné.",
+    submit: "Odeslat",
+    thanksTitle: "Díky za zpětnou vazbu",
+    thanksBody: "Odpověď jsme zaznamenali. Už vás tímto dotazníkem znovu obtěžovat nebudeme.",
+    invalidTitle: "Odkaz je neplatný",
+    invalidBody: "Tento odkaz na dotazník je neplatný nebo poškozený.",
+  },
+  sk: {
+    otherTitle: "Iný dôvod",
+    otherBody: "Napíšte nám krátko, čo rozhodlo. Pole je voliteľné — môžete odoslať aj prázdne.",
+    submit: "Odoslať",
+    thanksTitle: "Ďakujeme za spätnú väzbu",
+    thanksBody: "Odpoveď sme zaznamenali. Týmto dotazníkom vás už znova obťažovať nebudeme.",
+    invalidTitle: "Odkaz je neplatný",
+    invalidBody: "Tento odkaz na dotazník je neplatný alebo poškodený.",
+  },
+};
+
+function surveyThanksHtml(lang) {
+  const copy = SURVEY_COPY[lang] || SURVEY_COPY.cs;
+  return unsubscribeHtml(copy.thanksTitle, copy.thanksBody, lang);
+}
+
+function surveyOtherFormHtml(actionUrl, lang) {
+  const copy = SURVEY_COPY[lang] || SURVEY_COPY.cs;
+  const htmlLang = lang === "sk" ? "sk" : "cs";
   const safeAction = escapeHtml(actionUrl);
   return `<!DOCTYPE html>
-<html lang="cs">
+<html lang="${htmlLang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Jiný důvod — GoFixWeb</title>
+<title>${escapeHtml(copy.otherTitle)} — GoFixWeb</title>
 </head>
 <body style="margin:0;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;background:#ffffff;color:#1a2332;">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;margin:0 auto;">
     <tr><td style="padding:0 0 16px 0;font-size:22px;font-weight:700;">GoFix<span style="color:#16a34a;">Web</span></td></tr>
-    <tr><td style="padding:0 0 12px 0;font-size:20px;font-weight:700;">Jiný důvod</td></tr>
-    <tr><td style="padding:0 0 16px 0;font-size:16px;line-height:1.5;">Napište nám krátce, co rozhodlo. Pole je volitelné — můžete odeslat i prázdné.</td></tr>
+    <tr><td style="padding:0 0 12px 0;font-size:20px;font-weight:700;">${escapeHtml(copy.otherTitle)}</td></tr>
+    <tr><td style="padding:0 0 16px 0;font-size:16px;line-height:1.5;">${escapeHtml(copy.otherBody)}</td></tr>
     <tr><td>
       <form method="post" action="${safeAction}">
         <textarea name="note" maxlength="500" rows="4" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-family:inherit;font-size:15px;"></textarea>
         <p style="margin:12px 0 0 0;">
-          <button type="submit" style="border:0;border-radius:8px;padding:10px 16px;background:#16a34a;color:#fff;font-weight:700;cursor:pointer;">Odeslat</button>
+          <button type="submit" style="border:0;border-radius:8px;padding:10px 16px;background:#16a34a;color:#fff;font-weight:700;cursor:pointer;">${escapeHtml(copy.submit)}</button>
         </p>
       </form>
     </td></tr>
@@ -3882,17 +3908,16 @@ async function handleSurvey(request, env) {
   const reason = String(url.searchParams.get("reason") || "").trim().toLowerCase();
   const token = String(url.searchParams.get("t") || "").trim();
   const source = surveySourceFromUrl(url);
-  const invalid = unsubscribeHtml(
-    "Odkaz je neplatný",
-    "Tento odkaz na dotazník je neplatný nebo poškozený.",
-  );
+  const lang = surveyLang(url);
+  const copy = SURVEY_COPY[lang] || SURVEY_COPY.cs;
+  const invalid = unsubscribeHtml(copy.invalidTitle, copy.invalidBody, lang);
   if (!TRACKING_ID_RE.test(id) || !SURVEY_REASONS.has(reason)) {
     return new Response(invalid, { status: 400, headers: { "Content-Type": "text/html; charset=UTF-8" } });
   }
   if (!(await surveyTokenMatches(env, id, reason, source, token))) {
     return new Response(invalid, { status: 400, headers: { "Content-Type": "text/html; charset=UTF-8" } });
   }
-  const thanks = new Response(surveyThanksHtml(), {
+  const thanks = new Response(surveyThanksHtml(lang), {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=UTF-8",
@@ -3901,7 +3926,7 @@ async function handleSurvey(request, env) {
     },
   });
   if (reason === "other" && request.method === "GET") {
-    return new Response(surveyOtherFormHtml(url.toString()), {
+    return new Response(surveyOtherFormHtml(url.toString(), lang), {
       status: 200,
       headers: {
         "Content-Type": "text/html; charset=UTF-8",
