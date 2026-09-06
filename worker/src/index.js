@@ -3310,7 +3310,7 @@ function renderAdminHtml(snapshot, {
     ? `<p class="banner-err">${escapeHtml(launchError)}</p>`
     : "";
   const scanNote = scanQueued
-    ? `<p class="banner-ok">Ostrý scan je ve frontě GitHub Actions. PDF přijde na ${escapeHtml(scanEmail || ADMIN_DEV_SCAN_DEFAULT_EMAIL)} (obvykle do 10–15 minut). Záloha je i jako artefakt v GHA. Před-po potřebuje dříve uložený kompletní scan stejné domény.${
+    ? `<p class="banner-ok">Ostrý scan je ve frontě GitHub Actions. Zákaznický e-mail (u teaseru stejná šablona jako LP) přijde na ${escapeHtml(scanEmail || ADMIN_DEV_SCAN_DEFAULT_EMAIL)} (obvykle do 10–15 minut). Záloha PDF je i jako artefakt v GHA. Před-po potřebuje dříve uložený kompletní scan stejné domény.${
         scanLead
           ? " Poptávka z landing page se označí jako vyřízená po persistu DB (obvykle do minuty)."
           : ""
@@ -3458,7 +3458,7 @@ function renderAdminHtml(snapshot, {
   const devScanBox = `<div class="suppress-box dev-scan-live" id="dev-scan">
         <h2>OSTRÝ SCAN — jde na zákazníka</h2>
         <p class="mode-tag mode-tag-live">Skenovat reálný e-shop</p>
-        <p class="hint">Stávající pipeline: plný scan zadané domény a odeslání skutečného reportu na zadaný e-mail — stejná logika jako CLI <code>scripts/dev_scan.py</code>. Bez denního limitu, jen Basic Auth. PDF přijde na zadaný e-mail; záloha je v <a href="${ADMIN_LINKS.devScan}" target="_blank" rel="noopener">GitHub Actions</a>.</p>
+        <p class="hint">Plný scan zadané domény a odeslání skutečného zákaznického e-mailu (u teaseru stejná šablona jako formulář na webu: skóre, nález, dual CTA, podpis). Bez denního limitu, jen Basic Auth. Záloha PDF je v <a href="${ADMIN_LINKS.devScan}" target="_blank" rel="noopener">GitHub Actions</a>.</p>
         <form class="suppress-form" method="post" action="/admin/dev-scan">
           <input type="hidden" name="landing_lead_id" value="">
           <label>Doména / URL e-shopu
@@ -3472,7 +3472,7 @@ function renderAdminHtml(snapshot, {
               <option value="pred-po">Před-po</option>
             </select>
           </label>
-          <label>Kam poslat PDF
+          <label>Kam poslat zákaznický e-mail
             <input type="email" name="email" required value="${ADMIN_DEV_SCAN_DEFAULT_EMAIL}" autocomplete="off">
           </label>
           <button class="launch-warn" type="submit">Spustit ostrý scan</button>
