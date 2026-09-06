@@ -210,7 +210,7 @@ export default function LeadForm({ variant = 'hero' }: { variant?: Variant }) {
           <ol className="mt-5 space-y-3 text-sm">
             {[
               'Do 10 minut proběhne technický sken přes Google PageSpeed API.',
-              'Do hodiny dostanete PDF s nalezenými chybami a vyčíslenou měsíční ztrátou.',
+              'Do 10 minut dostanete PDF s nalezenými chybami a vyčíslenou měsíční ztrátou.',
               'Bez závazku se rozhodnete, jestli chyby opravíme za vás.',
             ].map((step, index) => (
               <li key={step} className="flex gap-3">
