@@ -105,6 +105,17 @@ function isSubscriptionPlan(product) {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Admin test/scan forms: o něco přísnější formát + časté překlepy (outook.com). */
+const ADMIN_EMAIL_RE = /^[a-z0-9._%+\-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
+const EMAIL_DOMAIN_TYPOS = {
+  "outook.com": "outlook.com",
+  "outlok.com": "outlook.com",
+  "outlook.con": "outlook.com",
+  "outlook.co": "outlook.com",
+  "gmial.com": "gmail.com",
+  "gmal.com": "gmail.com",
+  "gmail.con": "gmail.com",
+};
 const STRIPE_TIMESTAMP_TOLERANCE_SEC = 300;
 const TURNSTILE_ACTION = "free-report";
 const TURNSTILE_HOSTNAMES = new Set(["gofixweb.com", "www.gofixweb.com"]);
@@ -152,6 +163,24 @@ function todayKey() {
 
 function isRateLimitWhitelisted(email) {
   return RATE_LIMIT_WHITELIST.has(String(email || "").trim().toLowerCase());
+}
+
+function normalizeAdminEmail(raw) {
+  return String(raw || "").trim().toLowerCase();
+}
+
+function adminEmailError(raw) {
+  const email = normalizeAdminEmail(raw);
+  if (!email) return "Zadejte e-mailovou adresu.";
+  if (!ADMIN_EMAIL_RE.test(email)) {
+    return "Neplatný formát e-mailu. Použijte tvar jméno@doména.cz.";
+  }
+  const domain = email.split("@")[1] || "";
+  const hint = EMAIL_DOMAIN_TYPOS[domain];
+  if (hint) {
+    return `Překlep v e-mailu: ${domain} — mysleli jste ${hint}? Scan ani odeslání se nespustilo.`;
+  }
+  return "";
 }
 
 /** Interní / QC platby — mimo Objednávky a Tržby na /admin. */
@@ -769,9 +798,11 @@ async function refreshAdminOrdersCache(env) {
 }
 
 async function resolveAdminOrders(snapshot) {
+  const fromSnap = ordersFromSnapshot(snapshot);
+  if (Number(fromSnap.fetched || 0) > 0 || Number(fromSnap.count || 0) > 0) return fromSnap;
   const cached = await readAdminOrdersCache();
   if (cached && Number(cached.fetched || 0) > 0) return cached;
-  return ordersFromSnapshot(snapshot);
+  return fromSnap;
 }
 
 async function fetchStripeCheckoutSessions(env) {
@@ -849,7 +880,7 @@ function matchedOrdersCsvHref(matches) {
 }
 
 function renderMatchedOrdersDetail(data) {
-  const matches = Array.isArray(data.matches) ? data.matches : [];
+  const matches = Array.isArray(data.matches) ? data.matches.slice(0, ADMIN_LIST_LIMIT) : [];
   if (!matches.length) return "";
   const rows = matches.map((row) => {
     const trClass = row.clicked ? ' class="eng-clicked"' : "";
@@ -2748,6 +2779,48 @@ async function requireAdminAuth(request, env) {
   return null;
 }
 
+const ADMIN_SNAPSHOT_CACHE = "https://admin.gofixweb/campaign-snapshot-v2";
+const ADMIN_RUNSTATE_CACHE = "https://admin.gofixweb/outreach-runs-v2";
+const ADMIN_PAGE_CACHE_TTL_SEC = 60;
+const ADMIN_LIST_LIMIT = 50;
+
+async function readJsonCache(key) {
+  const hit = await caches.default.match(key);
+  if (!hit) return null;
+  try {
+    const raw = await hit.json();
+    return raw && typeof raw === "object" ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+async function putJsonCache(key, value, ttlSec) {
+  await caches.default.put(
+    key,
+    new Response(JSON.stringify(value), {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": `max-age=${ttlSec}`,
+      },
+    }),
+  );
+}
+
+function slimAdminSnapshot(snapshot) {
+  const data = snapshot && typeof snapshot === "object" ? snapshot : {};
+  const leads = data.landing_leads && typeof data.landing_leads === "object" ? data.landing_leads : {};
+  return {
+    ...data,
+    rows: Array.isArray(data.rows) ? data.rows.slice(0, ADMIN_LIST_LIMIT) : [],
+    contacts: [],
+    landing_leads: {
+      ...leads,
+      rows: Array.isArray(leads.rows) ? leads.rows.slice(0, ADMIN_LIST_LIMIT) : [],
+    },
+  };
+}
+
 async function fetchCampaignSnapshot(env) {
   const repo = env.GITHUB_REPO || "gypa70/gofixweb-scanner";
   const token = env.GITHUB_TOKEN;
@@ -2769,7 +2842,45 @@ async function fetchCampaignSnapshot(env) {
     const text = await res.text();
     throw new Error(`github_snapshot_${res.status}:${text.slice(0, 300)}`);
   }
-  return res.json();
+  return slimAdminSnapshot(await res.json());
+}
+
+async function loadCampaignSnapshot(env) {
+  const cached = await readJsonCache(ADMIN_SNAPSHOT_CACHE);
+  if (cached && cached.stats) return slimAdminSnapshot(cached);
+  const snapshot = await fetchCampaignSnapshot(env);
+  try {
+    await putJsonCache(ADMIN_SNAPSHOT_CACHE, snapshot, ADMIN_PAGE_CACHE_TTL_SEC);
+  } catch (err) {
+    console.error("admin_snapshot_cache_put_failed", err);
+  }
+  return snapshot;
+}
+
+async function loadOutreachRunState(env, extraRunId = "") {
+  const wanted = String(extraRunId || "");
+  if (!wanted) {
+    const cached = await readJsonCache(ADMIN_RUNSTATE_CACHE);
+    if (cached && Array.isArray(cached.recent)) return cached;
+  }
+  const runState = await fetchOutreachRunState(env, wanted);
+  try {
+    await putJsonCache(ADMIN_RUNSTATE_CACHE, runState, ADMIN_PAGE_CACHE_TTL_SEC);
+  } catch (err) {
+    console.error("admin_runstate_cache_put_failed", err);
+  }
+  return runState;
+}
+
+async function warmAdminPageCaches(env) {
+  const snapshot = await fetchCampaignSnapshot(env);
+  await putJsonCache(ADMIN_SNAPSHOT_CACHE, snapshot, ADMIN_PAGE_CACHE_TTL_SEC);
+  try {
+    const runState = await fetchOutreachRunState(env);
+    await putJsonCache(ADMIN_RUNSTATE_CACHE, runState, ADMIN_PAGE_CACHE_TTL_SEC);
+  } catch (err) {
+    console.error("admin_run_state_warm_failed", err);
+  }
 }
 
 async function githubApi(env, path) {
@@ -2910,7 +3021,7 @@ async function fetchOutreachRunState(env, extraRunId = "") {
   const repo = env.GITHUB_REPO || "gypa70/gofixweb-scanner";
   const data = await githubApi(
     env,
-    `/repos/${repo}/actions/workflows/outreach-batch.yml/runs?per_page=20`,
+    `/repos/${repo}/actions/workflows/outreach-batch.yml/runs?per_page=8`,
   );
   let runs = Array.isArray(data.workflow_runs) ? data.workflow_runs : [];
   const wanted = String(extraRunId || "");
@@ -3270,7 +3381,7 @@ function renderAdminHtml(snapshot, {
 } = {}) {
   const stats = snapshot?.stats || {};
   const halt = snapshot?.halt || {};
-  const rows = sortAdminDeliveryRows(Array.isArray(snapshot?.rows) ? snapshot.rows : []);
+  const rows = sortAdminDeliveryRows(Array.isArray(snapshot?.rows) ? snapshot.rows : []).slice(0, ADMIN_LIST_LIMIT);
   const halted = Boolean(halt.halted || stats.halted);
   const haltClass = halted ? "halt-on" : "halt-off";
   const haltLabel = halted ? "ZAPNUTO" : "VYPNUTO";
@@ -3278,7 +3389,7 @@ function renderAdminHtml(snapshot, {
   const launchedRun = findRunById(runState, launchedRunId);
   const batchBusy = Boolean((runState?.active || []).length)
     || (launched && (!launchedRun || isActiveRun(launchedRun)));
-  const refreshSec = batchBusy ? 8 : 30;
+  const refreshSec = batchBusy ? 20 : 60;
   const generated = snapshot?.generated_at
     ? formatWhen(snapshot.generated_at)
     : "—";
@@ -3450,7 +3561,7 @@ function renderAdminHtml(snapshot, {
             <input type="text" name="domain" required value="money.cz" placeholder="money.cz" autocomplete="off">
           </label>
           <label>Váš e-mail
-            <input type="email" name="email" required value="${ADMIN_DEV_EMAIL_DEFAULT}" autocomplete="off">
+            <input type="email" name="email" required value="${ADMIN_DEV_EMAIL_DEFAULT}" autocomplete="off" inputmode="email" maxlength="254" pattern="[^\\s@]+@[^\\s@]+\\.[^\\s@]+">
           </label>
           <button class="launch" type="submit">Odeslat testovací e-mail</button>
         </form>
@@ -3473,7 +3584,7 @@ function renderAdminHtml(snapshot, {
             </select>
           </label>
           <label>Kam poslat zákaznický e-mail
-            <input type="email" name="email" required value="${ADMIN_DEV_SCAN_DEFAULT_EMAIL}" autocomplete="off">
+            <input type="email" name="email" required value="${ADMIN_DEV_SCAN_DEFAULT_EMAIL}" autocomplete="off" inputmode="email" maxlength="254" pattern="[^\\s@]+@[^\\s@]+\\.[^\\s@]+">
           </label>
           <button class="launch-warn" type="submit">Spustit ostrý scan</button>
         </form>
@@ -3505,7 +3616,6 @@ function renderAdminHtml(snapshot, {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex,nofollow">
-  <meta http-equiv="refresh" content="${refreshSec}">
   <title>Kampan — GoFixWeb admin</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -3695,10 +3805,27 @@ function renderAdminHtml(snapshot, {
         if (!window.confirm(msg)) event.preventDefault();
       });
     });
+    var EMAIL_FORMAT_RE = /^[a-z0-9._%+\\-]+@[a-z0-9.-]+\\.[a-z]{2,}$/i;
+    var EMAIL_TYPOS = ${JSON.stringify(EMAIL_DOMAIN_TYPOS)};
+    function adminEmailError(value) {
+      var email = String(value || "").trim().toLowerCase();
+      if (!email) return "Zadejte e-mailovou adresu.";
+      if (!EMAIL_FORMAT_RE.test(email)) return "Neplatný formát e-mailu. Použijte tvar jméno@doména.cz.";
+      var domain = email.split("@")[1] || "";
+      var hint = EMAIL_TYPOS[domain];
+      if (hint) return "Překlep v e-mailu: " + domain + " — mysleli jste " + hint + "?";
+      return "";
+    }
     document.querySelectorAll('form[action="/admin/dev-email"]').forEach(function (form) {
       form.addEventListener("submit", function (event) {
         var kind = (form.querySelector('select[name="kind"]') || {}).value || "";
         var email = (form.querySelector('input[name="email"]') || {}).value || "";
+        var emailErr = adminEmailError(email);
+        if (emailErr) {
+          event.preventDefault();
+          window.alert(emailErr);
+          return;
+        }
         var msg = "Odeslat TESTOVACÍ e-mail (" + kind + ") na " + email + "? Sken e-shopu se nespustí.";
         if (!window.confirm(msg)) {
           event.preventDefault();
@@ -3715,6 +3842,12 @@ function renderAdminHtml(snapshot, {
       form.addEventListener("submit", function (event) {
         var email = (form.querySelector('input[name="email"]') || {}).value || "";
         var shop = (form.querySelector('input[name="shop_url"]') || {}).value || "";
+        var emailErr = adminEmailError(email);
+        if (emailErr) {
+          event.preventDefault();
+          window.alert(emailErr);
+          return;
+        }
         var msg = "OSTRÝ SCAN — jde na zákazníka.\\nE-shop: " + shop + "\\nE-mail: " + email + "\\nOpravdu spustit plný scan a odeslat reálný report?";
         if (!window.confirm(msg)) {
           event.preventDefault();
@@ -3772,7 +3905,12 @@ function renderAdminHtml(snapshot, {
         });
       });
     });
-    setTimeout(function () { location.reload(); }, ${refreshSec}000);
+    setTimeout(function () {
+      var el = document.activeElement;
+      var tag = el && el.tagName ? String(el.tagName).toLowerCase() : "";
+      if (tag === "input" || tag === "select" || tag === "textarea") return;
+      location.reload();
+    }, ${refreshSec}000);
   </script>
 </body>
 </html>`;
@@ -3815,8 +3953,8 @@ async function handleAdminPage(request, env) {
   let error = "";
   let runState = emptyOutreachRunState();
   const [snapResult, runResult] = await Promise.allSettled([
-    fetchCampaignSnapshot(env),
-    fetchOutreachRunState(env, launchedRunId),
+    loadCampaignSnapshot(env),
+    loadOutreachRunState(env, launchedRunId),
   ]);
   if (snapResult.status === "fulfilled") {
     snapshot = snapResult.value;
@@ -4140,16 +4278,11 @@ async function handleAdminDevScan(request, env) {
   if (denied) return denied;
 
   const fail = async (message, status = 400) => {
-    let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
-    let runState = emptyOutreachRunState();
-    try {
-      snapshot = await fetchCampaignSnapshot(env);
-    } catch {}
-    try {
-      runState = await fetchOutreachRunState(env);
-    } catch {}
     return adminHtmlResponse(
-      renderAdminHtml(snapshot, { scanError: message, runState }),
+      renderAdminHtml({ stats: {}, halt: {}, rows: [], series: {} }, {
+        scanError: message,
+        runState: emptyOutreachRunState(),
+      }),
       status,
     );
   };
@@ -4180,8 +4313,9 @@ async function handleAdminDevScan(request, env) {
   if (!ADMIN_DEV_SCAN_KINDS.has(reportKind)) {
     return fail("Vyberte typ reportu: teaser, kompletní manuál, kompletní AUTO, nebo před-po.");
   }
-  if (!EMAIL_RE.test(email)) {
-    return fail("Zadejte platnou e-mailovou adresu, kam poslat PDF.");
+  const scanEmailErr = adminEmailError(email);
+  if (scanEmailErr) {
+    return fail(scanEmailErr);
   }
   if (landingLeadId && !/^\d+$/.test(landingLeadId)) {
     landingLeadId = "";
@@ -4217,16 +4351,11 @@ async function handleAdminDevEmail(request, env) {
   if (denied) return denied;
 
   const fail = async (message, status = 400) => {
-    let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
-    let runState = emptyOutreachRunState();
-    try {
-      snapshot = await fetchCampaignSnapshot(env);
-    } catch {}
-    try {
-      runState = await fetchOutreachRunState(env);
-    } catch {}
     return adminHtmlResponse(
-      renderAdminHtml(snapshot, { emailError: message, runState }),
+      renderAdminHtml({ stats: {}, halt: {}, rows: [], series: {} }, {
+        emailError: message,
+        runState: emptyOutreachRunState(),
+      }),
       status,
     );
   };
@@ -4249,8 +4378,9 @@ async function handleAdminDevEmail(request, env) {
   if (!domain) {
     return fail("Zadejte testovací doménu (např. money.cz).");
   }
-  if (!EMAIL_RE.test(email)) {
-    return fail("Zadejte platnou e-mailovou adresu.");
+  const emailErr = adminEmailError(email);
+  if (emailErr) {
+    return fail(emailErr);
   }
 
   try {
@@ -5262,8 +5392,8 @@ async function handleUnsubStatus(request, env) {
 export default {
   async scheduled(_controller, env, ctx) {
     ctx.waitUntil(
-      refreshAdminOrdersCache(env).catch((err) => {
-        console.error("admin_orders_cron_failed", err);
+      warmAdminPageCaches(env).catch((err) => {
+        console.error("admin_cache_warm_failed", err);
       }),
     );
   },

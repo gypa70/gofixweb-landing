@@ -5,7 +5,8 @@ compatibility_date = "2024-08-01"
 # Production Worker for /submit, /checkout, /stripe-webhook, /wp-onboarding, /wp-rollback, /admin, and /unsubscribe.
 
 [triggers]
-# Stripe párování pro /admin — mimo page load (Error 1102).
+# GET /admin čte GHA snapshot + Cache API. Cron jen zahřívá cache (bez živého Stripe).
+# Živé Stripe na page load / cron = Error 1102.
 crons = ["*/5 * * * *"]
 
 [vars]
