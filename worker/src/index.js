@@ -2677,6 +2677,7 @@ const GMAIL_BOUNCE_SEARCH_URL =
 const ADMIN_LINKS = {
   scans: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/free-report.yml",
   devScan: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/dev-scan.yml",
+  devEmail: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/dev-email.yml",
   bounce: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-bounce-monitor.yml",
   resume: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-campaign-resume.yml",
   outreach: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/outreach-batch.yml",
@@ -3221,6 +3222,27 @@ const ADMIN_DEV_SCAN_KINDS = new Set([
   "pred-po",
 ]);
 const ADMIN_DEV_SCAN_DEFAULT_EMAIL = "audit@gofixweb.com";
+const ADMIN_DEV_EMAIL_DEFAULT = "trueforexway@gmail.com";
+const ADMIN_DEV_EMAIL_KINDS = new Set([
+  "teaser",
+  "open_2h",
+  "click_48h",
+  "payment",
+  "auto_typ3_ok",
+  "auto_typ3_fail",
+  "manual",
+  "final_manual",
+]);
+const ADMIN_DEV_EMAIL_LABELS = {
+  teaser: "1. Teaser (bezplatný)",
+  open_2h: "2. Follow-up 2h",
+  click_48h: "3. Follow-up 48h",
+  payment: "4. Potvrzení platby",
+  auto_typ3_ok: "5a. Audit trail AUTO — last-offer (typ 3 OK)",
+  auto_typ3_fail: "5b. Audit trail AUTO — bez last-offer (typ 3 fail)",
+  manual: "6. Kompletní report MANUÁL",
+  final_manual: "7. Finální report MANUÁL (check-in)",
+};
 
 function renderAdminHtml(snapshot, {
   error = "",
@@ -3237,6 +3259,10 @@ function renderAdminHtml(snapshot, {
   scanEmail = "",
   scanLead = false,
   scanError = "",
+  emailQueued = false,
+  emailKind = "",
+  emailTo = "",
+  emailError = "",
   launchError = "",
   runState = {},
   orders = null,
@@ -3284,7 +3310,7 @@ function renderAdminHtml(snapshot, {
     ? `<p class="banner-err">${escapeHtml(launchError)}</p>`
     : "";
   const scanNote = scanQueued
-    ? `<p class="banner-ok">Testovací scan je ve frontě GitHub Actions. PDF přijde na ${escapeHtml(scanEmail || ADMIN_DEV_SCAN_DEFAULT_EMAIL)} (obvykle do 10–15 minut). Záloha je i jako artefakt v GHA. Před-po potřebuje dříve uložený kompletní scan stejné domény.${
+    ? `<p class="banner-ok">Ostrý scan je ve frontě GitHub Actions. PDF přijde na ${escapeHtml(scanEmail || ADMIN_DEV_SCAN_DEFAULT_EMAIL)} (obvykle do 10–15 minut). Záloha je i jako artefakt v GHA. Před-po potřebuje dříve uložený kompletní scan stejné domény.${
         scanLead
           ? " Poptávka z landing page se označí jako vyřízená po persistu DB (obvykle do minuty)."
           : ""
@@ -3292,6 +3318,12 @@ function renderAdminHtml(snapshot, {
     : "";
   const scanErr = scanError
     ? `<p class="banner-err">${escapeHtml(scanError)}</p>`
+    : "";
+  const emailNote = emailQueued
+    ? `<p class="banner-ok">Testovací e-mail (${escapeHtml(ADMIN_DEV_EMAIL_LABELS[emailKind] || emailKind || "fáze")}) je ve frontě GitHub Actions. Přijde na ${escapeHtml(emailTo || ADMIN_DEV_EMAIL_DEFAULT)} (obvykle do 1–2 minut). Předmět začíná <code>[QC Admin]</code>, ať ho neplete se zákaznickým mailem. <a href="${ADMIN_LINKS.devEmail}" target="_blank" rel="noopener">GHA</a></p>`
+    : "";
+  const emailErr = emailError
+    ? `<p class="banner-err">${escapeHtml(emailError)}</p>`
     : "";
   const seriesCards = OUTREACH_SERIES.map((def) => {
     const view = seriesView(snapshot, runState, def);
@@ -3401,9 +3433,32 @@ function renderAdminHtml(snapshot, {
           <button class="launch" type="submit">Přidat do suppression listu</button>
         </form>
       </div>`;
-  const devScanBox = `<div class="suppress-box" id="dev-scan">
-        <h2>Spustit testovací scan</h2>
-        <p class="hint">Stejná logika jako CLI <code>scripts/dev_scan.py</code> — bez denního limitu, jen za Basic Auth tohoto dashboardu. PDF přijde na zadaný e-mail; záloha je v <a href="${ADMIN_LINKS.devScan}" target="_blank" rel="noopener">GitHub Actions</a>.</p>
+  const devEmailOptions = Object.entries(ADMIN_DEV_EMAIL_LABELS)
+    .map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`)
+    .join("");
+  const devEmailBox = `<div class="suppress-box dev-email-box" id="dev-email">
+        <h2>Testovací e-mail</h2>
+        <p class="mode-tag mode-tag-safe">Jen pro vás — neprovádí se sken e-shopu</p>
+        <p class="hint">Odešle přesně tu produkční šablonu z <code>utils/email_sender.py</code>, kterou by v dané fázi dostal zákazník. Fixture data: money.cz nebo sk-woo-fixture.sk. Bez denního limitu, jen Basic Auth. Předmět má prefix <code>[QC Admin]</code>.</p>
+        <form class="suppress-form" method="post" action="/admin/dev-email">
+          <label>Typ e-mailu
+            <select name="kind" required>
+              ${devEmailOptions}
+            </select>
+          </label>
+          <label>Testovací doména
+            <input type="text" name="domain" required value="money.cz" placeholder="money.cz" autocomplete="off">
+          </label>
+          <label>Váš e-mail
+            <input type="email" name="email" required value="${ADMIN_DEV_EMAIL_DEFAULT}" autocomplete="off">
+          </label>
+          <button class="launch" type="submit">Odeslat testovací e-mail</button>
+        </form>
+      </div>`;
+  const devScanBox = `<div class="suppress-box dev-scan-live" id="dev-scan">
+        <h2>OSTRÝ SCAN — jde na zákazníka</h2>
+        <p class="mode-tag mode-tag-live">Skenovat reálný e-shop</p>
+        <p class="hint">Stávající pipeline: plný scan zadané domény a odeslání skutečného reportu na zadaný e-mail — stejná logika jako CLI <code>scripts/dev_scan.py</code>. Bez denního limitu, jen Basic Auth. PDF přijde na zadaný e-mail; záloha je v <a href="${ADMIN_LINKS.devScan}" target="_blank" rel="noopener">GitHub Actions</a>.</p>
         <form class="suppress-form" method="post" action="/admin/dev-scan">
           <input type="hidden" name="landing_lead_id" value="">
           <label>Doména / URL e-shopu
@@ -3420,7 +3475,7 @@ function renderAdminHtml(snapshot, {
           <label>Kam poslat PDF
             <input type="email" name="email" required value="${ADMIN_DEV_SCAN_DEFAULT_EMAIL}" autocomplete="off">
           </label>
-          <button class="launch" type="submit">Spustit testovací scan</button>
+          <button class="launch-warn" type="submit">Spustit ostrý scan</button>
         </form>
       </div>`;
 
@@ -3499,6 +3554,14 @@ function renderAdminHtml(snapshot, {
     .auto-form-row input[type=number] { width: 5.5rem; padding: 0.45rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: #0f172a; color: #fff; }
     .suppress-box { background: var(--navy-light); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 1.15rem; }
     .suppress-box h2 { font-size: 1.05rem; margin-bottom: 0.35rem; }
+    .dev-email-box { border: 1px solid rgba(22,163,74,0.45); background: rgba(22,163,74,0.08); }
+    .dev-email-box h2 { color: #4ade80; }
+    .dev-scan-live { border: 1px solid rgba(251,191,36,0.55); background: rgba(251,191,36,0.10); }
+    .dev-scan-live h2 { color: #fbbf24; }
+    .mode-tag { display: inline-block; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.2rem 0.5rem; border-radius: 999px; margin: 0 0 0.55rem; }
+    .mode-tag-safe { background: rgba(22,163,74,0.2); color: #86efac; }
+    .mode-tag-live { background: rgba(251,191,36,0.22); color: #fde68a; }
+    button.launch-warn { background: #d97706; margin-top: 0; border: 0; border-radius: 8px; padding: 0.8rem 1.1rem; font-weight: 700; color: #fff; cursor: pointer; }
     .orders-box { background: var(--navy-light); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 1.15rem; }
     .orders-box h2 { font-size: 1.05rem; margin-bottom: 0.35rem; }
     .orders-box .cards { margin-top: 0.75rem; }
@@ -3542,7 +3605,7 @@ function renderAdminHtml(snapshot, {
   <div class="wrap">
     <h1>GoFix<span>Web</span> — stav kampaně</h1>
     <p class="sub">Interní přehled. Snapshot z DB: ${generated}. Obnova každých ${refreshSec} s.</p>
-    ${err}${queuedNote}${launchedNote}${autoNote}${suppressedNote}${scanNote}${scanErr}${launchErr}
+    ${err}${queuedNote}${launchedNote}${autoNote}${suppressedNote}${emailNote}${emailErr}${scanNote}${scanErr}${launchErr}
     <div class="cards">
       <div class="card"><div class="k">Odesláno</div><div class="v">${escapeHtml(stats.sent ?? 0)}</div></div>
       <div class="card"><div class="k">Accepted</div><div class="v ok">${escapeHtml(stats.accepted ?? 0)}</div></div>
@@ -3563,6 +3626,7 @@ function renderAdminHtml(snapshot, {
     ${haltBox}
     ${suppressBox}
     ${renderLandingLeadsBox(snapshot)}
+    ${devEmailBox}
     ${devScanBox}
     <h2 style="font-size:1.05rem;margin:0 0 0.65rem;">E-mailové série</h2>
     <div class="series-grid">${seriesCards}</div>
@@ -3571,7 +3635,8 @@ function renderAdminHtml(snapshot, {
     ${renderWhyNotBuyBox(snapshot?.why_not_buy)}
     <div class="links">
       <a href="${ADMIN_LINKS.scans}" target="_blank" rel="noopener">GHA scan jobs</a>
-      <a href="${ADMIN_LINKS.devScan}" target="_blank" rel="noopener">GHA testovací scan</a>
+      <a href="${ADMIN_LINKS.devEmail}" target="_blank" rel="noopener">GHA testovací e-mail</a>
+      <a href="${ADMIN_LINKS.devScan}" target="_blank" rel="noopener">GHA ostrý scan</a>
       <a href="${ADMIN_LINKS.bounce}" target="_blank" rel="noopener">GHA bounce monitor</a>
       <a href="${ADMIN_LINKS.resume}" target="_blank" rel="noopener">GHA resume halt</a>
       <a href="${ADMIN_LINKS.outreach}" target="_blank" rel="noopener">GHA outreach dávky</a>
@@ -3630,9 +3695,32 @@ function renderAdminHtml(snapshot, {
         if (!window.confirm(msg)) event.preventDefault();
       });
     });
-    document.querySelectorAll('form[action="/admin/dev-scan"]').forEach(function (form) {
-      form.addEventListener("submit", function () {
+    document.querySelectorAll('form[action="/admin/dev-email"]').forEach(function (form) {
+      form.addEventListener("submit", function (event) {
+        var kind = (form.querySelector('select[name="kind"]') || {}).value || "";
+        var email = (form.querySelector('input[name="email"]') || {}).value || "";
+        var msg = "Odeslat TESTOVACÍ e-mail (" + kind + ") na " + email + "? Sken e-shopu se nespustí.";
+        if (!window.confirm(msg)) {
+          event.preventDefault();
+          return;
+        }
         var btn = form.querySelector("button.launch");
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Odesílám…";
+        }
+      });
+    });
+    document.querySelectorAll('form[action="/admin/dev-scan"]').forEach(function (form) {
+      form.addEventListener("submit", function (event) {
+        var email = (form.querySelector('input[name="email"]') || {}).value || "";
+        var shop = (form.querySelector('input[name="shop_url"]') || {}).value || "";
+        var msg = "OSTRÝ SCAN — jde na zákazníka.\\nE-shop: " + shop + "\\nE-mail: " + email + "\\nOpravdu spustit plný scan a odeslat reálný report?";
+        if (!window.confirm(msg)) {
+          event.preventDefault();
+          return;
+        }
+        var btn = form.querySelector("button.launch-warn") || form.querySelector("button.launch");
         if (btn) {
           btn.disabled = true;
           btn.textContent = "Spouštím…";
@@ -3720,6 +3808,9 @@ async function handleAdminPage(request, env) {
   const scanQueued = url.searchParams.get("scan") === "1";
   const scanEmail = String(url.searchParams.get("to") || "").trim().toLowerCase();
   const scanLead = url.searchParams.get("lead") === "1";
+  const emailQueued = url.searchParams.get("email_queued") === "1";
+  const emailKind = String(url.searchParams.get("email_kind") || "").trim();
+  const emailTo = String(url.searchParams.get("email_to") || "").trim().toLowerCase();
   let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
   let error = "";
   let runState = emptyOutreachRunState();
@@ -3743,7 +3834,7 @@ async function handleAdminPage(request, env) {
   const orders = await resolveAdminOrders(snapshot);
   const ordersError = String(snapshot?.orders?.error || snapshot?.orders_error || "");
   return adminHtmlResponse(renderAdminHtml(snapshot, {
-    error, queued, launched, launchedSeries, launchedRunId, autoQueued, autoSizeQueued, suppressed, suppressedAlready, suppressedEmail, scanQueued, scanEmail, scanLead, runState,
+    error, queued, launched, launchedSeries, launchedRunId, autoQueued, autoSizeQueued, suppressed, suppressedAlready, suppressedEmail, scanQueued, scanEmail, scanLead, emailQueued, emailKind, emailTo, runState,
     orders, ordersError,
   }));
 }
@@ -4109,12 +4200,75 @@ async function handleAdminDevScan(request, env) {
     await dispatchGithubEvent(env, "dev-scan", payload);
   } catch (err) {
     console.error("admin_dev_scan_dispatch_failed", err);
-    return fail("Testovací scan se nepodařilo spustit v GitHub Actions. Zkuste workflow ručně.", 502);
+    return fail("Ostrý scan se nepodařilo spustit v GitHub Actions. Zkuste workflow ručně.", 502);
   }
   const next = new URL("/admin", request.url);
   next.searchParams.set("scan", "1");
   next.searchParams.set("to", email);
   if (landingLeadId) next.searchParams.set("lead", "1");
+  return Response.redirect(next.toString(), 303);
+}
+
+async function handleAdminDevEmail(request, env) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const denied = await requireAdminAuth(request, env);
+  if (denied) return denied;
+
+  const fail = async (message, status = 400) => {
+    let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
+    let runState = emptyOutreachRunState();
+    try {
+      snapshot = await fetchCampaignSnapshot(env);
+    } catch {}
+    try {
+      runState = await fetchOutreachRunState(env);
+    } catch {}
+    return adminHtmlResponse(
+      renderAdminHtml(snapshot, { emailError: message, runState }),
+      status,
+    );
+  };
+
+  let kind = "";
+  let email = "";
+  let domain = "";
+  try {
+    const form = await request.formData();
+    kind = String(form.get("kind") || "").trim().toLowerCase();
+    email = String(form.get("email") || ADMIN_DEV_EMAIL_DEFAULT).trim().toLowerCase();
+    domain = String(form.get("domain") || "").trim();
+  } catch {
+    return fail("Neplatný formulář.");
+  }
+
+  if (!ADMIN_DEV_EMAIL_KINDS.has(kind)) {
+    return fail("Vyberte typ testovacího e-mailu.");
+  }
+  if (!domain) {
+    return fail("Zadejte testovací doménu (např. money.cz).");
+  }
+  if (!EMAIL_RE.test(email)) {
+    return fail("Zadejte platnou e-mailovou adresu.");
+  }
+
+  try {
+    await dispatchGithubEvent(env, "dev-email", {
+      source: "admin",
+      kind,
+      email,
+      domain,
+      at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("admin_dev_email_dispatch_failed", err);
+    return fail("Testovací e-mail se nepodařilo spustit v GitHub Actions. Zkuste workflow ručně.", 502);
+  }
+  const next = new URL("/admin", request.url);
+  next.searchParams.set("email_queued", "1");
+  next.searchParams.set("email_kind", kind);
+  next.searchParams.set("email_to", email);
   return Response.redirect(next.toString(), 303);
 }
 
@@ -5198,6 +5352,10 @@ export default {
 
     if (url.pathname === "/admin/dev-scan") {
       return handleAdminDevScan(request, env);
+    }
+
+    if (url.pathname === "/admin/dev-email") {
+      return handleAdminDevEmail(request, env);
     }
 
     if (url.pathname === "/admin/landing-leads/delete") {
