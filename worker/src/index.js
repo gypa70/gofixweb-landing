@@ -5417,13 +5417,32 @@ function applyBankEnv(data, env) {
 const REPORT_VIEW_TOKEN_RE = /^[A-Za-z0-9_-]{32,64}$/;
 const REPORT_VIEW_TTL_SEC = 90 * 24 * 3600;
 
+const REPORT_VIEW_CACHE_VER = "v2";
+
 function reportViewCacheKey(token) {
-  return `https://report-view.gofixweb/${String(token || "").trim()}`;
+  return `https://report-view.gofixweb/${REPORT_VIEW_CACHE_VER}/${String(token || "").trim()}`;
 }
 
-function reportViewPayloadTime(payload) {
-  const t = Date.parse(String(payload && payload.created_at ? payload.created_at : ""));
-  return Number.isFinite(t) ? t : 0;
+function reportViewLegacyCacheKeys(token) {
+  const tok = String(token || "").trim();
+  return [
+    `https://report-view.gofixweb/${tok}`,
+    `https://report-view.gofixweb/v1/${tok}`,
+  ];
+}
+
+async function purgeReportViewCache(token) {
+  const keys = [reportViewCacheKey(token), ...reportViewLegacyCacheKeys(token)];
+  const deleted = [];
+  for (const key of keys) {
+    try {
+      deleted.push({ key, ok: await caches.default.delete(key) });
+    } catch (err) {
+      console.error("report_view_cache_delete_failed", key, err);
+      deleted.push({ key, ok: false });
+    }
+  }
+  return deleted;
 }
 
 function reportViewExpiredHtml(lang) {
@@ -5442,11 +5461,14 @@ async function fetchReportViewFromGithub(env, token) {
     `https://api.github.com/repos/${repo}/contents/data/report_views/${encodeURIComponent(token)}.json?ref=main`,
     {
       method: "GET",
+      cache: "no-store",
       headers: {
         Authorization: `Bearer ${ghToken}`,
         Accept: "application/vnd.github.raw",
         "User-Agent": "gofixweb-report-worker",
-        "Cache-Control": "no-cache",
+        "Cache-Control": "no-store",
+        Pragma: "no-cache",
+        "X-Gofixweb-Bust": String(Date.now()),
       },
       cf: { cacheTtl: 0, cacheEverything: false },
     },
@@ -5488,29 +5510,14 @@ async function rememberReportViewPayload(token, payload) {
 }
 
 async function fetchReportViewPayload(env, token) {
-  const cached = await fetchReportViewFromCache(token);
   const github = await fetchReportViewFromGithub(env, token);
-  let payload = null;
-  let source = "miss";
-  if (github && cached) {
-    if (reportViewPayloadTime(github) >= reportViewPayloadTime(cached)) {
-      payload = github;
-      source = "github";
-    } else {
-      payload = cached;
-      source = "cache";
-    }
-  } else if (github) {
-    payload = github;
-    source = "github";
-  } else if (cached) {
-    payload = cached;
-    source = "cache";
+  if (github) {
+    await rememberReportViewPayload(token, github);
+    return { payload: github, source: "github" };
   }
-  if (payload && source === "github") {
-    await rememberReportViewPayload(token, payload);
-  }
-  return { payload, source };
+  const cached = await fetchReportViewFromCache(token);
+  if (cached) return { payload: cached, source: "cache" };
+  return { payload: null, source: "miss" };
 }
 
 async function handleReportViewPut(request, env) {
@@ -5540,7 +5547,30 @@ async function handleReportViewPut(request, env) {
       },
     }),
   );
+  for (const key of reportViewLegacyCacheKeys(id)) {
+    try {
+      await caches.default.delete(key);
+    } catch (err) {
+      console.error("report_view_legacy_delete_failed", err);
+    }
+  }
   return jsonResponse({ ok: true }, 200);
+}
+
+async function handleReportViewPurge(request, env) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const url = new URL(request.url);
+  const match = url.pathname.match(/^\/report-view\/([A-Za-z0-9_-]{32,64})\/purge$/);
+  if (!match) return new Response("Not Found", { status: 404 });
+  const id = match[1];
+  const token = String(url.searchParams.get("t") || "").trim();
+  if (!REPORT_VIEW_TOKEN_RE.test(id) || !(await tokenMatchesTracking(env, `report-view\n${id}`, token))) {
+    return jsonResponse({ ok: false, error: "invalid" }, 401);
+  }
+  const deleted = await purgeReportViewCache(id);
+  return jsonResponse({ ok: true, cache_ver: REPORT_VIEW_CACHE_VER, deleted }, 200);
 }
 
 async function recordReportViewAccess(env, request, token, payload) {
@@ -5580,6 +5610,9 @@ async function handleReportView(request, env, ctx) {
     return new Response("Not Found", { status: 404 });
   }
   const token = match[1];
+  if (ctx && typeof ctx.waitUntil === "function") {
+    ctx.waitUntil(Promise.all(reportViewLegacyCacheKeys(token).map((key) => caches.default.delete(key).catch(() => false))));
+  }
   const loaded = await fetchReportViewPayload(env, token);
   const payload = loaded && loaded.payload;
   const source = (loaded && loaded.source) || "miss";
@@ -5623,6 +5656,7 @@ async function handleReportView(request, env, ctx) {
       "Cache-Control": "no-store",
       "X-Robots-Tag": "noindex, nofollow",
       "X-Report-View-Source": source,
+      "X-Report-View-Cache-Key": REPORT_VIEW_CACHE_VER,
     },
   });
 }
@@ -5932,6 +5966,10 @@ export default {
 
     if (/^\/view\/[A-Za-z0-9_-]{32,64}$/.test(url.pathname)) {
       return handleReportView(request, env, ctx);
+    }
+
+    if (/^\/report-view\/[A-Za-z0-9_-]{32,64}\/purge$/.test(url.pathname)) {
+      return handleReportViewPurge(request, env);
     }
 
     if (/^\/report-view\/[A-Za-z0-9_-]{32,64}$/.test(url.pathname)) {
