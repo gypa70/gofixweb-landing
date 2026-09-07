@@ -112,51 +112,51 @@
       <div id="banner" class="banner hidden" role="status"></div>
       <form id="onboarding-form" autocomplete="off">
         <div class="field">
-          <label for="site_url">URL e-shopu</label>
+          <label for="site_url" data-i18n="labelUrl">URL e-shopu</label>
           <input id="site_url" name="site_url" type="url" required placeholder="https://muj-eshop.cz" spellcheck="false">
-          <p class="hint">Musí začínat na <code>https://</code> (WordPress / WooCommerce).</p>
+          <p class="hint" data-i18n="hintUrl">Musí začínat na https:// (WordPress / WooCommerce).</p>
         </div>
         <div class="field">
-          <label for="email">E-mail zákazníka</label>
+          <label for="email" data-i18n="labelEmail">E-mail zákazníka</label>
           <input id="email" name="email" type="email" required autocomplete="email" placeholder="jana@muj-eshop.cz">
-          <p class="hint">Stejný e-mail jako u objednávky Kompletního auditu (Stripe).</p>
+          <p class="hint" data-i18n="hintEmail">Stejný e-mail jako u objednávky Kompletního auditu (Stripe).</p>
         </div>
         <div class="field">
-          <label for="username">Uživatelské jméno</label>
+          <label for="username" data-i18n="labelUser">Uživatelské jméno</label>
           <input id="username" name="username" type="text" required autocomplete="username" placeholder="admin">
-          <p class="hint">Účet s právem upravovat stránky (Editor nebo Administrátor).</p>
-          <p class="hint">Pro základní SEO opravy stačí role Editor. Pro rychlostní vylepšení (komprese obrázků, správa pluginů) potřebujeme roli Administrator.</p>
+          <p class="hint" data-i18n="hintUser">Účet s právem upravovat stránky (Editor nebo Administrátor).</p>
+          <p class="hint" data-i18n="hintUser2">Pro základní SEO opravy stačí role Editor. Pro rychlostní vylepšení (komprese obrázků, správa pluginů) potřebujeme roli Administrator.</p>
         </div>
         <div class="field">
           <label for="app_password">Application Password</label>
           <input id="app_password" name="app_password" type="password" required autocomplete="new-password" placeholder="xxxx xxxx xxxx xxxx xxxx xxxx">
           <label class="toggle">
             <input type="checkbox" onclick="document.getElementById('app_password').type = this.checked ? 'text' : 'password'">
-            Zobrazit heslo
+            <span data-i18n="showPass">Zobrazit heslo</span>
           </label>
           <p class="hint">
-            Heslo aplikace z WordPressu, ne běžné přihlašovací heslo.
-            <a href="/wordpress-autofix/navod/">Jak ho vygenerovat</a>
+            <span data-i18n="hintPass">Heslo aplikace z WordPressu, ne běžné přihlašovací heslo.</span>
+            <a href="/wordpress-autofix/navod/" data-i18n="howPass">Jak ho vygenerovat</a>
           </p>
         </div>
         <div class="consent-box">
-          <h2>Co automatická oprava udělá</h2>
+          <h2 data-i18n="consentH2">Co automatická oprava udělá</h2>
           <ul>
-            <li>Upravíme titulky a meta popisy stránek pro lepší SEO.</li>
-            <li>Pokud web nemá SEO plugin, nainstalujeme Slim SEO pro zápis meta popisků do stránky.</li>
-            <li>Vypneme jasně identifikované nepoužívané pluginy (např. demo plugin Hello Dolly, duplicitní SEO plugin).</li>
-            <li>Zkontrolujeme líné načítání obrázků (lazy loading) a doporučíme úpravy.</li>
-            <li>Se souhlasem nainstalujeme nástroj na kompresi obrázků (Smush) a spustíme kompresi.</li>
+            <li data-i18n="c1">Upravíme titulky a meta popisy stránek pro lepší SEO.</li>
+            <li data-i18n="c2">Pokud web nemá SEO plugin, nainstalujeme Slim SEO pro zápis meta popisků do stránky.</li>
+            <li data-i18n="c3">Vypneme jasně identifikované nepoužívané pluginy (např. demo plugin Hello Dolly, duplicitní SEO plugin).</li>
+            <li data-i18n="c4">Zkontrolujeme líné načítání obrázků (lazy loading) a doporučíme úpravy.</li>
+            <li data-i18n="c5">Se souhlasem nainstalujeme nástroj na kompresi obrázků (Smush) a spustíme kompresi.</li>
           </ul>
           <label class="consent-check">
             <input id="consent_steps" name="consent_steps" type="checkbox" value="1" required>
-            <span>Souhlasím s výše uvedenými kroky</span>
+            <span data-i18n="consentSteps">Souhlasím s výše uvedenými kroky</span>
           </label>
         </div>
         <div class="consent-box consent-smush">
           <label class="consent-check">
             <input id="consent_install_plugins" name="consent_install_plugins" type="checkbox" value="1">
-            <span>Souhlasím, že GoFixWeb může na mém WordPressu nainstalovat pluginy z oficiálního adresáře wordpress.org (komprese obrázků Smush a v případě chybějícího SEO nástroje Slim SEO) a že tyto zásahy mohu vzít zpět odinstalací pluginu.</span>
+            <span data-i18n="consentPlugins">Souhlasím, že GoFixWeb může na mém WordPressu nainstalovat pluginy z oficiálního adresáře wordpress.org (komprese obrázků Smush a v případě chybějícího SEO nástroje Slim SEO) a že tyto zásahy mohu vzít zpět odinstalací pluginu.</span>
           </label>
         </div>
         <button type="submit" id="submit-btn">Ověřit připojení</button>
@@ -183,7 +183,25 @@
           paid: "Platba byla přijata, děkujeme. Na váš e-mail vám během chvíle přijde potvrzení s dalšími informacemi. Teď připojte WordPress e-shop.",
           httpsError: "URL e-shopu musí začínat na https://.",
           consentError: "Potvrďte souhlas s kroky automatické opravy.",
-          networkError: "Nelze se spojit s GoFixWeb serverem. Zkuste to znovu."
+          networkError: "Nelze se spojit s GoFixWeb serverem. Zkuste to znovu.",
+          labelUrl: "URL e-shopu",
+          hintUrl: "Musí začínat na https:// (WordPress / WooCommerce).",
+          labelEmail: "E-mail zákazníka",
+          hintEmail: "Stejný e-mail jako u objednávky Kompletního auditu (Stripe).",
+          labelUser: "Uživatelské jméno",
+          hintUser: "Účet s právem upravovat stránky (Editor nebo Administrátor).",
+          hintUser2: "Pro základní SEO opravy stačí role Editor. Pro rychlostní vylepšení (komprese obrázků, správa pluginů) potřebujeme roli Administrator.",
+          showPass: "Zobrazit heslo",
+          hintPass: "Heslo aplikace z WordPressu, ne běžné přihlašovací heslo.",
+          howPass: "Jak ho vygenerovat",
+          consentH2: "Co automatická oprava udělá",
+          c1: "Upravíme titulky a meta popisy stránek pro lepší SEO.",
+          c2: "Pokud web nemá SEO plugin, nainstalujeme Slim SEO pro zápis meta popisků do stránky.",
+          c3: "Vypneme jasně identifikované nepoužívané pluginy (např. demo plugin Hello Dolly, duplicitní SEO plugin).",
+          c4: "Zkontrolujeme líné načítání obrázků (lazy loading) a doporučíme úpravy.",
+          c5: "Se souhlasem nainstalujeme nástroj na kompresi obrázků (Smush) a spustíme kompresi.",
+          consentSteps: "Souhlasím s výše uvedenými kroky",
+          consentPlugins: "Souhlasím, že GoFixWeb může na mém WordPressu nainstalovat pluginy z oficiálního adresáře wordpress.org (komprese obrázků Smush a v případě chybějícího SEO nástroje Slim SEO) a že tyto zásahy mohu vzít zpět odinstalací pluginu."
         },
         sk: {
           title: "Pripojenie e-shopu · GoFixWeb",
@@ -197,7 +215,25 @@
           paid: "Platba bola prijatá, ďakujeme. Na váš e-mail vám o chvíľu príde potvrdenie s ďalšími informáciami. Teraz pripojte WordPress e-shop.",
           httpsError: "URL e-shopu musí začínať na https://.",
           consentError: "Potvrďte súhlas s krokmi automatickej opravy.",
-          networkError: "Nedá sa spojiť so serverom GoFixWeb. Skúste to znova."
+          networkError: "Nedá sa spojiť so serverom GoFixWeb. Skúste to znova.",
+          labelUrl: "URL e-shopu",
+          hintUrl: "Musí začínať na https:// (WordPress / WooCommerce).",
+          labelEmail: "E-mail zákazníka",
+          hintEmail: "Rovnaký e-mail ako pri objednávke Kompletného auditu (Stripe).",
+          labelUser: "Používateľské meno",
+          hintUser: "Účet s právom upravovať stránky (Editor alebo Administrátor).",
+          hintUser2: "Na základné SEO opravy stačí rola Editor. Na rýchlostné vylepšenia (kompresia obrázkov, správa pluginov) potrebujeme rolu Administrator.",
+          showPass: "Zobraziť heslo",
+          hintPass: "Heslo aplikácie z WordPressu, nie bežné prihlasovacie heslo.",
+          howPass: "Ako ho vygenerovať",
+          consentH2: "Čo automatická oprava urobí",
+          c1: "Upravíme titulky a meta popisy stránok pre lepšie SEO.",
+          c2: "Ak web nemá SEO plugin, nainštalujeme Slim SEO na zápis meta popiskov do stránky.",
+          c3: "Vypneme jasne identifikované nepoužívané pluginy (napr. demo plugin Hello Dolly, duplicitný SEO plugin).",
+          c4: "Skontrolujeme lenivé načítanie obrázkov (lazy loading) a odporučíme úpravy.",
+          c5: "So súhlasom nainštalujeme nástroj na kompresiu obrázkov (Smush) a spustíme kompresiu.",
+          consentSteps: "Súhlasím s vyššie uvedenými krokmi",
+          consentPlugins: "Súhlasím, že GoFixWeb môže na mojom WordPress nainštalovať pluginy z oficiálneho adresára wordpress.org (kompresia obrázkov Smush a v prípade chýbajúceho SEO nástroja Slim SEO) a že tieto zásahy môžem vziať späť odinštaláciou pluginu."
         }
       };
       function detectLang() {
@@ -214,6 +250,10 @@
       var t = COPY[loc] || COPY.cs;
       document.documentElement.lang = loc === "sk" ? "sk" : "cs";
       document.title = t.title;
+      document.querySelectorAll("[data-i18n]").forEach(function (el) {
+        var key = el.getAttribute("data-i18n");
+        if (key && t[key]) el.textContent = t[key];
+      });
       var kicker = document.getElementById("kicker");
       if (kicker) kicker.textContent = t.kicker;
       var navConnect = document.getElementById("nav-connect");
@@ -225,6 +265,12 @@
       var lede = document.getElementById("lede");
       if (lede) lede.textContent = t.lede;
       if (btn) btn.textContent = t.submit;
+      if (loc === "sk") {
+        var urlInput = document.getElementById("site_url");
+        var emailInput = document.getElementById("email");
+        if (urlInput) urlInput.placeholder = "https://moj-eshop.sk";
+        if (emailInput) emailInput.placeholder = "jana@moj-eshop.sk";
+      }
       var paidBanner = document.getElementById("paid-banner");
       if (paidBanner && params.get("paid") === "1") {
         paidBanner.className = "banner banner-success";
