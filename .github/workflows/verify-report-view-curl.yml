@@ -105,6 +105,25 @@ jobs:
           echo "===== WORKER PURGE BODY ====="
           cat dump/worker-purge-body.txt
 
+      - name: Dump Worker GitHub probe
+        env:
+          UNSUBSCRIBE_SECRET: ${{ secrets.UNSUBSCRIBE_SECRET }}
+        run: |
+          set -euo pipefail
+          mkdir -p dump
+          HMAC=$(python3 - <<'PY'
+          import hmac, hashlib, os
+          print(hmac.new(os.environ["UNSUBSCRIBE_SECRET"].encode("utf-8"), f"report-view\n{os.environ['VIEW_TOKEN']}".encode("utf-8"), hashlib.sha256).hexdigest())
+          PY
+          )
+          echo "===== DEBUG REPORT VIEW HEADERS ====="
+          curl -sS -D dump/debug-headers.txt -o dump/debug.json \
+            "https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev/debug-report-view/${VIEW_TOKEN}?t=${HMAC}"
+          cat dump/debug-headers.txt
+          echo "===== DEBUG REPORT VIEW BODY ====="
+          cat dump/debug.json
+          echo
+
       - name: Raw curl dump
         run: |
           set -euo pipefail
