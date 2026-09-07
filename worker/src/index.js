@@ -23,6 +23,8 @@
  * POST /exit-intent — důvod odchodu z nabídky (price|trust|dismiss).
  * GET /survey/{id} — 48h thanks (price|trust|other) nebo 2h personalizované stránky
  *   (findings|loss|price|later, src=open_2h).
+ * GET /view/{token} — HTML náhled reportu (teaser / MANUÁL / AUTO / Před-Po).
+ * POST /report-view/{token} — GHA/scanner uloží payload do Worker cache.
  * GET /result/{id} — 7. e-mail MANUÁL „Chci vidět výsledek“ (HMAC) spustí Před/Po sken.
  * POST /submit — formulář: whitelist e-mail spustí free scan, ostatní jen poptávku.
  * POST /wp-onboarding — handshake WordPress REST; uložení credentials běží v GHA.
@@ -3343,6 +3345,7 @@ const ADMIN_DEV_EMAIL_KINDS = new Set([
   "auto_typ3_fail",
   "manual",
   "final_manual",
+  "final_auto",
 ]);
 const ADMIN_DEV_EMAIL_LABELS = {
   teaser: "1. Teaser (bezplatný)",
@@ -3353,6 +3356,7 @@ const ADMIN_DEV_EMAIL_LABELS = {
   auto_typ3_fail: "5b. Audit trail AUTO — bez last-offer (typ 3 fail)",
   manual: "6. Kompletní report MANUÁL",
   final_manual: "7. Finální report MANUÁL (check-in)",
+  final_auto: "7b. Finální report Před/Po",
 };
 
 function renderAdminHtml(snapshot, {
@@ -5159,6 +5163,133 @@ function applyBankEnv(data, env) {
   return { ...base, transfer };
 }
 
+const REPORT_VIEW_TOKEN_RE = /^[A-Za-z0-9_-]{32,64}$/;
+const REPORT_VIEW_TTL_SEC = 90 * 24 * 3600;
+
+function reportViewCacheKey(token) {
+  return `https://report-view.gofixweb/${String(token || "").trim()}`;
+}
+
+function reportViewExpiredHtml(lang) {
+  const title = lang === "sk" ? "Odkaz vypršal" : "Odkaz vypršel";
+  const body = lang === "sk"
+    ? "Tento report už nie je dostupný online. Ak ho potrebujete, napíšte na info@gofixweb.com."
+    : "Tento report už není dostupný online. Pokud ho potřebujete, napište na info@gofixweb.com.";
+  return `<!DOCTYPE html><html lang="${lang === "sk" ? "sk" : "cs"}"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>${title} — GoFixWeb</title></head><body style="font-family:Arial,Helvetica,sans-serif;padding:32px 16px;color:#1a2332;"><h1>${title}</h1><p>${body}</p></body></html>`;
+}
+
+async function fetchReportViewPayload(env, token) {
+  const cache = caches.default;
+  const hit = await cache.match(reportViewCacheKey(token));
+  if (hit) {
+    try {
+      return await hit.json();
+    } catch {
+      /* GitHub fallback */
+    }
+  }
+  const repo = env.GITHUB_REPO || "gypa70/gofixweb-scanner";
+  const ghToken = env.GITHUB_TOKEN;
+  if (!ghToken) return null;
+  const res = await fetch(
+    `https://api.github.com/repos/${repo}/contents/data/report_views/${encodeURIComponent(token)}.json?ref=main`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${ghToken}`,
+        Accept: "application/vnd.github.raw",
+        "User-Agent": "gofixweb-report-worker",
+        "Cache-Control": "no-cache",
+      },
+      cf: { cacheTtl: 0, cacheEverything: false },
+    },
+  );
+  if (!res.ok) return null;
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+async function handleReportViewPut(request, env) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const url = new URL(request.url);
+  const match = url.pathname.match(/^\/report-view\/([A-Za-z0-9_-]{32,64})$/);
+  if (!match) return new Response("Not Found", { status: 404 });
+  const id = match[1];
+  const token = String(url.searchParams.get("t") || "").trim();
+  if (!REPORT_VIEW_TOKEN_RE.test(id) || !(await tokenMatchesTracking(env, `report-view\n${id}`, token))) {
+    return jsonResponse({ ok: false, error: "invalid" }, 401);
+  }
+  let payload = {};
+  try {
+    payload = await request.json();
+  } catch {
+    return jsonResponse({ ok: false, error: "invalid_json" }, 400);
+  }
+  await caches.default.put(
+    reportViewCacheKey(id),
+    new Response(JSON.stringify(payload), {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": `public, max-age=${REPORT_VIEW_TTL_SEC}`,
+      },
+    }),
+  );
+  return jsonResponse({ ok: true }, 200);
+}
+
+async function handleReportView(request, env) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const url = new URL(request.url);
+  const match = url.pathname.match(/^\/view\/([A-Za-z0-9_-]{32,64})$/);
+  if (!match || !REPORT_VIEW_TOKEN_RE.test(match[1])) {
+    return new Response("Not Found", { status: 404 });
+  }
+  const token = match[1];
+  const payload = await fetchReportViewPayload(env, token);
+  const lang = String(url.searchParams.get("lang") || "").toLowerCase() === "sk" ? "sk" : "cs";
+  if (!payload || typeof payload !== "object") {
+    return new Response(reportViewExpiredHtml(lang), {
+      status: 404,
+      headers: { "Content-Type": "text/html; charset=utf-8", "X-Robots-Tag": "noindex, nofollow" },
+    });
+  }
+  const expiresAt = Date.parse(String(payload.expires_at || ""));
+  if (Number.isFinite(expiresAt) && expiresAt < Date.now()) {
+    return new Response(reportViewExpiredHtml(payload.locale === "sk" ? "sk" : lang), {
+      status: 410,
+      headers: { "Content-Type": "text/html; charset=utf-8", "X-Robots-Tag": "noindex, nofollow" },
+    });
+  }
+  console.log(JSON.stringify({
+    event: "report_view_access",
+    kind: String(payload.kind || ""),
+    token_prefix: token.slice(0, 8),
+    at: new Date().toISOString(),
+  }));
+  const page = String(payload.html || "").trim();
+  if (!page) {
+    return new Response(reportViewExpiredHtml(lang), {
+      status: 404,
+      headers: { "Content-Type": "text/html; charset=utf-8", "X-Robots-Tag": "noindex, nofollow" },
+    });
+  }
+  return new Response(page, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex, nofollow",
+    },
+  });
+}
+
 function surveyDataCacheKey(trackingId) {
   return `https://survey-data.gofixweb/${String(trackingId || "").trim()}`;
 }
@@ -5456,6 +5587,14 @@ export default {
         return new Response("Method Not Allowed", { status: 405 });
       }
       return handleResultScan(request, env);
+    }
+
+    if (/^\/view\/[A-Za-z0-9_-]{32,64}$/.test(url.pathname)) {
+      return handleReportView(request, env);
+    }
+
+    if (/^\/report-view\/[A-Za-z0-9_-]{32,64}$/.test(url.pathname)) {
+      return handleReportViewPut(request, env);
     }
 
     if (/^\/survey-data\/[A-Za-z0-9]{8,64}$/.test(url.pathname)) {
