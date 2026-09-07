@@ -43,6 +43,27 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: worker
 
+      - name: Verify /view serves GitHub snapshot from a clean runner
+        if: steps.cf.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          URL="https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev/view/WxwUPYLwcnt11-UtoFRhVoAaXtidTsrwebajGnEagVE"
+          curl -sS -D /tmp/rv.hdr -o /tmp/rv.html -A "gofixweb-gha-verify" "$URL"
+          echo "--- response headers ---"
+          cat /tmp/rv.hdr
+          python3 - <<'PY'
+          from pathlib import Path
+          hdr = Path("/tmp/rv.hdr").read_text(encoding="utf-8", errors="replace")
+          html = Path("/tmp/rv.html").read_text(encoding="utf-8", errors="replace")
+          src = next((line.split(":", 1)[1].strip() for line in hdr.splitlines() if line.lower().startswith("x-report-view-source:")), "")
+          print("x-report-view-source", src)
+          assert src == "github", hdr
+          assert "SKÓRE PŘED OPRAVOU" in html, html[:500]
+          assert "58" in html and "71" in html
+          compact = html.replace("\xa0", "").replace(" ", "")
+          assert "2600" in compact and "31200" in compact, compact[:800]
+          PY
+
       - name: Verify live Stripe secret before Worker put
         id: stripe_key
         if: steps.cf.outputs.present == 'true'

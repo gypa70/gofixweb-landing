@@ -5421,6 +5421,11 @@ function reportViewCacheKey(token) {
   return `https://report-view.gofixweb/${String(token || "").trim()}`;
 }
 
+function reportViewPayloadTime(payload) {
+  const t = Date.parse(String(payload && payload.created_at ? payload.created_at : ""));
+  return Number.isFinite(t) ? t : 0;
+}
+
 function reportViewExpiredHtml(lang) {
   const title = lang === "sk" ? "Odkaz vypršal" : "Odkaz vypršel";
   const body = lang === "sk"
@@ -5429,16 +5434,7 @@ function reportViewExpiredHtml(lang) {
   return `<!DOCTYPE html><html lang="${lang === "sk" ? "sk" : "cs"}"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>${title} — GoFixWeb</title></head><body style="font-family:Arial,Helvetica,sans-serif;padding:32px 16px;color:#1a2332;"><h1>${title}</h1><p>${body}</p></body></html>`;
 }
 
-async function fetchReportViewPayload(env, token) {
-  const cache = caches.default;
-  const hit = await cache.match(reportViewCacheKey(token));
-  if (hit) {
-    try {
-      return await hit.json();
-    } catch {
-      /* GitHub fallback */
-    }
-  }
+async function fetchReportViewFromGithub(env, token) {
   const repo = env.GITHUB_REPO || "gypa70/gofixweb-scanner";
   const ghToken = env.GITHUB_TOKEN;
   if (!ghToken) return null;
@@ -5457,10 +5453,64 @@ async function fetchReportViewPayload(env, token) {
   );
   if (!res.ok) return null;
   try {
-    return await res.json();
+    const payload = await res.json();
+    return payload && typeof payload === "object" ? payload : null;
   } catch {
     return null;
   }
+}
+
+async function fetchReportViewFromCache(token) {
+  const hit = await caches.default.match(reportViewCacheKey(token));
+  if (!hit) return null;
+  try {
+    const payload = await hit.json();
+    return payload && typeof payload === "object" ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
+async function rememberReportViewPayload(token, payload) {
+  try {
+    await caches.default.put(
+      reportViewCacheKey(token),
+      new Response(JSON.stringify(payload), {
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": `public, max-age=${REPORT_VIEW_TTL_SEC}`,
+        },
+      }),
+    );
+  } catch (err) {
+    console.error("report_view_cache_put_failed", err);
+  }
+}
+
+async function fetchReportViewPayload(env, token) {
+  const cached = await fetchReportViewFromCache(token);
+  const github = await fetchReportViewFromGithub(env, token);
+  let payload = null;
+  let source = "miss";
+  if (github && cached) {
+    if (reportViewPayloadTime(github) >= reportViewPayloadTime(cached)) {
+      payload = github;
+      source = "github";
+    } else {
+      payload = cached;
+      source = "cache";
+    }
+  } else if (github) {
+    payload = github;
+    source = "github";
+  } else if (cached) {
+    payload = cached;
+    source = "cache";
+  }
+  if (payload && source === "github") {
+    await rememberReportViewPayload(token, payload);
+  }
+  return { payload, source };
 }
 
 async function handleReportViewPut(request, env) {
@@ -5530,7 +5580,9 @@ async function handleReportView(request, env, ctx) {
     return new Response("Not Found", { status: 404 });
   }
   const token = match[1];
-  const payload = await fetchReportViewPayload(env, token);
+  const loaded = await fetchReportViewPayload(env, token);
+  const payload = loaded && loaded.payload;
+  const source = (loaded && loaded.source) || "miss";
   const lang = String(url.searchParams.get("lang") || "").toLowerCase() === "sk" ? "sk" : "cs";
   if (!payload || typeof payload !== "object") {
     return new Response(reportViewExpiredHtml(lang), {
@@ -5570,6 +5622,7 @@ async function handleReportView(request, env, ctx) {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
       "X-Robots-Tag": "noindex, nofollow",
+      "X-Report-View-Source": source,
     },
   });
 }
