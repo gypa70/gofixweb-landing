@@ -5457,27 +5457,27 @@ async function fetchReportViewFromGithub(env, token) {
   const repo = env.GITHUB_REPO || "gypa70/gofixweb-scanner";
   const ghToken = env.GITHUB_TOKEN;
   if (!ghToken) return null;
-  const res = await fetch(
-    `https://api.github.com/repos/${repo}/contents/data/report_views/${encodeURIComponent(token)}.json?ref=main`,
-    {
-      method: "GET",
-      cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${ghToken}`,
-        Accept: "application/vnd.github.raw",
-        "User-Agent": "gofixweb-report-worker",
-        "Cache-Control": "no-store",
-        Pragma: "no-cache",
-        "X-Gofixweb-Bust": String(Date.now()),
-      },
-      cf: { cacheTtl: 0, cacheEverything: false },
-    },
-  );
-  if (!res.ok) return null;
   try {
+    const res = await fetch(
+      `https://api.github.com/repos/${repo}/contents/data/report_views/${encodeURIComponent(token)}.json?ref=main`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${ghToken}`,
+          Accept: "application/vnd.github.raw",
+          "User-Agent": "gofixweb-report-worker",
+          "Cache-Control": "no-store",
+          Pragma: "no-cache",
+          "X-Gofixweb-Bust": String(Date.now()),
+        },
+        cf: { cacheTtl: 0, cacheEverything: false },
+      },
+    );
+    if (!res.ok) return null;
     const payload = await res.json();
     return payload && typeof payload === "object" ? payload : null;
-  } catch {
+  } catch (err) {
+    console.error("report_view_github_fetch_failed", err);
     return null;
   }
 }
@@ -5611,7 +5611,15 @@ async function handleReportView(request, env, ctx) {
   }
   const token = match[1];
   if (ctx && typeof ctx.waitUntil === "function") {
-    ctx.waitUntil(Promise.all(reportViewLegacyCacheKeys(token).map((key) => caches.default.delete(key).catch(() => false))));
+    ctx.waitUntil((async () => {
+      for (const key of reportViewLegacyCacheKeys(token)) {
+        try {
+          await caches.default.delete(key);
+        } catch (err) {
+          console.error("report_view_legacy_delete_failed", err);
+        }
+      }
+    })());
   }
   const loaded = await fetchReportViewPayload(env, token);
   const payload = loaded && loaded.payload;
