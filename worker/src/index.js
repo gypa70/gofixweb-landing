@@ -80,6 +80,11 @@ const ONBOARDING_URL = "https://gofixweb.com/wordpress-autofix";
 const VOP_VERSION = "2026-09-04";
 const VOP_TERMS_URL = "https://gofixweb.com/terms.html";
 const VOP_AUTOFIX_SECTION_URL = `${VOP_TERMS_URL}#vop-autofix-section`;
+const WITHDRAWAL_CONSENT_VERSION = "2026-09-07";
+const WITHDRAWAL_CONSENT_TEXT = {
+  cz: "Souhlasím s tím, aby GoFixWeb (FinalEdge s.r.o.) zahájil poskytování digitálního obsahu (report/oprava e-shopu) ihned po zaplacení, a beru na vědomí, že tímto ztrácím právo odstoupit od smlouvy do 14 dnů.",
+  sk: "Súhlasím s tým, aby GoFixWeb (FinalEdge s.r.o.) začal poskytovať digitálny obsah (report/oprava e-shopu) ihneď po zaplatení, a beriem na vedomie, že tým strácam právo odstúpiť od zmluvy v lehote 14 dní.",
+};
 const MONEY_AMBER = "#b45309";
 
 const SUBSCRIPTION_PLANS = {
@@ -976,6 +981,61 @@ function renderOrdersBox(orders, ordersError) {
       : ""}
     ${ambiguousNote}
     ${renderMatchedOrdersDetail(data)}
+  </div>`;
+}
+
+function renderDisputeEvidenceBox(snapshot) {
+  const data = snapshot && snapshot.dispute_evidence ? snapshot.dispute_evidence : {};
+  const consents = Array.isArray(data.consents) ? data.consents.slice(0, 25) : [];
+  const opens = Array.isArray(data.report_opens) ? data.report_opens.slice(0, 25) : [];
+  const consentRows = consents.length
+    ? consents.map((row) => {
+        const text = String(row.consent_text || "").slice(0, 160);
+        return `<tr>
+          <td>${escapeHtml(row.consent_at || row.created_at || "—")}</td>
+          <td>${escapeHtml(row.email || "—")}</td>
+          <td>${escapeHtml(row.domain || "—")}</td>
+          <td>${escapeHtml(row.product || "—")}</td>
+          <td>${escapeHtml(row.kind || "—")}</td>
+          <td>${escapeHtml(row.ip || "—")}</td>
+          <td>${escapeHtml(text)}${String(row.consent_text || "").length > 160 ? "…" : ""}</td>
+        </tr>`;
+      }).join("")
+    : `<tr><td colspan="7">Zatím žádný uložený souhlas z checkoutu.</td></tr>`;
+  const openRows = opens.length
+    ? opens.map((row) => `<tr>
+          <td>${escapeHtml(row.accessed_at || "—")}</td>
+          <td>${escapeHtml(row.email || "—")}</td>
+          <td>${escapeHtml(row.domain || "—")}</td>
+          <td>${escapeHtml(row.kind || "—")}</td>
+          <td>${escapeHtml(row.ip || "—")}</td>
+          <td>${escapeHtml(String(row.token || "").slice(0, 12))}…</td>
+        </tr>`).join("")
+    : `<tr><td colspan="6">Zatím žádné otevření online reportu.</td></tr>`;
+  return `<div class="orders-box">
+    <h2>Důkazní balíček (chargeback)</h2>
+    <p class="hint">Souhlas při checkoutu (čas, IP, přesné znění) a otevření online HTML reportu.
+    SMTP accepted čas je v tabulce odeslání níže (opened_at = pixel v e-mailu).
+    Snapshot z DB, obnova po persistu GHA.</p>
+    <h3 style="font-size:0.95rem;margin:1rem 0 0.4rem;">Souhlasy z checkoutu</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Čas</th><th>E-mail</th><th>Doména</th><th>Produkt</th>
+          <th>Druh</th><th>IP</th><th>Znění</th>
+        </tr>
+      </thead>
+      <tbody>${consentRows}</tbody>
+    </table>
+    <h3 style="font-size:0.95rem;margin:1rem 0 0.4rem;">Otevření online reportu</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Čas</th><th>E-mail</th><th>Doména</th><th>Typ</th><th>IP</th><th>Token</th>
+        </tr>
+      </thead>
+      <tbody>${openRows}</tbody>
+    </table>
   </div>`;
 }
 
@@ -1991,6 +2051,7 @@ const CHECKOUT_COPY = {
     exitTrust: "Nevím, jestli vám můžu důvěřovat",
     exitDismiss: "Zavřít bez odpovědi",
     vopError: "Bez souhlasu s VOP nelze pokračovat k platbě.",
+    withdrawalError: "Bez souhlasu se zahájením plnění a ztrátou práva na odstoupení nelze pokračovat k platbě.",
     findingsAuto: "U tohoto e-shopu vyřešíme automaticky: {auto}.",
     findingsManualHomepage:
       "Tento nález budete muset dořešit sami podle návodu: {manual}, protože jde o zásah do vzhledu vaší homepage.",
@@ -2035,6 +2096,7 @@ const CHECKOUT_COPY = {
     exitTrust: "Neviem, či vám môžem dôverovať",
     exitDismiss: "Zavrieť bez odpovede",
     vopError: "Bez súhlasu s VOP nie je možné pokračovať k platbe.",
+    withdrawalError: "Bez súhlasu so začatím plnenia a stratou práva na odstúpenie nie je možné pokračovať k platbe.",
     findingsAuto: "U tohto e-shopu vyriešime automaticky: {auto}.",
     findingsManualHomepage:
       "Toto zistenie budete musieť dorobiť sami podľa návodu: {manual}, pretože ide o zásah do vzhľadu vašej homepage.",
@@ -2062,6 +2124,54 @@ const CHECKOUT_COPY = {
 
 function checkoutCopy(domain, email) {
   return CHECKOUT_COPY[checkoutLocale(domain, email)] || CHECKOUT_COPY.cz;
+}
+
+function withdrawalConsentText(domain, email) {
+  const loc = checkoutLocale(domain, email);
+  return WITHDRAWAL_CONSENT_TEXT[loc] || WITHDRAWAL_CONSENT_TEXT.cz;
+}
+
+function withdrawalConsentBlock(domain, email) {
+  return `<label for="withdrawal-consent">
+        <input type="checkbox" id="withdrawal-consent" name="withdrawal_consent" value="1" required>
+        <span>${escapeHtml(withdrawalConsentText(domain, email))}</span>
+      </label>`;
+}
+
+function checkoutPayGateScript() {
+  return `<script>
+    (function () {
+      var withdrawal = document.getElementById("withdrawal-consent");
+      var vop = document.getElementById("vop-consent");
+      var btn = document.getElementById("pay-btn");
+      if (!btn) return;
+      function sync() {
+        var ok = withdrawal ? withdrawal.checked : false;
+        if (vop) ok = ok && vop.checked;
+        btn.disabled = !ok;
+      }
+      if (withdrawal) withdrawal.addEventListener("change", sync);
+      if (vop) vop.addEventListener("change", sync);
+      sync();
+    })();
+  </script>`;
+}
+
+async function persistCheckoutConsent(env, request, { email, domain, product, vop }) {
+  const loc = checkoutLocale(domain, email);
+  await dispatchGithubEvent(env, "wp-vop-consent", {
+    email,
+    domain,
+    ip: clientIp(request),
+    consent_at: new Date().toISOString(),
+    product,
+    locale: loc,
+    kind: "checkout",
+    withdrawal: "1",
+    withdrawal_version: WITHDRAWAL_CONSENT_VERSION,
+    vop: vop ? "1" : "",
+    vop_version: vop ? VOP_VERSION : "",
+  });
 }
 
 const PAID_THANKS_COPY = {
@@ -2412,19 +2522,9 @@ function checkoutOfferPage({
         </span>
       </label>`
     : "";
-  const payDisabled = isAuto ? " disabled" : "";
-  const payScript = isAuto
-    ? `<script>
-    (function () {
-      var cb = document.getElementById("vop-consent");
-      var btn = document.getElementById("pay-btn");
-      if (!cb || !btn) return;
-      function sync() { btn.disabled = !cb.checked; }
-      cb.addEventListener("change", sync);
-      sync();
-    })();
-  </script>`
-    : "";
+  const withdrawalBlock = alreadyPaid ? "" : withdrawalConsentBlock(domain, email);
+  const payDisabled = alreadyPaid ? "" : " disabled";
+  const payScript = alreadyPaid ? "" : checkoutPayGateScript();
   const parsedIssues = parseCheckoutIssueTypes(issueTypes);
   const encodedIssues = parsedIssues.join(",");
   const findingsBlock = checkoutFindingsHtml({
@@ -2452,7 +2552,7 @@ function checkoutOfferPage({
     a { color: #16a34a; }
     .price { font-size: 1.35rem; font-weight: 800; color: #b45309; margin-bottom: 0.5rem; }
     .card { border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.25rem; background: #243044; }
-    label { display: flex; gap: 0.7rem; align-items: flex-start; color: #e2e8f0; font-size: 0.95rem; cursor: pointer; }
+    label { display: flex; gap: 0.7rem; align-items: flex-start; color: #e2e8f0; font-size: 0.95rem; cursor: pointer; margin-bottom: 0.85rem; }
     input[type="checkbox"] { margin-top: 0.3rem; width: 1.1rem; height: 1.1rem; flex-shrink: 0; }
     button { margin-top: 1.25rem; width: 100%; border: 0; border-radius: 8px; padding: 0.85rem 1rem; font-weight: 700; font-size: 1rem; background: #16a34a; color: #fff; cursor: pointer; }
     button:disabled { background: #475569; color: #cbd5e1; cursor: not-allowed; }
@@ -2482,6 +2582,7 @@ function checkoutOfferPage({
       <input type="hidden" name="tid" value="${escapeHtml(trackingId)}">
       ${issuesHidden}
       ${vopBlock}
+      ${withdrawalBlock}
       ${findingsBlock}
       <button type="submit" id="pay-btn"${payDisabled}>${escapeHtml(copy.pay)}</button>
     </form>`}
@@ -2555,7 +2656,7 @@ function subscriptionOfferPage({
     a { color: #16a34a; }
     .price { font-size: 1.35rem; font-weight: 800; color: #b45309; margin-bottom: 0.5rem; }
     .card { border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.25rem; background: #243044; }
-    label { display: flex; gap: 0.7rem; align-items: flex-start; color: #e2e8f0; font-size: 0.95rem; cursor: pointer; }
+    label { display: flex; gap: 0.7rem; align-items: flex-start; color: #e2e8f0; font-size: 0.95rem; cursor: pointer; margin-bottom: 0.85rem; }
     label.field { flex-direction: column; gap: 0.35rem; margin-bottom: 0.85rem; cursor: default; }
     input[type="checkbox"] { margin-top: 0.3rem; width: 1.1rem; height: 1.1rem; flex-shrink: 0; }
     input[type="text"], input[type="email"] { width: 100%; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 0.65rem 0.75rem; background: #1a2332; color: #fff; font-size: 1rem; }
@@ -2589,19 +2690,11 @@ function subscriptionOfferPage({
           <a href="${VOP_AUTOFIX_SECTION_URL}" target="_blank" rel="noopener">${escapeHtml(copy.vopArticle)}</a>
         </span>
       </label>
+      ${withdrawalConsentBlock(domain, email)}
       <button type="submit" id="pay-btn" disabled>${escapeHtml(copy.pay)}</button>
     </form>
   </div>
-  <script>
-    (function () {
-      var cb = document.getElementById("vop-consent");
-      var btn = document.getElementById("pay-btn");
-      if (!cb || !btn) return;
-      function sync() { btn.disabled = !cb.checked; }
-      cb.addEventListener("change", sync);
-      sync();
-    })();
-  </script>
+  ${checkoutPayGateScript()}
 </body>
 </html>`;
   return new Response(html, {
@@ -2613,15 +2706,17 @@ function subscriptionOfferPage({
   });
 }
 
-async function handleSubscriptionCheckout(request, env, { plan, domain, email, consent, tid }) {
+async function handleSubscriptionCheckout(request, env, { plan, domain, email, consent, withdrawal, tid }) {
   const copy = checkoutCopy(domain, email);
   const spec = SUBSCRIPTION_PLANS[plan];
   const consented = isVopConsented(consent);
+  const withdrawn = isVopConsented(withdrawal);
   const domainOk = Boolean(String(domain || "").trim());
   const emailOk = Boolean(email && EMAIL_RE.test(email));
-  if (request.method !== "POST" || !consented || !domainOk || !emailOk) {
+  if (request.method !== "POST" || !consented || !withdrawn || !domainOk || !emailOk) {
     let errorMessage = "";
-    if (request.method === "POST" && !consented) errorMessage = copy.vopError;
+    if (request.method === "POST" && !withdrawn) errorMessage = copy.withdrawalError;
+    else if (request.method === "POST" && !consented) errorMessage = copy.vopError;
     else if (request.method === "POST" && !domainOk) errorMessage = copy.domainError;
     return subscriptionOfferPage({
       product: plan,
@@ -2641,13 +2736,11 @@ async function handleSubscriptionCheckout(request, env, { plan, domain, email, c
   }
 
   try {
-    await dispatchGithubEvent(env, "wp-vop-consent", {
+    await persistCheckoutConsent(env, request, {
       email,
       domain,
-      ip: clientIp(request),
-      vop_version: VOP_VERSION,
-      consent_at: new Date().toISOString(),
       product: plan,
+      vop: true,
     });
   } catch (err) {
     console.error("vop_consent_dispatch_failed", err);
@@ -2668,6 +2761,8 @@ async function handleSubscriptionCheckout(request, env, { plan, domain, email, c
   body.set("metadata[domain]", domain);
   body.set("metadata[vop_consent]", "1");
   body.set("metadata[vop_version]", VOP_VERSION);
+  body.set("metadata[withdrawal_consent]", "1");
+  body.set("metadata[withdrawal_consent_version]", WITHDRAWAL_CONSENT_VERSION);
   body.set("metadata[locale]", copy.lang);
   body.set("subscription_data[metadata][product]", plan);
   body.set("subscription_data[metadata][plan]", plan);
@@ -2713,6 +2808,7 @@ async function handleCheckout(request, env) {
   let domain = String(url.searchParams.get("domain") || "").trim();
   let email = String(url.searchParams.get("email") || "").trim().toLowerCase();
   let consent = "";
+  let withdrawal = "";
   let tid = String(url.searchParams.get("tid") || "").trim();
   let issues = String(url.searchParams.get("i") || url.searchParams.get("issues") || "").trim();
 
@@ -2722,6 +2818,7 @@ async function handleCheckout(request, env) {
     domain = String(form.get("domain") || domain).trim();
     email = String(form.get("email") || email).trim().toLowerCase();
     consent = String(form.get("vop_consent") || "").trim();
+    withdrawal = String(form.get("withdrawal_consent") || "").trim();
     tid = String(form.get("tid") || tid).trim();
     issues = String(form.get("i") || form.get("issues") || issues).trim();
   }
@@ -2736,6 +2833,7 @@ async function handleCheckout(request, env) {
       domain,
       email,
       consent,
+      withdrawal,
       tid,
     });
   }
@@ -2762,28 +2860,19 @@ async function handleCheckout(request, env) {
     }
   }
 
-  if (product === "wp_autofix") {
-    const consented = isVopConsented(consent);
-    if (request.method !== "POST" || !consented) {
-      return checkoutOfferPage({
-        product,
-        domain,
-        email,
-        trackingId: tid,
-        issueTypes: issues,
-        errorMessage:
-          request.method === "POST" && !consented
-            ? copy.vopError
-            : "",
-      });
-    }
-  } else if (request.method !== "POST") {
+  const withdrawn = isVopConsented(withdrawal);
+  const vopOk = product !== "wp_autofix" || isVopConsented(consent);
+  if (request.method !== "POST" || !withdrawn || !vopOk) {
+    let errorMessage = "";
+    if (request.method === "POST" && !withdrawn) errorMessage = copy.withdrawalError;
+    else if (request.method === "POST" && !vopOk) errorMessage = copy.vopError;
     return checkoutOfferPage({
       product,
       domain,
       email,
       trackingId: tid,
       issueTypes: issues,
+      errorMessage,
     });
   }
 
@@ -2795,23 +2884,19 @@ async function handleCheckout(request, env) {
     });
   }
 
-  if (product === "wp_autofix") {
-    try {
-      await dispatchGithubEvent(env, "wp-vop-consent", {
-        email,
-        domain,
-        ip: clientIp(request),
-        vop_version: VOP_VERSION,
-        consent_at: new Date().toISOString(),
-        product,
-      });
-    } catch (err) {
-      console.error("vop_consent_dispatch_failed", err);
-      return new Response(copy.vopRecordFailed, {
-        status: 502,
-        headers: { "Content-Type": "text/plain; charset=utf-8" },
-      });
-    }
+  try {
+    await persistCheckoutConsent(env, request, {
+      email,
+      domain,
+      product,
+      vop: product === "wp_autofix",
+    });
+  } catch (err) {
+    console.error("vop_consent_dispatch_failed", err);
+    return new Response(copy.vopRecordFailed, {
+      status: 502,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
   }
 
   const amount = ONE_TIME_FIX_AMOUNT;
@@ -2829,6 +2914,8 @@ async function handleCheckout(request, env) {
   body.set("client_reference_id", product);
   body.set("metadata[product]", product);
   body.set("metadata[locale]", copy.lang);
+  body.set("metadata[withdrawal_consent]", "1");
+  body.set("metadata[withdrawal_consent_version]", WITHDRAWAL_CONSENT_VERSION);
   if (product === "wp_autofix") {
     body.set("metadata[vop_consent]", "1");
     body.set("metadata[vop_version]", VOP_VERSION);
@@ -3908,6 +3995,7 @@ function renderAdminHtml(snapshot, {
     <h2 style="font-size:1.05rem;margin:0 0 0.65rem;">E-mailové série</h2>
     <div class="series-grid">${seriesCards}</div>
     ${renderOrdersBox(orders, ordersError)}
+    ${renderDisputeEvidenceBox(snapshot)}
     ${renderSubscribersBox(snapshot)}
     ${renderWhyNotBuyBox(snapshot?.why_not_buy)}
     <div class="links">
@@ -5405,7 +5493,34 @@ async function handleReportViewPut(request, env) {
   return jsonResponse({ ok: true }, 200);
 }
 
-async function handleReportView(request, env) {
+async function recordReportViewAccess(env, request, token, payload) {
+  const ip = clientIp(request);
+  const cache = caches.default;
+  const debounceKey = new Request(
+    `https://report-view-access.gofixweb/${encodeURIComponent(token)}/${encodeURIComponent(ip || "na")}`,
+  );
+  try {
+    if (await cache.match(debounceKey)) return;
+    await cache.put(debounceKey, new Response("1"), { expirationTtl: 21600 });
+  } catch (err) {
+    console.error("report_view_access_cache_failed", err);
+  }
+  try {
+    await dispatchGithubEvent(env, "report-view-access", {
+      token,
+      kind: String(payload?.kind || ""),
+      domain: String(payload?.domain || ""),
+      email: String(payload?.email || ""),
+      ip,
+      user_agent: String(request.headers.get("User-Agent") || "").slice(0, 240),
+      at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("report_view_access_dispatch_failed", err);
+  }
+}
+
+async function handleReportView(request, env, ctx) {
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method Not Allowed", { status: 405 });
   }
@@ -5434,8 +5549,14 @@ async function handleReportView(request, env) {
     event: "report_view_access",
     kind: String(payload.kind || ""),
     token_prefix: token.slice(0, 8),
+    ip: clientIp(request),
     at: new Date().toISOString(),
   }));
+  if (ctx && typeof ctx.waitUntil === "function") {
+    ctx.waitUntil(recordReportViewAccess(env, request, token, payload));
+  } else {
+    await recordReportViewAccess(env, request, token, payload);
+  }
   const page = String(payload.html || "").trim();
   if (!page) {
     return new Response(reportViewExpiredHtml(lang), {
@@ -5757,7 +5878,7 @@ export default {
     }
 
     if (/^\/view\/[A-Za-z0-9_-]{32,64}$/.test(url.pathname)) {
-      return handleReportView(request, env);
+      return handleReportView(request, env, ctx);
     }
 
     if (/^\/report-view\/[A-Za-z0-9_-]{32,64}$/.test(url.pathname)) {
