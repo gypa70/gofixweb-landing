@@ -97,14 +97,15 @@
     <a class="brand" href="/wordpress-autofix/">
       <span class="brand-go">GoFix</span><span class="brand-web">Web</span>
     </a>
-    <p class="kicker">WordPress Autofix · onboarding</p>
+    <p class="kicker" id="kicker">WordPress Autofix · onboarding</p>
     <nav class="nav">
-      <a href="/wordpress-autofix/">Připojit e-shop</a>
-      <a href="/wordpress-autofix/navod/">Návod</a>
+      <a href="/wordpress-autofix/" id="nav-connect">Připojit e-shop</a>
+      <a href="/wordpress-autofix/navod/" id="nav-help">Návod</a>
     </nav>
+    <div id="paid-banner" class="banner banner-success hidden" role="status"></div>
     <div class="card">
-      <h1>Připojit WordPress e-shop</h1>
-      <p class="lede">
+      <h1 id="page-title">Připojit WordPress e-shop</h1>
+      <p class="lede" id="lede">
         Zadejte URL e-shopu, e-mail a Application Password. Nejdřív ověříme přístup
         k WordPress REST API, a teprve potom údaje uložíme šifrovaně.
       </p>
@@ -169,6 +170,66 @@
       var banner = document.getElementById("banner");
       var btn = document.getElementById("submit-btn");
       var params = new URLSearchParams(window.location.search);
+      var COPY = {
+        cs: {
+          title: "Připojení e-shopu · GoFixWeb",
+          kicker: "WordPress Autofix · onboarding",
+          navConnect: "Připojit e-shop",
+          navHelp: "Návod",
+          h1: "Připojit WordPress e-shop",
+          lede: "Zadejte URL e-shopu, e-mail a Application Password. Nejdřív ověříme přístup k WordPress REST API, a teprve potom údaje uložíme šifrovaně.",
+          submit: "Ověřit připojení",
+          verifying: "Ověřuji…",
+          paid: "Platba byla přijata, děkujeme. Na váš e-mail vám během chvíle přijde potvrzení s dalšími informacemi. Teď připojte WordPress e-shop.",
+          httpsError: "URL e-shopu musí začínat na https://.",
+          consentError: "Potvrďte souhlas s kroky automatické opravy.",
+          networkError: "Nelze se spojit s GoFixWeb serverem. Zkuste to znovu."
+        },
+        sk: {
+          title: "Pripojenie e-shopu · GoFixWeb",
+          kicker: "WordPress Autofix · onboarding",
+          navConnect: "Pripojiť e-shop",
+          navHelp: "Návod",
+          h1: "Pripojiť WordPress e-shop",
+          lede: "Zadajte URL e-shopu, e-mail a Application Password. Najprv overíme prístup k WordPress REST API a až potom údaje uložíme šifrovane.",
+          submit: "Overiť pripojenie",
+          verifying: "Overujem…",
+          paid: "Platba bola prijatá, ďakujeme. Na váš e-mail vám o chvíľu príde potvrdenie s ďalšími informáciami. Teraz pripojte WordPress e-shop.",
+          httpsError: "URL e-shopu musí začínať na https://.",
+          consentError: "Potvrďte súhlas s krokmi automatickej opravy.",
+          networkError: "Nedá sa spojiť so serverom GoFixWeb. Skúste to znova."
+        }
+      };
+      function detectLang() {
+        var lang = String(params.get("lang") || "").toLowerCase();
+        if (lang === "sk" || lang === "cs" || lang === "cz") return lang === "sk" ? "sk" : "cs";
+        var shopHint = params.get("shop") || params.get("site_url") || "";
+        try {
+          var host = new URL(/^https?:\/\//i.test(shopHint) ? shopHint : "https://" + shopHint).hostname;
+          if (host.endsWith(".sk")) return "sk";
+        } catch (err) { /* ignore */ }
+        return "cs";
+      }
+      var loc = detectLang();
+      var t = COPY[loc] || COPY.cs;
+      document.documentElement.lang = loc === "sk" ? "sk" : "cs";
+      document.title = t.title;
+      var kicker = document.getElementById("kicker");
+      if (kicker) kicker.textContent = t.kicker;
+      var navConnect = document.getElementById("nav-connect");
+      if (navConnect) navConnect.textContent = t.navConnect;
+      var navHelp = document.getElementById("nav-help");
+      if (navHelp) navHelp.textContent = t.navHelp;
+      var pageTitle = document.getElementById("page-title");
+      if (pageTitle) pageTitle.textContent = t.h1;
+      var lede = document.getElementById("lede");
+      if (lede) lede.textContent = t.lede;
+      if (btn) btn.textContent = t.submit;
+      var paidBanner = document.getElementById("paid-banner");
+      if (paidBanner && params.get("paid") === "1") {
+        paidBanner.className = "banner banner-success";
+        paidBanner.textContent = t.paid;
+      }
       var prefillEmail = params.get("email") || "";
       var prefillShop = params.get("shop") || params.get("site_url") || "";
       if (prefillEmail) document.getElementById("email").value = prefillEmail;
@@ -187,15 +248,15 @@
         e.preventDefault();
         var siteUrl = document.getElementById("site_url").value.trim();
         if (!/^https:\/\//i.test(siteUrl)) {
-          showBanner("error", "URL e-shopu musí začínat na https://.");
+          showBanner("error", t.httpsError);
           return;
         }
         if (!document.getElementById("consent_steps").checked) {
-          showBanner("error", "Potvrďte souhlas s kroky automatické opravy.");
+          showBanner("error", t.consentError);
           return;
         }
         btn.disabled = true;
-        btn.textContent = "Ověřuji…";
+        btn.textContent = t.verifying;
         fetch(API, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -234,11 +295,11 @@
             }
           })
           .catch(function () {
-            showBanner("error", "Nelze se spojit s GoFixWeb serverem. Zkuste to znovu.");
+            showBanner("error", t.networkError);
           })
           .finally(function () {
             btn.disabled = false;
-            btn.textContent = "Ověřit připojení";
+            btn.textContent = t.submit;
           });
       });
     })();

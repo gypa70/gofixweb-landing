@@ -19,6 +19,7 @@
  * GET /checkout — nabídka (manual_fix / wp_autofix jednorázově; basic/pro/premium
  *   měsíčně). POST spustí Stripe Checkout Session.
  * POST /stripe-webhook — checkout.session.completed (jednorázově) a invoice.paid
+ * GET  /paid — potvrzovací stránka po Stripe platbě (MANUÁL a předplatné, CZ/SK)
  *   / invoice.payment_failed / customer.subscription.deleted (předplatné).
  * POST /exit-intent — důvod odchodu z nabídky (price|trust|dismiss).
  * GET /survey/{id} — 48h thanks (price|trust|other) nebo 2h personalizované stránky
@@ -2063,6 +2064,177 @@ function checkoutCopy(domain, email) {
   return CHECKOUT_COPY[checkoutLocale(domain, email)] || CHECKOUT_COPY.cz;
 }
 
+const PAID_THANKS_COPY = {
+  cz: {
+    lang: "cs",
+    title: "Platba byla přijata — GoFixWeb",
+    heading: "Platba byla přijata",
+    thanks: "Děkujeme.",
+    body: "Na váš e-mail {email} vám během chvíle přijde potvrzení s dalšími informacemi.",
+    bodyNoEmail: "Na váš e-mail vám během chvíle přijde potvrzení s dalšími informacemi.",
+    manualNote: "Kompletní report s návodem připravujeme. Nic dalšího teď nemusíte vyplňovat.",
+    autoNote: "Další krok je připojení WordPress e-shopu, aby mohla automatická oprava začít.",
+    subNote: "Předplatné je aktivní. Připojte WordPress, ať můžeme spustit pravidelné scany a opravy.",
+    connectCta: "Připojit WordPress e-shop",
+    productManual: "Manuální oprava",
+    productAuto: "Automatická oprava",
+    slogan: "Pravidelný sken a optimalizace vašeho e-shopu",
+  },
+  sk: {
+    lang: "sk",
+    title: "Platba bola prijatá — GoFixWeb",
+    heading: "Platba bola prijatá",
+    thanks: "Ďakujeme.",
+    body: "Na váš e-mail {email} vám o chvíľu príde potvrdenie s ďalšími informáciami.",
+    bodyNoEmail: "Na váš e-mail vám o chvíľu príde potvrdenie s ďalšími informáciami.",
+    manualNote: "Kompletný report s návodom pripravujeme. Nič ďalšie teraz nemusíte vypĺňať.",
+    autoNote: "Ďalší krok je pripojenie WordPress e-shopu, aby mohla automatická oprava začať.",
+    subNote: "Predplatné je aktívne. Pripojte WordPress, aby sme mohli spustiť pravidelné skeny a opravy.",
+    connectCta: "Pripojiť WordPress e-shop",
+    productManual: "Manuálna oprava",
+    productAuto: "Automatická oprava",
+    slogan: "Pravidelný sken a optimalizácia vášho e-shopu",
+  },
+};
+
+function paidThanksLocale(lang, domain, email) {
+  const raw = String(lang || "").trim().toLowerCase();
+  if (raw === "sk" || raw === "cs" || raw === "cz") {
+    return raw === "sk" ? "sk" : "cz";
+  }
+  return checkoutLocale(domain, email);
+}
+
+function paidThanksKind(product) {
+  const key = String(product || "").trim().toLowerCase();
+  if (key === "wp_autofix") return "auto";
+  if (isSubscriptionPlan(key)) return "subscription";
+  return "manual";
+}
+
+function paidThanksSuccessUrl(origin, lang) {
+  const next = new URL("/paid", String(origin || "https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev"));
+  next.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
+  next.searchParams.set("lang", lang === "sk" ? "sk" : "cs");
+  return next.toString().replace(/%7BCHECKOUT_SESSION_ID%7D/gi, "{CHECKOUT_SESSION_ID}");
+}
+
+function autofixOnboardingSuccessUrl({ email = "", domain = "", lang = "cs" } = {}) {
+  const next = new URL(ONBOARDING_URL);
+  if (email && EMAIL_RE.test(email)) next.searchParams.set("email", email);
+  if (domain) {
+    const shop = /^https?:\/\//i.test(domain) ? domain : `https://${domain}`;
+    next.searchParams.set("shop", shop);
+  }
+  next.searchParams.set("paid", "1");
+  next.searchParams.set("lang", lang === "sk" ? "sk" : "cs");
+  return next.toString();
+}
+
+function renderPaidThanksHtml({
+  product = "manual_fix",
+  email = "",
+  domain = "",
+  lang = "",
+} = {}) {
+  const locale = paidThanksLocale(lang, domain, email);
+  const copy = PAID_THANKS_COPY[locale] || PAID_THANKS_COPY.cz;
+  const kind = paidThanksKind(product);
+  const safeEmail = String(email || "").trim();
+  const body = safeEmail
+    ? copy.body.replace("{email}", safeEmail)
+    : copy.bodyNoEmail;
+  let note = copy.manualNote;
+  let productLabel = copy.productManual;
+  if (kind === "auto") {
+    note = copy.autoNote;
+    productLabel = copy.productAuto;
+  } else if (kind === "subscription") {
+    const plan = String(product || "").trim();
+    const spec = SUBSCRIPTION_PLANS[plan] || {};
+    note = copy.subNote;
+    productLabel = spec.display ? `GoFixWeb ${spec.display}` : String(product || "").trim();
+  }
+  const connectHref = autofixOnboardingSuccessUrl({
+    email: safeEmail,
+    domain,
+    lang: copy.lang,
+  });
+  const connectHtml =
+    kind === "manual"
+      ? ""
+      : `<p style="margin:28px 0 0 0;"><a href="${escapeHtml(connectHref)}" style="display:inline-block;background:#16a34a;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:700;text-decoration:none;padding:12px 18px;border-radius:8px;">${escapeHtml(copy.connectCta)}</a></p>`;
+  const shop = String(domain || "").trim();
+  return `<!DOCTYPE html>
+<html lang="${escapeHtml(copy.lang)}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>${escapeHtml(copy.title)}</title>
+</head>
+<body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;background:#f8fafc;color:#1a2332;">
+  <div style="max-width:560px;margin:0 auto;padding:40px 16px 64px 16px;">
+    <div style="display:inline-block;background:#1a2332;padding:6px 12px;border-radius:8px;font-size:21px;font-weight:700;">
+      <span style="color:#ffffff;">GoFix</span><span style="color:#16a34a;">Web</span>
+    </div>
+    <div style="margin:6px 0 28px 0;font-size:14px;color:#64748b;">${escapeHtml(copy.slogan)}</div>
+    <h1 style="margin:0 0 8px 0;font-size:28px;line-height:1.25;">${escapeHtml(copy.heading)}</h1>
+    <p style="margin:0 0 16px 0;font-size:18px;font-weight:700;">${escapeHtml(copy.thanks)}</p>
+    ${productLabel ? `<p style="margin:0 0 8px 0;font-size:14px;color:#64748b;">${escapeHtml(productLabel)}${shop ? ` · ${escapeHtml(shop)}` : ""}</p>` : ""}
+    <p style="margin:0 0 12px 0;font-size:16px;line-height:1.55;">${escapeHtml(body)}</p>
+    <p style="margin:0;font-size:16px;line-height:1.55;color:#334155;">${escapeHtml(note)}</p>
+    ${connectHtml}
+  </div>
+</body>
+</html>`;
+}
+
+async function fetchCheckoutSessionForThanks(env, sessionId) {
+  const id = String(sessionId || "").trim();
+  if (!/^cs_[A-Za-z0-9_]+$/.test(id)) {
+    return null;
+  }
+  const live = await stripeGet(env, `checkout/sessions/${encodeURIComponent(id)}`, { testMode: false });
+  if (live && live.id) return live;
+  const test = await stripeGet(env, `checkout/sessions/${encodeURIComponent(id)}`, { testMode: true });
+  return test && test.id ? test : null;
+}
+
+async function handlePaidThanks(request, env) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const url = new URL(request.url);
+  let product = String(url.searchParams.get("product") || "").trim();
+  let email = String(url.searchParams.get("email") || "").trim().toLowerCase();
+  let domain = String(url.searchParams.get("domain") || "").trim();
+  let lang = String(url.searchParams.get("lang") || "").trim().toLowerCase();
+  const sessionId = String(url.searchParams.get("session_id") || "").trim();
+  if (sessionId) {
+    const session = await fetchCheckoutSessionForThanks(env, sessionId);
+    if (session) {
+      const meta = session.metadata && typeof session.metadata === "object" ? session.metadata : {};
+      product = String(meta.product || meta.plan || session.client_reference_id || product || "").trim();
+      domain = String(meta.domain || domain || "").trim();
+      const fromSession = String(
+        session.customer_email || session.customer_details?.email || "",
+      ).trim().toLowerCase();
+      if (fromSession && EMAIL_RE.test(fromSession)) email = fromSession;
+      if (!lang) lang = String(meta.locale || "").trim();
+    }
+  }
+  const html = renderPaidThanksHtml({ product, email, domain, lang });
+  return new Response(html, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex, nofollow",
+    },
+  });
+}
+
 const AUTO_WRITABLE_ISSUE_TYPES = new Set(["missing_title", "missing_meta"]);
 const SPEED_ISSUE_TYPES = new Set(["speed_critical", "speed_poor", "speed_average"]);
 const KNOWN_CHECKOUT_ISSUE_TYPES = new Set([
@@ -2485,15 +2657,10 @@ async function handleSubscriptionCheckout(request, env, { plan, domain, email, c
     });
   }
 
-  const next = new URL(ONBOARDING_URL);
-  next.searchParams.set("email", email);
-  const shop = /^https?:\/\//i.test(domain) ? domain : `https://${domain}`;
-  next.searchParams.set("shop", shop);
-
   const priceId = String(env[spec.priceEnv] || "").trim();
   const body = new URLSearchParams();
   body.set("mode", "subscription");
-  body.set("success_url", next.toString());
+  body.set("success_url", paidThanksSuccessUrl(new URL(request.url).origin, copy.lang));
   body.set("cancel_url", "https://gofixweb.com/#tarify");
   body.set("client_reference_id", plan);
   body.set("metadata[product]", plan);
@@ -2501,6 +2668,7 @@ async function handleSubscriptionCheckout(request, env, { plan, domain, email, c
   body.set("metadata[domain]", domain);
   body.set("metadata[vop_consent]", "1");
   body.set("metadata[vop_version]", VOP_VERSION);
+  body.set("metadata[locale]", copy.lang);
   body.set("subscription_data[metadata][product]", plan);
   body.set("subscription_data[metadata][plan]", plan);
   body.set("subscription_data[metadata][domain]", domain);
@@ -2649,16 +2817,10 @@ async function handleCheckout(request, env) {
   const amount = ONE_TIME_FIX_AMOUNT;
   const name = product === "manual_fix" ? copy.manualName : copy.autoName;
   const description = product === "manual_fix" ? copy.manualBlurb : copy.autoBlurb;
-  let successUrl = "https://gofixweb.com/";
-  if (product === "wp_autofix") {
-    const next = new URL(ONBOARDING_URL);
-    if (email && EMAIL_RE.test(email)) next.searchParams.set("email", email);
-    if (domain) {
-      const shop = /^https?:\/\//i.test(domain) ? domain : `https://${domain}`;
-      next.searchParams.set("shop", shop);
-    }
-    successUrl = next.toString();
-  }
+  const successUrl =
+    product === "wp_autofix"
+      ? autofixOnboardingSuccessUrl({ email, domain, lang: copy.lang })
+      : paidThanksSuccessUrl(new URL(request.url).origin, copy.lang);
 
   const body = new URLSearchParams();
   body.set("mode", "payment");
@@ -2666,6 +2828,7 @@ async function handleCheckout(request, env) {
   body.set("cancel_url", "https://gofixweb.com/");
   body.set("client_reference_id", product);
   body.set("metadata[product]", product);
+  body.set("metadata[locale]", copy.lang);
   if (product === "wp_autofix") {
     body.set("metadata[vop_consent]", "1");
     body.set("metadata[vop_version]", VOP_VERSION);
@@ -5562,6 +5725,10 @@ export default {
 
     if (url.pathname === "/checkout") {
       return handleCheckout(request, env);
+    }
+
+    if (url.pathname === "/paid" || url.pathname === "/paid/") {
+      return handlePaidThanks(request, env);
     }
 
     if (url.pathname === "/exit-intent") {
