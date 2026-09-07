@@ -43,6 +43,28 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: worker
 
+      - name: Dump Worker GitHub probe for report-view token
+        if: steps.cf.outputs.present == 'true'
+        env:
+          UNSUBSCRIBE_SECRET: ${{ secrets.UNSUBSCRIBE_SECRET }}
+          VIEW_TOKEN: WxwUPYLwcnt11-UtoFRhVoAaXtidTsrwebajGnEagVE
+        run: |
+          set -euo pipefail
+          HMAC=$(python3 - <<'PY'
+          import hmac, hashlib, os
+          print(hmac.new(os.environ["UNSUBSCRIBE_SECRET"].encode("utf-8"), f"report-view\n{os.environ['VIEW_TOKEN']}".encode("utf-8"), hashlib.sha256).hexdigest())
+          PY
+          )
+          echo "===== DEBUG REPORT VIEW HEADERS ====="
+          curl -sS -D - -o /tmp/dbg.json \
+            "https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev/debug-report-view/${VIEW_TOKEN}?t=${HMAC}"
+          echo "===== DEBUG REPORT VIEW BODY ====="
+          cat /tmp/dbg.json
+          echo
+          echo "===== /view TRACE HEADERS ====="
+          curl -sS -D - -o /tmp/view.html \
+            "https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev/view/${VIEW_TOKEN}"
+
       - name: Purge report-view CDN cache and Worker Cache API
         if: steps.cf.outputs.present == 'true'
         env:

@@ -5453,32 +5453,130 @@ function reportViewExpiredHtml(lang) {
   return `<!DOCTYPE html><html lang="${lang === "sk" ? "sk" : "cs"}"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>${title} — GoFixWeb</title></head><body style="font-family:Arial,Helvetica,sans-serif;padding:32px 16px;color:#1a2332;"><h1>${title}</h1><p>${body}</p></body></html>`;
 }
 
-async function fetchReportViewFromGithub(env, token) {
+function reportViewGithubUrl(env, token) {
   const repo = env.GITHUB_REPO || "gypa70/gofixweb-scanner";
-  const ghToken = env.GITHUB_TOKEN;
-  if (!ghToken) return null;
+  return {
+    repo,
+    url: `https://api.github.com/repos/${repo}/contents/data/report_views/${encodeURIComponent(token)}.json?ref=main`,
+  };
+}
+
+function summarizeReportViewPayload(payload) {
+  if (!payload || typeof payload !== "object") return null;
+  const html = String(payload.html || "");
+  return {
+    created_at: payload.created_at || null,
+    score: payload.score ?? null,
+    score_after: payload.score_after ?? null,
+    monthly_saving: payload.monthly_saving ?? null,
+    yearly_saving: payload.yearly_saving ?? null,
+    html_len: html.length,
+    html_has_skore: html.includes("SKÓRE PŘED OPRAVOU"),
+    html_excerpt: html.slice(1280, 1900),
+  };
+}
+
+function pickGithubDebugHeaders(res) {
+  const names = [
+    "etag",
+    "last-modified",
+    "cache-control",
+    "age",
+    "date",
+    "content-type",
+    "x-ratelimit-remaining",
+    "x-ratelimit-limit",
+    "x-github-request-id",
+    "x-github-media-type",
+    "cf-cache-status",
+    "cf-ray",
+  ];
+  const out = {};
+  for (const name of names) {
+    const value = res.headers.get(name);
+    if (value) out[name] = value;
+  }
+  return out;
+}
+
+function decodeGithubContentsWrapper(payload) {
+  if (!payload || typeof payload !== "object") return null;
+  if (payload.html || payload.score != null) return payload;
+  if (payload.encoding !== "base64" || typeof payload.content !== "string") return null;
   try {
-    const res = await fetch(
-      `https://api.github.com/repos/${repo}/contents/data/report_views/${encodeURIComponent(token)}.json?ref=main`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${ghToken}`,
-          Accept: "application/vnd.github.raw",
-          "User-Agent": "gofixweb-report-worker",
-          "Cache-Control": "no-store",
-          Pragma: "no-cache",
-          "X-Gofixweb-Bust": String(Date.now()),
-        },
-        cf: { cacheTtl: 0, cacheEverything: false },
-      },
-    );
-    if (!res.ok) return null;
-    const payload = await res.json();
-    return payload && typeof payload === "object" ? payload : null;
-  } catch (err) {
-    console.error("report_view_github_fetch_failed", err);
+    const text = atob(String(payload.content).replace(/\s/g, ""));
+    const decoded = JSON.parse(text);
+    return decoded && typeof decoded === "object" ? decoded : null;
+  } catch {
     return null;
+  }
+}
+
+async function inspectGithubReportView(env, token) {
+  const { repo, url } = reportViewGithubUrl(env, token);
+  const ghToken = String(env.GITHUB_TOKEN || "").trim();
+  const result = {
+    url,
+    repo,
+    ref: "main",
+    token_present: Boolean(ghToken),
+    token_len: ghToken.length,
+    http_status: 0,
+    github_headers: {},
+    parse_ok: false,
+    looks_like_contents_api_wrapper: false,
+    body_excerpt: "",
+    error: null,
+    raw: null,
+  };
+  if (!ghToken) {
+    result.error = "missing_GITHUB_TOKEN";
+    return result;
+  }
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${ghToken}`,
+        Accept: "application/vnd.github.raw",
+        "User-Agent": "gofixweb-report-worker",
+        "Cache-Control": "no-store",
+        Pragma: "no-cache",
+        "X-Gofixweb-Bust": String(Date.now()),
+      },
+      cf: { cacheTtl: 0, cacheEverything: false },
+    });
+    result.http_status = res.status;
+    result.github_headers = pickGithubDebugHeaders(res);
+    const text = await res.text();
+    result.body_excerpt = text.slice(0, 1200);
+    if (!res.ok) {
+      result.error = `github_http_${res.status}`;
+      return result;
+    }
+    const parsed = JSON.parse(text);
+    result.parse_ok = Boolean(parsed && typeof parsed === "object");
+    result.looks_like_contents_api_wrapper = Boolean(
+      parsed && parsed.encoding && parsed.content && parsed.html == null,
+    );
+    result.raw = result.looks_like_contents_api_wrapper
+      ? decodeGithubContentsWrapper(parsed)
+      : parsed;
+  } catch (err) {
+    result.error = String(err && err.message ? err.message : err);
+    console.error("report_view_github_fetch_failed", err);
+  }
+  return result;
+}
+
+async function inspectReportViewCacheKey(key) {
+  try {
+    const hit = await caches.default.match(key);
+    if (!hit) return { key, hit: false };
+    const payload = await hit.json();
+    return { key, hit: true, summary: summarizeReportViewPayload(payload) };
+  } catch {
+    return { key, hit: true, summary: null, parse_error: true };
   }
 }
 
@@ -5510,14 +5608,27 @@ async function rememberReportViewPayload(token, payload) {
 }
 
 async function fetchReportViewPayload(env, token) {
-  const github = await fetchReportViewFromGithub(env, token);
-  if (github) {
-    await rememberReportViewPayload(token, github);
-    return { payload: github, source: "github" };
+  const github = await inspectGithubReportView(env, token);
+  const raw = github && github.raw;
+  if (raw && typeof raw === "object") {
+    await rememberReportViewPayload(token, raw);
+    return { payload: raw, source: "github", github };
   }
   const cached = await fetchReportViewFromCache(token);
-  if (cached) return { payload: cached, source: "cache" };
-  return { payload: null, source: "miss" };
+  if (cached) return { payload: cached, source: "cache", github };
+  return { payload: null, source: "miss", github };
+}
+
+function reportViewTraceHeaders(loaded) {
+  const github = (loaded && loaded.github) || {};
+  const ghHeaders = github.github_headers || {};
+  return {
+    "X-Report-View-Source": String((loaded && loaded.source) || "miss"),
+    "X-Report-View-Cache-Key": REPORT_VIEW_CACHE_VER,
+    "X-Report-View-Github-Status": String(github.http_status || 0),
+    "X-Report-View-Github-Error": String(github.error || ""),
+    "X-Report-View-Github-Etag": String(ghHeaders.etag || ""),
+  };
 }
 
 async function handleReportViewPut(request, env) {
@@ -5624,18 +5735,27 @@ async function handleReportView(request, env, ctx) {
   const loaded = await fetchReportViewPayload(env, token);
   const payload = loaded && loaded.payload;
   const source = (loaded && loaded.source) || "miss";
+  const trace = reportViewTraceHeaders(loaded);
   const lang = String(url.searchParams.get("lang") || "").toLowerCase() === "sk" ? "sk" : "cs";
   if (!payload || typeof payload !== "object") {
     return new Response(reportViewExpiredHtml(lang), {
       status: 404,
-      headers: { "Content-Type": "text/html; charset=utf-8", "X-Robots-Tag": "noindex, nofollow" },
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "X-Robots-Tag": "noindex, nofollow",
+        ...trace,
+      },
     });
   }
   const expiresAt = Date.parse(String(payload.expires_at || ""));
   if (Number.isFinite(expiresAt) && expiresAt < Date.now()) {
     return new Response(reportViewExpiredHtml(payload.locale === "sk" ? "sk" : lang), {
       status: 410,
-      headers: { "Content-Type": "text/html; charset=utf-8", "X-Robots-Tag": "noindex, nofollow" },
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "X-Robots-Tag": "noindex, nofollow",
+        ...trace,
+      },
     });
   }
   console.log(JSON.stringify({
@@ -5654,7 +5774,11 @@ async function handleReportView(request, env, ctx) {
   if (!page) {
     return new Response(reportViewExpiredHtml(lang), {
       status: 404,
-      headers: { "Content-Type": "text/html; charset=utf-8", "X-Robots-Tag": "noindex, nofollow" },
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "X-Robots-Tag": "noindex, nofollow",
+        ...trace,
+      },
     });
   }
   return new Response(page, {
@@ -5663,10 +5787,39 @@ async function handleReportView(request, env, ctx) {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
       "X-Robots-Tag": "noindex, nofollow",
-      "X-Report-View-Source": source,
-      "X-Report-View-Cache-Key": REPORT_VIEW_CACHE_VER,
+      ...trace,
     },
   });
+}
+
+async function handleReportViewDebug(request, env) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const url = new URL(request.url);
+  const match = url.pathname.match(/^\/debug-report-view\/([A-Za-z0-9_-]{32,64})$/);
+  if (!match) return new Response("Not Found", { status: 404 });
+  const id = match[1];
+  const hmac = String(url.searchParams.get("t") || "").trim();
+  if (!REPORT_VIEW_TOKEN_RE.test(id) || !(await tokenMatchesTracking(env, `report-view\n${id}`, hmac))) {
+    return jsonResponse({ ok: false, error: "invalid" }, 401);
+  }
+  const loaded = await fetchReportViewPayload(env, id);
+  const cacheKeys = [reportViewCacheKey(id), ...reportViewLegacyCacheKeys(id)];
+  const cachesProbe = [];
+  for (const key of cacheKeys) {
+    cachesProbe.push(await inspectReportViewCacheKey(key));
+  }
+  const github = loaded && loaded.github ? { ...loaded.github, raw: undefined } : null;
+  if (github) delete github.raw;
+  return jsonResponse({
+    ok: true,
+    cache_ver: REPORT_VIEW_CACHE_VER,
+    source: (loaded && loaded.source) || "miss",
+    github,
+    served: summarizeReportViewPayload(loaded && loaded.payload),
+    caches: cachesProbe,
+  }, 200);
 }
 
 function surveyDataCacheKey(trackingId) {
@@ -5970,6 +6123,10 @@ export default {
         return new Response("Method Not Allowed", { status: 405 });
       }
       return handleResultScan(request, env);
+    }
+
+    if (/^\/debug-report-view\/[A-Za-z0-9_-]{32,64}$/.test(url.pathname)) {
+      return handleReportViewDebug(request, env);
     }
 
     if (/^\/view\/[A-Za-z0-9_-]{32,64}$/.test(url.pathname)) {
