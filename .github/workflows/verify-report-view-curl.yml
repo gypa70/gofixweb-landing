@@ -137,12 +137,17 @@ jobs:
           text = raw.decode("utf-8", "replace")
           Path("dump/body500.txt").write_text(text[:500], encoding="utf-8")
           Path("dump/body-len.txt").write_text(str(len(raw)), encoding="utf-8")
-          print("===== BODY FIRST 500 CHARACTERS =====")
-          print(text[:500], end="")
+          print("===== /view FULL BODY =====")
+          print(text, end="")
           print()
-          print("===== END BODY =====")
+          print("===== END /view FULL BODY =====")
           print("body_bytes", len(raw))
           print("body_chars", len(text))
+          assert "<!--gfw-view" in text, text[:400]
+          assert "SKÓRE PŘED OPRAVOU" in text, text[:800]
+          assert "58" in text and "71" in text
+          compact = text.replace("\xa0", "").replace(" ", "")
+          assert "2600" in compact and "31200" in compact
           PY
 
       - uses: actions/upload-artifact@v4

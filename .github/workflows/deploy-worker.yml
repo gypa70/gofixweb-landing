@@ -43,6 +43,10 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: worker
 
+      - name: Wait for Worker script to reach all colos
+        if: steps.cf.outputs.present == 'true'
+        run: sleep 8
+
       - name: Dump Worker GitHub probe for report-view token
         if: steps.cf.outputs.present == 'true'
         env:
@@ -129,17 +133,18 @@ jobs:
           from pathlib import Path
           hdr = Path("/tmp/rv.hdr").read_text(encoding="utf-8", errors="replace")
           html = Path("/tmp/rv.html").read_text(encoding="utf-8", errors="replace")
-          print("===== BODY FIRST 500 CHARACTERS =====")
-          print(html[:500], end="")
+          print("===== /view FULL BODY =====")
+          print(html, end="")
           print()
-          print("===== END BODY =====")
+          print("===== END /view FULL BODY =====")
           src = next((line.split(":", 1)[1].strip() for line in hdr.splitlines() if line.lower().startswith("x-report-view-source:")), "")
           cache_key = next((line.split(":", 1)[1].strip() for line in hdr.splitlines() if line.lower().startswith("x-report-view-cache-key:")), "")
           print("x-report-view-source", src)
           print("x-report-view-cache-key", cache_key)
           assert src == "github", hdr
           assert cache_key == "v2", hdr
-          assert "SKÓRE PŘED OPRAVOU" in html, html[:500]
+          assert "<!--gfw-view" in html, html[:400]
+          assert "SKÓRE PŘED OPRAVOU" in html, html[:800]
           assert "58" in html and "71" in html
           compact = html.replace("\xa0", "").replace(" ", "")
           assert "2600" in compact and "31200" in compact, compact[:800]

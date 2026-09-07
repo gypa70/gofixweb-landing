@@ -5631,6 +5631,50 @@ function reportViewTraceHeaders(loaded) {
   };
 }
 
+function stampReportViewHtml(loaded) {
+  const html = String((loaded && loaded.payload && loaded.payload.html) || "").trim();
+  if (!html) return "";
+  const github = (loaded && loaded.github) || {};
+  const etag = String((github.github_headers && github.github_headers.etag) || "").replace(/[^\w".=-]/g, "");
+  const stamp = `<!--gfw-view source=${String((loaded && loaded.source) || "miss")} cache=${REPORT_VIEW_CACHE_VER} gh=${github.http_status || 0} etag=${etag}-->`;
+  if (/^<!DOCTYPE/i.test(html)) {
+    const nl = html.indexOf("\n");
+    if (nl >= 0) return `${html.slice(0, nl + 1)}${stamp}\n${html.slice(nl + 1)}`;
+  }
+  return `${stamp}\n${html}`;
+}
+
+function buildReportViewPageResponse(loaded, lang) {
+  const payload = loaded && loaded.payload;
+  const trace = reportViewTraceHeaders(loaded);
+  const htmlHeaders = {
+    "Content-Type": "text/html; charset=utf-8",
+    "X-Robots-Tag": "noindex, nofollow",
+    ...trace,
+  };
+  if (!payload || typeof payload !== "object") {
+    return new Response(reportViewExpiredHtml(lang), { status: 404, headers: htmlHeaders });
+  }
+  const expiresAt = Date.parse(String(payload.expires_at || ""));
+  if (Number.isFinite(expiresAt) && expiresAt < Date.now()) {
+    return new Response(reportViewExpiredHtml(payload.locale === "sk" ? "sk" : lang), {
+      status: 410,
+      headers: htmlHeaders,
+    });
+  }
+  const page = stampReportViewHtml(loaded);
+  if (!page) {
+    return new Response(reportViewExpiredHtml(lang), { status: 404, headers: htmlHeaders });
+  }
+  return new Response(page, {
+    status: 200,
+    headers: {
+      ...htmlHeaders,
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
 async function handleReportViewPut(request, env) {
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -5721,75 +5765,25 @@ async function handleReportView(request, env, ctx) {
     return new Response("Not Found", { status: 404 });
   }
   const token = match[1];
-  if (ctx && typeof ctx.waitUntil === "function") {
-    ctx.waitUntil((async () => {
-      for (const key of reportViewLegacyCacheKeys(token)) {
-        try {
-          await caches.default.delete(key);
-        } catch (err) {
-          console.error("report_view_legacy_delete_failed", err);
-        }
-      }
-    })());
-  }
   const loaded = await fetchReportViewPayload(env, token);
-  const payload = loaded && loaded.payload;
-  const source = (loaded && loaded.source) || "miss";
-  const trace = reportViewTraceHeaders(loaded);
   const lang = String(url.searchParams.get("lang") || "").toLowerCase() === "sk" ? "sk" : "cs";
-  if (!payload || typeof payload !== "object") {
-    return new Response(reportViewExpiredHtml(lang), {
-      status: 404,
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "X-Robots-Tag": "noindex, nofollow",
-        ...trace,
-      },
-    });
+  const response = buildReportViewPageResponse(loaded, lang);
+  if (response.status === 200) {
+    const payload = loaded && loaded.payload;
+    console.log(JSON.stringify({
+      event: "report_view_access",
+      kind: String(payload && payload.kind || ""),
+      token_prefix: token.slice(0, 8),
+      ip: clientIp(request),
+      at: new Date().toISOString(),
+    }));
+    if (ctx && typeof ctx.waitUntil === "function") {
+      ctx.waitUntil(recordReportViewAccess(env, request, token, payload));
+    } else {
+      await recordReportViewAccess(env, request, token, payload);
+    }
   }
-  const expiresAt = Date.parse(String(payload.expires_at || ""));
-  if (Number.isFinite(expiresAt) && expiresAt < Date.now()) {
-    return new Response(reportViewExpiredHtml(payload.locale === "sk" ? "sk" : lang), {
-      status: 410,
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "X-Robots-Tag": "noindex, nofollow",
-        ...trace,
-      },
-    });
-  }
-  console.log(JSON.stringify({
-    event: "report_view_access",
-    kind: String(payload.kind || ""),
-    token_prefix: token.slice(0, 8),
-    ip: clientIp(request),
-    at: new Date().toISOString(),
-  }));
-  if (ctx && typeof ctx.waitUntil === "function") {
-    ctx.waitUntil(recordReportViewAccess(env, request, token, payload));
-  } else {
-    await recordReportViewAccess(env, request, token, payload);
-  }
-  const page = String(payload.html || "").trim();
-  if (!page) {
-    return new Response(reportViewExpiredHtml(lang), {
-      status: 404,
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "X-Robots-Tag": "noindex, nofollow",
-        ...trace,
-      },
-    });
-  }
-  return new Response(page, {
-    status: 200,
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "no-store",
-      "X-Robots-Tag": "noindex, nofollow",
-      ...trace,
-    },
-  });
+  return response;
 }
 
 async function handleReportViewDebug(request, env) {
@@ -5805,6 +5799,7 @@ async function handleReportViewDebug(request, env) {
     return jsonResponse({ ok: false, error: "invalid" }, 401);
   }
   const loaded = await fetchReportViewPayload(env, id);
+  const viewHtml = stampReportViewHtml(loaded);
   const cacheKeys = [reportViewCacheKey(id), ...reportViewLegacyCacheKeys(id)];
   const cachesProbe = [];
   for (const key of cacheKeys) {
@@ -5818,6 +5813,11 @@ async function handleReportViewDebug(request, env) {
     source: (loaded && loaded.source) || "miss",
     github,
     served: summarizeReportViewPayload(loaded && loaded.payload),
+    view: {
+      html_len: viewHtml.length,
+      html_has_skore: viewHtml.includes("SKÓRE PŘED OPRAVOU"),
+      stamp: (viewHtml.match(/<!--gfw-view[^>]*-->/) || [""])[0],
+    },
     caches: cachesProbe,
   }, 200);
 }
