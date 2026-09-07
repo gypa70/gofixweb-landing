@@ -1,0 +1,133 @@
+name: Verify report-view curl dump
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: "Label written into the dump (e.g. before-purge / after-purge)"
+        required: true
+        default: "ad-hoc"
+      purge:
+        description: "If true, purge CF zone cache and Worker Cache API before curling"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  curl-dump:
+    runs-on: ubuntu-latest
+    env:
+      VIEW_URL: https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev/view/WxwUPYLwcnt11-UtoFRhVoAaXtidTsrwebajGnEagVE
+      VIEW_TOKEN: WxwUPYLwcnt11-UtoFRhVoAaXtidTsrwebajGnEagVE
+    steps:
+      - name: Dump runner identity
+        run: |
+          set -euo pipefail
+          echo "label=${{ inputs.label }}"
+          echo "purge=${{ inputs.purge }}"
+          curl -sS --max-time 15 https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev/cdn-cgi/trace || true
+          echo "runner=$(uname -a)"
+
+      - name: Purge Cloudflare CDN cache by URL
+        if: ${{ inputs.purge }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p dump
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ]; then
+            echo "CLOUDFLARE_API_TOKEN missing" | tee dump/cf-purge.json
+            exit 0
+          fi
+          python3 - <<'PY'
+          import json, os, urllib.request
+          token = os.environ["CLOUDFLARE_API_TOKEN"]
+          view = os.environ["VIEW_URL"]
+          req = urllib.request.Request(
+              "https://api.cloudflare.com/client/v4/zones?per_page=50",
+              headers={"Authorization": f"Bearer {token}", "User-Agent": "gofixweb-gha-purge"},
+          )
+          zones = json.load(urllib.request.urlopen(req, timeout=30))
+          results = {"zones": [], "purges": []}
+          for zone in zones.get("result") or []:
+              results["zones"].append({"id": zone.get("id"), "name": zone.get("name")})
+              body = json.dumps({"files": [view]}).encode()
+              preq = urllib.request.Request(
+                  f"https://api.cloudflare.com/client/v4/zones/{zone['id']}/purge_cache",
+                  data=body,
+                  method="POST",
+                  headers={
+                      "Authorization": f"Bearer {token}",
+                      "Content-Type": "application/json",
+                      "User-Agent": "gofixweb-gha-purge",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(preq, timeout=30) as resp:
+                      payload = json.load(resp)
+                      results["purges"].append({"zone": zone.get("name"), "http": resp.status, "body": payload})
+              except Exception as exc:
+                  err_body = ""
+                  if getattr(exc, "read", None):
+                      try:
+                          err_body = exc.read().decode("utf-8", "replace")
+                      except Exception:
+                          err_body = str(exc)
+                  results["purges"].append({"zone": zone.get("name"), "error": str(exc), "body": err_body})
+          Path = __import__("pathlib").Path
+          Path("dump/cf-purge.json").write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+          print(json.dumps(results, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Purge Worker Cache API for this token
+        if: ${{ inputs.purge }}
+        env:
+          UNSUBSCRIBE_SECRET: ${{ secrets.UNSUBSCRIBE_SECRET }}
+        run: |
+          set -euo pipefail
+          mkdir -p dump
+          if [ -z "${UNSUBSCRIBE_SECRET}" ]; then
+            echo "UNSUBSCRIBE_SECRET missing" | tee dump/worker-purge.txt
+            exit 0
+          fi
+          HMAC=$(python3 - <<'PY'
+          import hmac, hashlib, os
+          secret = os.environ["UNSUBSCRIBE_SECRET"].encode("utf-8")
+          token = os.environ["VIEW_TOKEN"]
+          print(hmac.new(secret, f"report-view\n{token}".encode("utf-8"), hashlib.sha256).hexdigest())
+          PY
+          )
+          curl -sS -D dump/worker-purge-headers.txt -o dump/worker-purge-body.txt \
+            -X POST "https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev/report-view/${VIEW_TOKEN}/purge?t=${HMAC}" \
+            -A "gofixweb-gha-purge" || true
+          echo "===== WORKER PURGE HEADERS ====="
+          cat dump/worker-purge-headers.txt
+          echo "===== WORKER PURGE BODY ====="
+          cat dump/worker-purge-body.txt
+
+      - name: Raw curl dump
+        run: |
+          set -euo pipefail
+          mkdir -p dump
+          echo "===== RAW CURL STDOUT (headers via -D -) =====" | tee dump/combined.txt
+          curl -sS -D - -o dump/output.html "$VIEW_URL" | tee dump/headers.txt | tee -a dump/combined.txt
+          echo "===== END HEADERS =====" | tee -a dump/combined.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          raw = Path("dump/output.html").read_bytes()
+          text = raw.decode("utf-8", "replace")
+          Path("dump/body500.txt").write_text(text[:500], encoding="utf-8")
+          Path("dump/body-len.txt").write_text(str(len(raw)), encoding="utf-8")
+          print("===== BODY FIRST 500 CHARACTERS =====")
+          print(text[:500], end="")
+          print()
+          print("===== END BODY =====")
+          print("body_bytes", len(raw))
+          print("body_chars", len(text))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: report-view-curl-${{ inputs.label }}
+          path: dump/
+          if-no-files-found: error
