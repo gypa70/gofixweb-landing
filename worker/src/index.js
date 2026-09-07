@@ -4424,9 +4424,11 @@ async function rememberDeletedLeadId(id) {
   await caches.default.put(
     DELETED_LEADS_CACHE,
     new Response(JSON.stringify({ ids }), {
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": `public, max-age=${DELETED_LEADS_TTL}`,
+      },
     }),
-    { expirationTtl: DELETED_LEADS_TTL },
   );
 }
 
@@ -4434,9 +4436,12 @@ async function applyDeletedLandingLeads(snapshot) {
   const ids = new Set(await listDeletedLeadIds());
   const raw = snapshot && snapshot.landing_leads;
   if (!raw || !Array.isArray(raw.rows) || !ids.size) return snapshot;
+  const rows = raw.rows.filter((row) => !ids.has(String(row.id || "")));
   snapshot.landing_leads = {
     ...raw,
-    rows: raw.rows.filter((row) => !ids.has(String(row.id || ""))),
+    rows,
+    new: rows.filter((row) => String(row.status || "new").toLowerCase() !== "handled").length,
+    handled: rows.filter((row) => String(row.status || "").toLowerCase() === "handled").length,
   };
   return snapshot;
 }
@@ -4472,6 +4477,18 @@ async function handleAdminLandingLeadDelete(request, env) {
     return fail("Poptávku se nepodařilo smazat v GitHub Actions.", 502);
   }
   await rememberDeletedLeadId(leadId);
+  try {
+    const cached = await readJsonCache(ADMIN_SNAPSHOT_CACHE);
+    if (cached) {
+      await putJsonCache(
+        ADMIN_SNAPSHOT_CACHE,
+        await applyDeletedLandingLeads(cached),
+        ADMIN_PAGE_CACHE_TTL_SEC,
+      );
+    }
+  } catch (err) {
+    console.error("admin_snapshot_cache_delete_overlay_failed", err);
+  }
   return jsonResponse({ ok: true, id: leadId });
 }
 
