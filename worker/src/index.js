@@ -5097,6 +5097,7 @@ const SURVEY_PAGE_COPY = {
     shareLead: "Tuto stránku můžete přeposlat kolegovi, nebo ji vytisknout / uložit jako PDF.",
     sharePrint: "Tisk / uložit PDF",
     sharePrice: "Jednorázová cena",
+    years: "Odhadovaná ztráta za rok",
   },
   sk: {
     findingsTitle: "Čo nálezy znamenajú",
@@ -5161,12 +5162,28 @@ const SURVEY_PAGE_COPY = {
     shareLead: "Túto stránku môžete preposlať kolegovi, alebo ju vytlačiť / uložiť ako PDF.",
     sharePrint: "Tlač / uložiť PDF",
     sharePrice: "Jednorazová cena",
+    years: "Odhadovaná strata za rok",
   },
 };
 
 function fmtSurveyCzk(value) {
   const n = Math.round(Number(value) || 0);
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0");
+}
+
+function surveyMonthlyLoss(data) {
+  const findings = Array.isArray(data?.findings) ? data.findings : [];
+  const summed = findings.reduce((n, item) => n + (Number(item?.monthly_loss) || 0), 0);
+  const direct = Number(data?.monthly_loss);
+  const alt = Number(data?.total_monthly_loss_czk || data?.monthly_loss_czk);
+  const best = [direct, summed, alt].filter((n) => Number.isFinite(n) && n > 0);
+  return best.length ? Math.round(Math.max(...best)) : 0;
+}
+
+function surveyYearlyLoss(data) {
+  const yearly = Number(data?.yearly_loss);
+  if (Number.isFinite(yearly) && yearly > 0) return Math.round(yearly);
+  return surveyMonthlyLoss(data) * 12;
 }
 
 function surveyPageShell(lang, title, inner) {
@@ -5250,14 +5267,14 @@ function surveyExplainHtml(reason, payload, lang) {
         <tr><td style="padding:0 0 8px 0;">${escapeHtml(copy.speed)}: <strong>${data.speed_score == null ? "—" : escapeHtml(String(data.speed_score))}/100</strong></td></tr>
         <tr><td style="padding:0 0 16px 0;">${escapeHtml(copy.overall)}: <strong>${data.overall_score == null ? "—" : escapeHtml(String(data.overall_score))}/100</strong></td></tr>
         <tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows}</table></td></tr>
-        <tr><td style="padding:16px 0 8px 0;color:${MONEY_AMBER};font-size:18px;font-weight:700;">${escapeHtml(copy.totalLoss)}: ${fmtSurveyCzk(data.monthly_loss)} ${escapeHtml(copy.perMonth)}</td></tr>
+        <tr><td style="padding:16px 0 8px 0;color:${MONEY_AMBER};font-size:18px;font-weight:700;">${escapeHtml(copy.totalLoss)}: ${fmtSurveyCzk(surveyMonthlyLoss(data))} ${escapeHtml(copy.perMonth)}</td></tr>
         ${surveyCtaRow(data, copy)}`;
     return surveyPageShell(lang, copy.lossTitle, inner);
   }
   const priority = data.priority || findings[0];
   const inner = `<tr><td style="padding:0 0 8px 0;font-size:22px;font-weight:700;">${escapeHtml(copy.priceTitle)}</td></tr>
         <tr><td style="padding:0 0 12px 0;font-size:16px;">${escapeHtml(copy.priceLabel)}: <strong style="color:${MONEY_AMBER};">${fmtSurveyCzk(data.manual_price)} Kč</strong></td></tr>
-        <tr><td style="padding:0 0 16px 0;font-size:16px;">${escapeHtml(copy.months)}: <strong style="color:${MONEY_AMBER};">${fmtSurveyCzk(data.monthly_loss)} ${escapeHtml(copy.perMonth)}</strong></td></tr>
+        <tr><td style="padding:0 0 16px 0;font-size:16px;">${escapeHtml(copy.months)}: <strong style="color:${MONEY_AMBER};">${fmtSurveyCzk(surveyMonthlyLoss(data))} ${escapeHtml(copy.perMonth)}</strong></td></tr>
         ${priority ? `<tr><td style="padding:0 0 16px 0;font-size:16px;line-height:1.5;border-left:4px solid #dc2626;padding-left:12px;"><strong>${escapeHtml(copy.priority)}:</strong> ${escapeHtml(priority.title || "")} (${fmtSurveyCzk(priority.monthly_loss)} ${escapeHtml(copy.perMonth)})</td></tr>` : ""}
         ${surveyCtaRow(data, copy)}`;
   return surveyPageShell(lang, copy.priceTitle, inner);
@@ -5394,7 +5411,8 @@ function surveyClickPageHtml(reason, payload, lang, trackingId) {
         <tr><td style="padding:0 0 12px 0;font-size:16px;line-height:1.5;">${escapeHtml(copy.shareLead)}</td></tr>
         <tr><td style="padding:0 0 16px 0;"><button type="button" onclick="window.print()" style="border:0;border-radius:8px;padding:10px 16px;background:#1a2332;color:#fff;font-weight:700;cursor:pointer;">${escapeHtml(copy.sharePrint)}</button></td></tr>
         <tr><td style="padding:0 0 8px 0;">${escapeHtml(domain)}</td></tr>
-        <tr><td style="padding:0 0 8px 0;color:${MONEY_AMBER};font-weight:700;">${escapeHtml(copy.months)}: ${fmtSurveyCzk(data.monthly_loss)} Kč</td></tr>
+        <tr><td style="padding:0 0 8px 0;color:${MONEY_AMBER};font-weight:700;">${escapeHtml(copy.months)}: ${fmtSurveyCzk(surveyMonthlyLoss(data))} Kč</td></tr>
+        <tr><td style="padding:0 0 8px 0;color:${MONEY_AMBER};font-weight:700;">${escapeHtml(copy.years)}: ${fmtSurveyCzk(surveyYearlyLoss(data))} Kč</td></tr>
         <tr><td style="padding:0 0 16px 0;color:${MONEY_AMBER};font-weight:700;">${escapeHtml(copy.sharePrice)}: ${fmtSurveyCzk(data.manual_price || 1990)} Kč</td></tr>
         <tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows}</table></td></tr>
         ${surveyCtaRow(data, copy)}`;
