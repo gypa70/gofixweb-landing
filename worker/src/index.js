@@ -5080,7 +5080,7 @@ const SURVEY_PAGE_COPY = {
     variantManual: "MANUÁL — návod provedete sami",
     variantAuto: "AUTO — zapíšeme opravy do WordPressu",
     variantConfirm: "Dokončit platbu této varianty",
-    variantNoAuto: "Automatická oprava je jen pro WooCommerce. Tento e-shop proto nabízí MANUÁL.",
+    variantNoAuto: "Automatická oprava teď nic z těchto nálezů nezapíše. Nabízíme proto jen MANUÁL.",
     fearTitle: "Co automatická oprava mění",
     fearLead: "Zásah je omezený a vratný. Neměníme ceny, produkty ani vzhled homepage.",
     fearTitleSeo: "Titulek a popisek pro Google",
@@ -5144,7 +5144,7 @@ const SURVEY_PAGE_COPY = {
     variantManual: "MANUÁL — návod urobíte sami",
     variantAuto: "AUTO — zapíšeme opravy do WordPressu",
     variantConfirm: "Dokončiť platbu tejto varianty",
-    variantNoAuto: "Automatická oprava je len pre WooCommerce. Tento e-shop preto ponúka MANUÁL.",
+    variantNoAuto: "Automatická oprava teraz nič z týchto nálezov nezapíše. Ponúkame preto len MANUÁL.",
     fearTitle: "Čo automatická oprava mení",
     fearLead: "Zásah je obmedzený a vratný. Nemeníme ceny, produkty ani vzhľad homepage.",
     fearTitleSeo: "Titulok a popis pre Google",
@@ -5407,13 +5407,9 @@ function isWooPlatform(platform) {
 }
 
 function surveyAutoCheckoutUrl(data, domain, tid) {
-  const existing = String(data?.auto_checkout_url || "").trim();
-  if (existing) return existing;
-  if (!isWooPlatform(data?.platform)) return "";
-  const params = new URLSearchParams({ product: "wp_autofix" });
-  if (domain) params.set("domain", domain);
-  if (tid) params.set("tid", tid);
-  return `/checkout?${params.toString()}`;
+  // Empty auto_checkout_url means AUTO is not offered (speed-only / non-Woo).
+  // Do not reconstruct from platform — that put AUTO back on 2h/48h pages.
+  return String(data?.auto_checkout_url || "").trim();
 }
 
 function applyBankEnv(data, env) {
