@@ -374,10 +374,18 @@ async function handleLeadSubmit(request, env, origin) {
   );
 }
 
+const GITHUB_DISPATCH_MAX_KEYS = 10;
+
 async function dispatchGithubEvent(env, eventType, payload) {
   const repo = env.GITHUB_REPO || "gypa70/gofixweb-scanner";
   const token = env.GITHUB_TOKEN;
   if (!token) throw new Error("missing_github_token");
+  const keys = Object.keys(payload || {});
+  if (keys.length > GITHUB_DISPATCH_MAX_KEYS) {
+    throw new Error(
+      `github_dispatch_payload_too_many_keys:${eventType}:${keys.length}:${keys.join(",")}`,
+    );
+  }
 
   const res = await fetch(`https://api.github.com/repos/${repo}/dispatches`, {
     method: "POST",
@@ -2063,7 +2071,8 @@ const CHECKOUT_COPY = {
     alreadyPaid: "Tento nález už máte objednaný. Návod jsme poslali e-mailem — druhá platba není potřeba.",
     unknownProduct: "Neznámý produkt.",
     stripeMissing: "Stripe Checkout není nakonfigurovaný (STRIPE_SECRET_KEY).",
-    vopRecordFailed: "Souhlas se nepodařilo zaznamenat. Zkuste to znovu.",
+    vopRecordFailed:
+      "Souhlas je zaškrtnutý, ale evidenci (čas, IP, verze textu) se nepodařilo uložit. Zkuste platbu znovu za chvíli.",
     payFailed: "Nepodařilo se otevřít platbu. Zkuste to znovu.",
     stripeNoUrl: "Stripe Checkout nevrátil URL.",
     domainLabel: "URL e-shopu",
@@ -2108,7 +2117,8 @@ const CHECKOUT_COPY = {
     alreadyPaid: "Toto zistenie už máte objednané. Návod sme poslali e-mailom — druhá platba nie je potrebná.",
     unknownProduct: "Neznámy produkt.",
     stripeMissing: "Stripe Checkout nie je nakonfigurovaný (STRIPE_SECRET_KEY).",
-    vopRecordFailed: "Súhlas sa nepodarilo zaznamenať. Skúste to znova.",
+    vopRecordFailed:
+      "Súhlas je zaškrtnutý, ale evidenciu (čas, IP, verzia textu) sa nepodarilo uložiť. Skúste platbu znova o chvíľu.",
     payFailed: "Nepodarilo sa otvoriť platbu. Skúste to znova.",
     stripeNoUrl: "Stripe Checkout nevrátil URL.",
     domainLabel: "URL e-shopu",
@@ -2157,21 +2167,23 @@ function checkoutPayGateScript() {
   </script>`;
 }
 
-async function persistCheckoutConsent(env, request, { email, domain, product, vop }) {
+async function persistCheckoutConsent(env, request, { email, domain, product, vop, consentAt, ip }) {
   const loc = checkoutLocale(domain, email);
-  await dispatchGithubEvent(env, "wp-vop-consent", {
-    email,
-    domain,
-    ip: clientIp(request),
-    consent_at: new Date().toISOString(),
-    product,
+  // GitHub repository_dispatch: max 10 top-level keys. `kind` defaults to
+  // "checkout" in wp-vop-consent.yml — do not add an 11th field here.
+  const payload = {
+    email: email || "",
+    domain: domain || "",
+    ip: ip || clientIp(request),
+    consent_at: consentAt || new Date().toISOString(),
+    product: product || "",
     locale: loc,
-    kind: "checkout",
     withdrawal: "1",
     withdrawal_version: WITHDRAWAL_CONSENT_VERSION,
     vop: vop ? "1" : "",
     vop_version: vop ? VOP_VERSION : "",
-  });
+  };
+  await dispatchGithubEvent(env, "wp-vop-consent", payload);
 }
 
 const PAID_THANKS_COPY = {
@@ -2735,19 +2747,19 @@ async function handleSubscriptionCheckout(request, env, { plan, domain, email, c
     });
   }
 
+  const consentAt = new Date().toISOString();
+  const ip = clientIp(request);
   try {
     await persistCheckoutConsent(env, request, {
       email,
       domain,
       product: plan,
       vop: true,
+      consentAt,
+      ip,
     });
   } catch (err) {
-    console.error("vop_consent_dispatch_failed", err);
-    return new Response(copy.vopRecordFailed, {
-      status: 502,
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-    });
+    console.error("vop_consent_dispatch_failed", String(err && err.message ? err.message : err));
   }
 
   const priceId = String(env[spec.priceEnv] || "").trim();
@@ -2763,6 +2775,8 @@ async function handleSubscriptionCheckout(request, env, { plan, domain, email, c
   body.set("metadata[vop_version]", VOP_VERSION);
   body.set("metadata[withdrawal_consent]", "1");
   body.set("metadata[withdrawal_consent_version]", WITHDRAWAL_CONSENT_VERSION);
+  body.set("metadata[consent_at]", consentAt);
+  if (ip) body.set("metadata[consent_ip]", ip);
   body.set("metadata[locale]", copy.lang);
   body.set("subscription_data[metadata][product]", plan);
   body.set("subscription_data[metadata][plan]", plan);
@@ -2793,7 +2807,7 @@ async function handleSubscriptionCheckout(request, env, { plan, domain, email, c
   if (!response.ok) {
     const text = await response.text();
     console.error("stripe_subscription_checkout_failed", response.status, text);
-    return new Response(copy.payFailed, { status: 502 });
+    return new Response(`${copy.payFailed} (${response.status})`, { status: 502 });
   }
   const session = await response.json();
   if (!session.url) {
@@ -2884,19 +2898,19 @@ async function handleCheckout(request, env) {
     });
   }
 
+  const consentAt = new Date().toISOString();
+  const ip = clientIp(request);
   try {
     await persistCheckoutConsent(env, request, {
       email,
       domain,
       product,
       vop: product === "wp_autofix",
+      consentAt,
+      ip,
     });
   } catch (err) {
-    console.error("vop_consent_dispatch_failed", err);
-    return new Response(copy.vopRecordFailed, {
-      status: 502,
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-    });
+    console.error("vop_consent_dispatch_failed", String(err && err.message ? err.message : err));
   }
 
   const amount = ONE_TIME_FIX_AMOUNT;
@@ -2916,6 +2930,8 @@ async function handleCheckout(request, env) {
   body.set("metadata[locale]", copy.lang);
   body.set("metadata[withdrawal_consent]", "1");
   body.set("metadata[withdrawal_consent_version]", WITHDRAWAL_CONSENT_VERSION);
+  body.set("metadata[consent_at]", consentAt);
+  if (ip) body.set("metadata[consent_ip]", ip);
   if (product === "wp_autofix") {
     body.set("metadata[vop_consent]", "1");
     body.set("metadata[vop_version]", VOP_VERSION);
@@ -2943,7 +2959,7 @@ async function handleCheckout(request, env) {
   if (!response.ok) {
     const text = await response.text();
     console.error("stripe_checkout_create_failed", response.status, text);
-    return new Response(copy.payFailed, { status: 502 });
+    return new Response(`${copy.payFailed} (${response.status})`, { status: 502 });
   }
   const session = await response.json();
   if (!session.url) {
