@@ -2994,6 +2994,18 @@ const OUTREACH_SERIES = [
   { id: "vlna-1", name: "Vlna 1" },
   { id: "vlna-2", name: "Vlna 2" },
 ];
+const WAVE_GROUPS = [
+  { id: "nulte-kolo", name: "Nulté kolo", campaign: true },
+  { id: "vlna-1", name: "Vlna 1", campaign: true },
+  { id: "vlna-2", name: "Vlna 2", campaign: true },
+  { id: "ostatni", name: "Ostatní", campaign: true },
+  { id: "ops", name: "QC / testy", campaign: false },
+];
+const RESEND_FILTERS = [
+  { id: "all", label: "Celá skupina (bez bounce a odhlášených)" },
+  { id: "unopened", label: "Jen neotevřené" },
+  { id: "no_conversion", label: "Jen bez konverze" },
+];
 const MAX_BATCH = 20;
 const DEFAULT_BATCH = 5;
 const AUTO_INTERVAL_MIN = 30;
@@ -3634,6 +3646,118 @@ function adminTabButton(id, label, badgeHtml = "") {
   return `<button type="button" class="admin-tab" role="tab" id="tabbtn-${id}" data-tab="${id}" aria-controls="tab-${id}">${escapeHtml(label)}${badgeHtml}</button>`;
 }
 
+function waveFilterCount(wave, filterId) {
+  const filters = wave?.filters || {};
+  return Number(filters[filterId] ?? 0);
+}
+
+function resendEtaMinutes(count, batchSize) {
+  const n = Math.max(0, Number(count) || 0);
+  const size = Math.max(1, Math.min(MAX_BATCH, Number(batchSize) || DEFAULT_BATCH));
+  if (n <= 0) return 0;
+  const batches = Math.ceil(n / size);
+  return (batches - 1) * 5 + batches * 2;
+}
+
+function renderWaveKindBreakdown(wave) {
+  const kinds = wave?.kinds && typeof wave.kinds === "object" ? wave.kinds : {};
+  const entries = Object.entries(kinds).filter(([, n]) => Number(n) > 0);
+  if (!entries.length) {
+    return `<p class="hint">Rozpad podle typu e-mailu u historických odeslání není — pole se ukládá až od teď.</p>`;
+  }
+  const items = entries
+    .map(([kind, n]) => `<li><code>${escapeHtml(kind)}</code>: ${escapeHtml(n)}</li>`)
+    .join("");
+  return `<p class="hint">Typ e-mailu (jen nové logy s <code>email_kind</code>):</p><ul class="wave-kinds">${items}</ul>`;
+}
+
+function renderWaveEmailsSection(snapshot, { halted = false, runState = {} } = {}) {
+  const waves = Array.isArray(snapshot?.waves) ? snapshot.waves : [];
+  const byId = Object.fromEntries(waves.map((row) => [row.id, row]));
+  const nav = WAVE_GROUPS.map((def, idx) => {
+    const wave = byId[def.id] || { sent: 0 };
+    const cls = idx === 0 ? " is-active" : "";
+    return `<button type="button" class="wave-tab${cls}" data-wave="${escapeHtml(def.id)}" role="tab">${escapeHtml(def.name)}${adminTabBadge(wave.sent ?? 0)}</button>`;
+  }).join("");
+  const panels = WAVE_GROUPS.map((def, idx) => {
+    const wave = byId[def.id] || {
+      id: def.id,
+      name: def.name,
+      sent: 0,
+      bounced: 0,
+      bounce_rate: 0,
+      opened: 0,
+      open_rate: 0,
+      clicked: 0,
+      click_rate: 0,
+      conversions: 0,
+      contacts: 0,
+      filters: { all: 0, unopened: 0, no_conversion: 0 },
+      kinds: {},
+      campaign: def.campaign,
+      qc: !def.campaign,
+    };
+    const filterOpts = RESEND_FILTERS.map((item) => {
+      const n = waveFilterCount(wave, item.id);
+      return `<option value="${item.id}">${escapeHtml(item.label)} (${n})</option>`;
+    }).join("");
+    const allCount = waveFilterCount(wave, "all");
+    const campaignWave = def.campaign;
+    const block = campaignWave && halted
+      ? HALT_BLOCK_TEXT
+      : runState?.running
+        ? RUNNING_BLOCK_TEXT
+        : allCount <= 0
+          ? "V tomto filtru teď není koho znovu obeslat."
+          : "";
+    const disabled = Boolean(block);
+    const job = wave.resend_job;
+    const jobNote = job
+      ? `<p class="hint">Běží resend fronta: zbývá ${escapeHtml(job.pending ?? 0)} z ${escapeHtml(job.total ?? 0)} (filtr ${escapeHtml(job.filter_id || "all")}). Další dávka po cooldownu 5 min.</p>`
+      : "";
+    const qcNote = def.campaign
+      ? ""
+      : `<p class="hint">QC / testy jsou mimo statistiky reálné kampaně. Hromadný resend odsud jde jen na interní whitelist adresy.</p>`;
+    const active = idx === 0 ? " is-active" : "";
+    return `<div class="wave-panel${active}" data-wave-panel="${escapeHtml(def.id)}">
+      <div class="cards">
+        <div class="card"><div class="k">Odesláno</div><div class="v">${escapeHtml(wave.sent ?? 0)}</div></div>
+        <div class="card"><div class="k">Kontakty</div><div class="v">${escapeHtml(wave.contacts ?? 0)}</div></div>
+        <div class="card"><div class="k">Bounce</div><div class="v ${Number(wave.bounce_rate) >= 3 ? "bad" : ""}">${escapeHtml(wave.bounced ?? 0)} (${escapeHtml(wave.bounce_rate ?? 0)} %)</div></div>
+        <div class="card"><div class="k">Otevřeno</div><div class="v">${escapeHtml(wave.opened ?? 0)} (${escapeHtml(wave.open_rate ?? 0)} %)</div></div>
+        <div class="card"><div class="k">Proklik</div><div class="v">${escapeHtml(wave.clicked ?? 0)} (${escapeHtml(wave.click_rate ?? 0)} %)</div></div>
+        <div class="card"><div class="k">Konverze</div><div class="v">${escapeHtml(wave.conversions ?? 0)}</div></div>
+      </div>
+      ${renderWaveKindBreakdown(wave)}
+      ${qcNote}
+      ${jobNote}
+      <form class="resend-form" method="post" action="/admin/resend"
+        data-series-name="${escapeHtml(def.name)}"
+        data-campaign="${campaignWave ? "1" : "0"}"
+        data-count-all="${escapeHtml(waveFilterCount(wave, "all"))}"
+        data-count-unopened="${escapeHtml(waveFilterCount(wave, "unopened"))}"
+        data-count-noconv="${escapeHtml(waveFilterCount(wave, "no_conversion"))}">
+        <input type="hidden" name="series" value="${escapeHtml(def.id)}">
+        <label>Komu znovu poslat teaser
+          <select name="filter">${filterOpts}</select>
+        </label>
+        <label>Velikost dávky
+          <input type="number" name="limit" min="1" max="${MAX_BATCH}" value="${DEFAULT_BATCH}" ${disabled ? "disabled" : ""}>
+        </label>
+        <p class="hint resend-preview">Vyberte filtr a dávku — před odesláním se ukáže počet, šablona (teaser) a odhad doby.</p>
+        <button class="launch" type="submit" ${disabled ? "disabled" : ""}>Hromadně odeslat teaser</button>
+      </form>
+      ${block ? `<p class="block-reason">${escapeHtml(block)}</p>` : ""}
+    </div>`;
+  }).join("");
+  return `<div class="wave-box">
+    <h2>Odeslané e-maily podle skupiny</h2>
+    <p class="hint">Vlny z <code>campaign_series_progress</code>, doručení z <code>email_delivery_log</code> (jen outreach). QC/testy zvlášť. Nespárované outreach řádky jsou v záložce Ostatní.</p>
+    <nav class="wave-tabs" role="tablist" aria-label="Kampaňové skupiny">${nav}</nav>
+    ${panels}
+  </div>`;
+}
+
 function campaignRemainingCount(snapshot, runState) {
   return OUTREACH_SERIES.reduce(
     (n, def) => n + Number(seriesView(snapshot, runState, def).remaining || 0),
@@ -3661,6 +3785,7 @@ function renderAdminHtml(snapshot, {
   emailTo = "",
   emailError = "",
   launchError = "",
+  resendQueued = false,
   runState = {},
   orders = null,
   ordersError = "",
@@ -3679,6 +3804,7 @@ function renderAdminHtml(snapshot, {
   const campaignBadgeCls = halted || bounceRate >= 3 ? "bad" : remainingSend > 0 ? "warn" : "";
   const tabsNav = `<nav class="admin-tabs" role="tablist" aria-label="Sekce adminu">
       ${adminTabButton("campaign", "Stav kampaně", `${adminTabBadge(remainingSend, campaignBadgeCls)}${halted ? adminTabBadge("HALT", "bad") : ""}`)}
+      ${adminTabButton("emails", "Odeslané e-maily", adminTabBadge(stats.sent ?? 0))}
       ${adminTabButton("tests", "Testovací sken")}
       ${adminTabButton("leads", "Poptávky", adminTabBadge(leadsInfo.newCount, leadsInfo.newCount > 0 ? "warn" : ""))}
       ${adminTabButton("orders", "Objednávky", adminTabBadge(orderCount))}
@@ -3734,6 +3860,9 @@ function renderAdminHtml(snapshot, {
     : "";
   const emailErr = emailError
     ? `<p class="banner-err">${escapeHtml(emailError)}</p>`
+    : "";
+  const resendNote = resendQueued
+    ? `<p class="banner-ok">Hromadné znovuodeslání teaseru je ve frontě GitHub Actions (stejný outreach-batch, dávky 1–20, pauza 5 min, halt &gt; 3 %). <a href="${ADMIN_LINKS.outreach}" target="_blank" rel="noopener">GHA</a></p>`
     : "";
   const seriesCards = OUTREACH_SERIES.map((def) => {
     const view = seriesView(snapshot, runState, def);
@@ -4017,13 +4146,27 @@ function renderAdminHtml(snapshot, {
     .tab-badge.bad { background: rgba(248,113,113,0.22); color: #f87171; }
     .admin-panel { display: none; }
     .admin-panel.is-active { display: block; }
+    .wave-box { background: var(--navy-light); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; }
+    .wave-box h2 { font-size: 1.05rem; margin-bottom: 0.35rem; }
+    .wave-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.85rem 0 1rem; padding-bottom: 0.45rem; border-bottom: 1px solid var(--border); }
+    button.wave-tab { margin-top: 0; background: transparent; color: var(--text-muted); border: 1px solid transparent; border-radius: 8px; padding: 0.45rem 0.7rem; font-weight: 700; font-size: 0.84rem; cursor: pointer; }
+    button.wave-tab:hover { color: #fff; background: rgba(255,255,255,0.06); }
+    button.wave-tab.is-active { color: #fff; background: #0f172a; border-color: var(--border); }
+    .wave-panel { display: none; }
+    .wave-panel.is-active { display: block; }
+    .wave-kinds { margin: 0.35rem 0 0.75rem 1.1rem; color: var(--text-light); font-size: 0.88rem; }
+    .resend-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.55rem; margin-top: 0.85rem; }
+    .resend-form label { color: var(--text-muted); font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.25rem; }
+    .resend-form select, .resend-form input[type=number] { padding: 0.45rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: #0f172a; color: #fff; }
+    .resend-form select { min-width: 18rem; }
+    .resend-preview { flex: 1 1 100%; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>GoFix<span>Web</span> — stav kampaně</h1>
     <p class="sub">Interní přehled. Snapshot z DB: ${generated}. Obnova každých ${refreshSec} s (stejná čísla i na záložkách).</p>
-    ${err}${queuedNote}${launchedNote}${autoNote}${suppressedNote}${emailNote}${emailErr}${scanNote}${scanErr}${launchErr}
+    ${err}${queuedNote}${launchedNote}${autoNote}${suppressedNote}${emailNote}${emailErr}${resendNote}${scanNote}${scanErr}${launchErr}
     ${tabsNav}
     <section class="admin-panel is-active" id="tab-campaign" role="tabpanel" aria-labelledby="tabbtn-campaign">
     <div class="cards">
@@ -4078,6 +4221,9 @@ function renderAdminHtml(snapshot, {
       <tbody>${tableRows}</tbody>
     </table>
     </section>
+    <section class="admin-panel" id="tab-emails" role="tabpanel" aria-labelledby="tabbtn-emails">
+      ${renderWaveEmailsSection(snapshot, { halted, runState })}
+    </section>
     <section class="admin-panel" id="tab-tests" role="tabpanel" aria-labelledby="tabbtn-tests">
       ${devEmailBox}
       ${devScanBox}
@@ -4095,6 +4241,72 @@ function renderAdminHtml(snapshot, {
     </section>
   </div>
   <script>
+    document.querySelectorAll("form.resend-form").forEach(function (form) {
+      function counts() {
+        return {
+          all: Number(form.getAttribute("data-count-all") || 0),
+          unopened: Number(form.getAttribute("data-count-unopened") || 0),
+          no_conversion: Number(form.getAttribute("data-count-noconv") || 0),
+        };
+      }
+      function syncPreview() {
+        var filter = (form.querySelector('select[name="filter"]') || {}).value || "all";
+        var limitEl = form.querySelector('input[name="limit"]');
+        var n = Number(limitEl && limitEl.value);
+        if (!Number.isFinite(n) || n < 1) n = ${DEFAULT_BATCH};
+        if (n > ${MAX_BATCH}) n = ${MAX_BATCH};
+        var total = counts()[filter] || 0;
+        var batches = total > 0 ? Math.ceil(total / n) : 0;
+        var etaMin = total > 0 ? (batches - 1) * 5 + batches * 2 : 0;
+        var box = form.querySelector(".resend-preview");
+        if (box) {
+          box.textContent = total
+            ? ("Náhled: teaser na " + total + " kontaktů, dávky po " + n + " (max 20), pauza 5 min, odhad ~" + etaMin + " min.")
+            : "Náhled: v tomto filtru teď není koho obeslat.";
+        }
+      }
+      form.addEventListener("change", syncPreview);
+      form.addEventListener("input", syncPreview);
+      syncPreview();
+      form.addEventListener("submit", function (event) {
+        var filter = (form.querySelector('select[name="filter"]') || {}).value || "all";
+        var limitEl = form.querySelector('input[name="limit"]');
+        var n = Number(limitEl && limitEl.value);
+        if (!Number.isFinite(n) || n < 1) n = ${DEFAULT_BATCH};
+        var total = counts()[filter] || 0;
+        var name = form.getAttribute("data-series-name") || "";
+        var batches = total > 0 ? Math.ceil(total / n) : 0;
+        var etaMin = total > 0 ? (batches - 1) * 5 + batches * 2 : 0;
+        var msg = "Hromadné znovuodeslání TEASERU skupině " + name
+          + ".\\nKontaktů: " + total
+          + " (filtr: " + filter + ")"
+          + ".\\nŠablona: teaser (ne původní follow-up)."
+          + "\\nDávky po " + n + " e-mailech, pauza 5 min mezi dávkami (stejný outreach-batch)."
+          + "\\nOdhad dokončení: ~" + etaMin + " min."
+          + "\\nHalt >3 %, suppression a whitelist platí."
+          + "\\nOpravdu spustit?";
+        if (!total || !window.confirm(msg)) {
+          event.preventDefault();
+          return;
+        }
+        var btn = form.querySelector("button.launch");
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Spouštím…";
+        }
+      });
+    });
+    document.querySelectorAll(".wave-tab").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-wave") || "";
+        document.querySelectorAll(".wave-tab").forEach(function (item) {
+          item.classList.toggle("is-active", item.getAttribute("data-wave") === id);
+        });
+        document.querySelectorAll(".wave-panel").forEach(function (panel) {
+          panel.classList.toggle("is-active", panel.getAttribute("data-wave-panel") === id);
+        });
+      });
+    });
     document.querySelectorAll("form.launch-form").forEach(function (form) {
       form.addEventListener("submit", function (event) {
         var input = form.querySelector('input[name="limit"]');
@@ -4227,7 +4439,7 @@ function renderAdminHtml(snapshot, {
       });
     });
     function showAdminTab(id) {
-      var known = { campaign: 1, tests: 1, leads: 1, orders: 1, feedback: 1 };
+      var known = { campaign: 1, emails: 1, tests: 1, leads: 1, orders: 1, feedback: 1 };
       if (!known[id]) id = "campaign";
       document.querySelectorAll(".admin-tab").forEach(function (btn) {
         var on = btn.getAttribute("data-tab") === id;
@@ -4254,7 +4466,7 @@ function renderAdminHtml(snapshot, {
       var q = new URLSearchParams(location.search);
       var fromQuery = (q.get("scan") === "1" || q.get("email_queued") === "1" || q.get("email_kind"))
         ? "tests"
-        : "";
+        : (q.get("resend") === "1" ? "emails" : "");
       showAdminTab(fromHash || fromQuery || fromStore || "campaign");
     })();
     setTimeout(function () {
@@ -4301,6 +4513,7 @@ async function handleAdminPage(request, env) {
   const emailQueued = url.searchParams.get("email_queued") === "1";
   const emailKind = String(url.searchParams.get("email_kind") || "").trim();
   const emailTo = String(url.searchParams.get("email_to") || "").trim().toLowerCase();
+  const resendQueued = url.searchParams.get("resend") === "1";
   let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
   let error = "";
   let runState = emptyOutreachRunState();
@@ -4324,7 +4537,7 @@ async function handleAdminPage(request, env) {
   const orders = await resolveAdminOrders(snapshot);
   const ordersError = String(snapshot?.orders?.error || snapshot?.orders_error || "");
   return adminHtmlResponse(renderAdminHtml(snapshot, {
-    error, queued, launched, launchedSeries, launchedRunId, autoQueued, autoSizeQueued, suppressed, suppressedAlready, suppressedEmail, scanQueued, scanEmail, scanLead, emailQueued, emailKind, emailTo, runState,
+    error, queued, launched, launchedSeries, launchedRunId, autoQueued, autoSizeQueued, suppressed, suppressedAlready, suppressedEmail, scanQueued, scanEmail, scanLead, emailQueued, emailKind, emailTo, resendQueued, runState,
     orders, ordersError,
   }));
 }
@@ -4422,6 +4635,94 @@ async function handleAdminLaunch(request, env) {
   next.searchParams.set("launched", "1");
   next.searchParams.set("series", series);
   if (runId) next.searchParams.set("run", runId);
+  return Response.redirect(next.toString(), 303);
+}
+
+async function handleAdminResend(request, env) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const denied = await requireAdminAuth(request, env);
+  if (denied) return denied;
+
+  const fail = async (message, status = 400) => {
+    let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
+    let runState = emptyOutreachRunState();
+    try {
+      snapshot = await fetchCampaignSnapshot(env);
+    } catch {}
+    try {
+      runState = await fetchOutreachRunState(env);
+    } catch {}
+    return adminHtmlResponse(
+      renderAdminHtml(snapshot, { launchError: message, runState }),
+      status,
+    );
+  };
+
+  let series = "";
+  let limit = DEFAULT_BATCH;
+  let filter = "all";
+  try {
+    const form = await request.formData();
+    series = String(form.get("series") || "").trim();
+    filter = String(form.get("filter") || "all").trim() || "all";
+    limit = clampBatchSize(form.get("limit"));
+  } catch {
+    return fail("Neplatný formulář.");
+  }
+
+  if (!WAVE_GROUPS.some((item) => item.id === series)) {
+    return fail("Neznámá skupina.");
+  }
+  if (!RESEND_FILTERS.some((item) => item.id === filter)) {
+    return fail("Neznámý filtr.");
+  }
+  if (limit < 1 || limit > MAX_BATCH) {
+    return fail(`Velikost dávky musí být 1–${MAX_BATCH}.`);
+  }
+
+  let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
+  let runState = emptyOutreachRunState();
+  try {
+    snapshot = await fetchCampaignSnapshot(env);
+  } catch (err) {
+    return fail("Snapshot z DB se nepodařilo načíst: " + String(err && err.message ? err.message : err), 502);
+  }
+  try {
+    runState = await fetchOutreachRunState(env);
+  } catch (err) {
+    console.error("admin_run_state_failed", err);
+  }
+
+  const group = WAVE_GROUPS.find((item) => item.id === series);
+  const halted = Boolean(snapshot?.halt?.halted || snapshot?.stats?.halted);
+  if (group.campaign && halted) return fail(HALT_BLOCK_TEXT);
+  if (runState?.running) return fail(RUNNING_BLOCK_TEXT);
+  const wave = (Array.isArray(snapshot?.waves) ? snapshot.waves : []).find((row) => row.id === series) || {};
+  const count = Number((wave.filters || {})[filter] || 0);
+  if (count <= 0) return fail("V tomto filtru teď není koho znovu obeslat.");
+
+  const dispatchedAt = new Date().toISOString();
+  const whitelistOnly = group.campaign ? "false" : "true";
+  try {
+    await dispatchGithubEvent(env, "outreach-batch", {
+      source: "admin",
+      mode: "resend",
+      series,
+      filter,
+      limit: String(limit),
+      actor: "admin",
+      whitelist_only: whitelistOnly,
+      at: dispatchedAt,
+    });
+  } catch (err) {
+    console.error("admin_resend_dispatch_failed", err);
+    return fail("Resend GHA se nepodařilo spustit. Zkuste workflow ručně.", 502);
+  }
+  const next = new URL("/admin", request.url);
+  next.searchParams.set("resend", "1");
+  next.searchParams.set("series", series);
   return Response.redirect(next.toString(), 303);
 }
 
@@ -6323,6 +6624,10 @@ export default {
 
     if (url.pathname === "/admin/launch") {
       return handleAdminLaunch(request, env);
+    }
+
+    if (url.pathname === "/admin/resend") {
+      return handleAdminResend(request, env);
     }
 
     if (url.pathname === "/admin/auto") {
