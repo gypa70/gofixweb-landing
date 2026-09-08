@@ -41,7 +41,14 @@ function NavItem({
 }) {
   if (link.to) {
     return (
-      <Link to={link.to} className={className} onClick={onClick}>
+      <Link
+        to={link.to}
+        className={className}
+        onClick={(event) => {
+          window.scrollTo(0, 0);
+          onClick?.(event);
+        }}
+      >
         {link.label}
       </Link>
     );

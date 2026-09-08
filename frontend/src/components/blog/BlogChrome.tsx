@@ -81,6 +81,7 @@ const BlogChrome = ({ children }: BlogChromeProps) => (
             <Link
               to="/blog/"
               className="text-muted-foreground transition-colors duration-200 hover:md:text-foreground"
+              onClick={() => window.scrollTo(0, 0)}
             >
               Blog
             </Link>
