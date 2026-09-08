@@ -1,0 +1,131 @@
+name: Weekly AI blog post
+
+# Monday 07:00 UTC ≈ 09:00 Prague in summer. After the review article is merged,
+# later runs commit to main. GITHUB_TOKEN does not retrigger pages.yml, so the
+# deploy job builds Pages from the updated main.
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+    inputs:
+      force_pr:
+        description: "Open a PR even if a weekly article was already published"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: weekly-blog
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      first_run: ${{ steps.gen.outputs.first_run }}
+      slug: ${{ steps.gen.outputs.slug }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Require Anthropic key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "${ANTHROPIC_API_KEY}" ]; then
+            echo "::error::Add GitHub secret ANTHROPIC_API_KEY on gypa70/gofixweb-landing."
+            exit 1
+          fi
+
+      - name: Generate next unused topic
+        id: gen
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          python scripts/publish_weekly_blog.py --github-output "$GITHUB_OUTPUT"
+          python scripts/build_blog.py
+
+      - name: Open review PR
+        if: ${{ steps.gen.outputs.first_run == 'true' || github.event.inputs.force_pr == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SLUG: ${{ steps.gen.outputs.slug }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "weekly-blog/${SLUG}"
+          git add frontend/seo/content blog worker/src/blog-posts.generated.js
+          git commit -m "Add weekly blog post ${SLUG}"
+          git push -u origin HEAD
+          gh pr create --title "Weekly blog: ${SLUG}" --body "$(cat <<EOF
+          Automaticky vygenerovaný článek (Claude) k ruční kontrole.
+
+          Náhled po merge: https://gofixweb.com/blog/${SLUG}/
+          EOF
+          )"
+
+      - name: Push to main
+        if: ${{ steps.gen.outputs.first_run != 'true' && github.event.inputs.force_pr != 'true' }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/seo/content blog worker/src/blog-posts.generated.js
+          git commit -m "Publish weekly blog post ${{ steps.gen.outputs.slug }}"
+          git push origin HEAD
+
+  deploy-pages:
+    needs: publish
+    if: ${{ needs.publish.outputs.first_run != 'true' && github.event.inputs.force_pr != 'true' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build landing
+        working-directory: frontend
+        run: npm run build
+
+      - name: Assemble GitHub Pages artifact
+        run: |
+          set -euo pipefail
+          rm -rf publish
+          mkdir -p publish
+          cp -a frontend/dist/. publish/
+          mkdir -p publish/data
+          cp data/public_stats.json publish/data/public_stats.json
+          cp -a wordpress-autofix publish/wordpress-autofix
+          cp frontend/dist/index.html publish/404.html
+
+      - uses: actions/configure-pages@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: publish
+      - id: deployment
+        uses: actions/deploy-pages@v4
