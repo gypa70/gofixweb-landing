@@ -87,10 +87,7 @@ export default function Pricing() {
         <div className="mt-12 rounded-lg border-2 border-primary bg-card p-7 sm:p-9">
           <div className="grid gap-8 lg:grid-cols-12 lg:gap-12">
             <div className="lg:col-span-4">
-              <span className="inline-flex rounded-full bg-primary px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-primary-foreground">
-                Nejčastější volba
-              </span>
-              <h3 className="mt-5 text-[1.6rem]">Audit + oprava</h3>
+              <h3 className="text-[1.6rem]">Audit + oprava</h3>
               <p className="mt-4 flex items-baseline gap-2">
                 <span className="tnum display text-[3rem] font-extrabold leading-none">1 990 Kč</span>
               </p>
