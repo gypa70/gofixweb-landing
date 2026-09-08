@@ -1190,7 +1190,7 @@ function renderLandingLeadsBox(snapshot) {
   return `<div class="orders-box" id="landing-leads">
     <h2>Poptávky z landing page</h2>
     <p class="hint">Formulář mimo whitelist. Ukládá se do DB a notifikace jde na audit@gofixweb.com.
-    Posledních 50, nejnovější nahoře. „Odeslat report“ předvyplní testovací scan níže; po odeslání se poptávka označí jako vyřízená (snapshot se obnoví s persistem DB). „Smazat“ záznam z DB odstraní.</p>
+    Posledních 50, nejnovější nahoře. „Odeslat report“ přepne na záložku Testovací sken a předvyplní ostrý scan; po odeslání se poptávka označí jako vyřízená (snapshot se obnoví s persistem DB). „Smazat“ záznam z DB odstraní.</p>
     <div class="cards">
       <div class="card"><div class="k">Nové</div><div class="v warn">${escapeHtml(data.newCount)}</div></div>
       <div class="card"><div class="k">Vyřízené</div><div class="v ok">${escapeHtml(data.handledCount)}</div></div>
@@ -3625,6 +3625,22 @@ const ADMIN_DEV_EMAIL_LABELS = {
   final_auto: "7b. Finální report Před/Po",
 };
 
+function adminTabBadge(value, cls = "") {
+  const extra = cls ? ` ${cls}` : "";
+  return `<span class="tab-badge${extra}">${escapeHtml(String(value))}</span>`;
+}
+
+function adminTabButton(id, label, badgeHtml = "") {
+  return `<button type="button" class="admin-tab" role="tab" id="tabbtn-${id}" data-tab="${id}" aria-controls="tab-${id}">${escapeHtml(label)}${badgeHtml}</button>`;
+}
+
+function campaignRemainingCount(snapshot, runState) {
+  return OUTREACH_SERIES.reduce(
+    (n, def) => n + Number(seriesView(snapshot, runState, def).remaining || 0),
+    0,
+  );
+}
+
 function renderAdminHtml(snapshot, {
   error = "",
   queued = false,
@@ -3655,6 +3671,19 @@ function renderAdminHtml(snapshot, {
   const halted = Boolean(halt.halted || stats.halted);
   const haltClass = halted ? "halt-on" : "halt-off";
   const haltLabel = halted ? "ZAPNUTO" : "VYPNUTO";
+  const leadsInfo = landingLeadsFromSnapshot(snapshot);
+  const remainingSend = campaignRemainingCount(snapshot, runState);
+  const bounceRate = Number(stats.bounce_rate ?? 0);
+  const whyPending = Number((snapshot?.why_not_buy || {}).pending ?? 0);
+  const orderCount = Number((orders || emptyStripeOrders()).count || 0);
+  const campaignBadgeCls = halted || bounceRate >= 3 ? "bad" : remainingSend > 0 ? "warn" : "";
+  const tabsNav = `<nav class="admin-tabs" role="tablist" aria-label="Sekce adminu">
+      ${adminTabButton("campaign", "Stav kampaně", `${adminTabBadge(remainingSend, campaignBadgeCls)}${halted ? adminTabBadge("HALT", "bad") : ""}`)}
+      ${adminTabButton("tests", "Testovací sken")}
+      ${adminTabButton("leads", "Poptávky", adminTabBadge(leadsInfo.newCount, leadsInfo.newCount > 0 ? "warn" : ""))}
+      ${adminTabButton("orders", "Objednávky", adminTabBadge(orderCount))}
+      ${adminTabButton("feedback", "Zpětná vazba", adminTabBadge(whyPending, whyPending > 0 ? "warn" : ""))}
+    </nav>`;
   const lastSuccess = runState?.lastSuccess;
   const launchedRun = findRunById(runState, launchedRunId);
   const batchBusy = Boolean((runState?.active || []).length)
@@ -3979,13 +4008,24 @@ function renderAdminHtml(snapshot, {
     .eng-swatch.opened { background: #38bdf8; }
     .eng-swatch.clicked { background: #4ade80; }
     .eng-swatch.replied { background: #fb923c; }
+    .admin-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0 0 1.15rem; padding-bottom: 0.45rem; border-bottom: 1px solid var(--border); }
+    button.admin-tab { margin-top: 0; background: transparent; color: var(--text-muted); border: 1px solid transparent; border-radius: 8px; padding: 0.5rem 0.8rem; font-weight: 700; font-size: 0.88rem; cursor: pointer; }
+    button.admin-tab:hover { color: #fff; background: rgba(255,255,255,0.06); }
+    button.admin-tab.is-active { color: #fff; background: var(--navy-light); border-color: var(--border); }
+    .tab-badge { display: inline-block; min-width: 1.15rem; margin-left: 0.35rem; padding: 0.05rem 0.4rem; border-radius: 999px; background: #334155; color: #e2e8f0; font-size: 0.72rem; font-weight: 800; vertical-align: middle; }
+    .tab-badge.warn { background: rgba(251,191,36,0.22); color: #fbbf24; }
+    .tab-badge.bad { background: rgba(248,113,113,0.22); color: #f87171; }
+    .admin-panel { display: none; }
+    .admin-panel.is-active { display: block; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>GoFix<span>Web</span> — stav kampaně</h1>
-    <p class="sub">Interní přehled. Snapshot z DB: ${generated}. Obnova každých ${refreshSec} s.</p>
+    <p class="sub">Interní přehled. Snapshot z DB: ${generated}. Obnova každých ${refreshSec} s (stejná čísla i na záložkách).</p>
     ${err}${queuedNote}${launchedNote}${autoNote}${suppressedNote}${emailNote}${emailErr}${scanNote}${scanErr}${launchErr}
+    ${tabsNav}
+    <section class="admin-panel is-active" id="tab-campaign" role="tabpanel" aria-labelledby="tabbtn-campaign">
     <div class="cards">
       <div class="card"><div class="k">Odesláno</div><div class="v">${escapeHtml(stats.sent ?? 0)}</div></div>
       <div class="card"><div class="k">Accepted</div><div class="v ok">${escapeHtml(stats.accepted ?? 0)}</div></div>
@@ -4005,15 +4045,8 @@ function renderAdminHtml(snapshot, {
     </div>
     ${haltBox}
     ${suppressBox}
-    ${renderLandingLeadsBox(snapshot)}
-    ${devEmailBox}
-    ${devScanBox}
     <h2 style="font-size:1.05rem;margin:0 0 0.65rem;">E-mailové série</h2>
     <div class="series-grid">${seriesCards}</div>
-    ${renderOrdersBox(orders, ordersError)}
-    ${renderDisputeEvidenceBox(snapshot)}
-    ${renderSubscribersBox(snapshot)}
-    ${renderWhyNotBuyBox(snapshot?.why_not_buy)}
     <div class="links">
       <a href="${ADMIN_LINKS.scans}" target="_blank" rel="noopener">GHA scan jobs</a>
       <a href="${ADMIN_LINKS.devEmail}" target="_blank" rel="noopener">GHA testovací e-mail</a>
@@ -4044,6 +4077,22 @@ function renderAdminHtml(snapshot, {
       </thead>
       <tbody>${tableRows}</tbody>
     </table>
+    </section>
+    <section class="admin-panel" id="tab-tests" role="tabpanel" aria-labelledby="tabbtn-tests">
+      ${devEmailBox}
+      ${devScanBox}
+    </section>
+    <section class="admin-panel" id="tab-leads" role="tabpanel" aria-labelledby="tabbtn-leads">
+      ${renderLandingLeadsBox(snapshot)}
+    </section>
+    <section class="admin-panel" id="tab-orders" role="tabpanel" aria-labelledby="tabbtn-orders">
+      ${renderOrdersBox(orders, ordersError)}
+      ${renderSubscribersBox(snapshot)}
+      ${renderDisputeEvidenceBox(snapshot)}
+    </section>
+    <section class="admin-panel" id="tab-feedback" role="tabpanel" aria-labelledby="tabbtn-feedback">
+      ${renderWhyNotBuyBox(snapshot?.why_not_buy)}
+    </section>
   </div>
   <script>
     document.querySelectorAll("form.launch-form").forEach(function (form) {
@@ -4144,6 +4193,7 @@ function renderAdminHtml(snapshot, {
         if (shopInput) shopInput.value = domain;
         if (emailInput && email) emailInput.value = email;
         if (leadInput) leadInput.value = leadId;
+        if (typeof showAdminTab === "function") showAdminTab("tests");
         var box = document.getElementById("dev-scan");
         if (box && box.scrollIntoView) box.scrollIntoView({ behavior: "smooth", block: "start" });
         if (shopInput && shopInput.focus) shopInput.focus();
@@ -4176,6 +4226,37 @@ function renderAdminHtml(snapshot, {
         });
       });
     });
+    function showAdminTab(id) {
+      var known = { campaign: 1, tests: 1, leads: 1, orders: 1, feedback: 1 };
+      if (!known[id]) id = "campaign";
+      document.querySelectorAll(".admin-tab").forEach(function (btn) {
+        var on = btn.getAttribute("data-tab") === id;
+        btn.classList.toggle("is-active", on);
+        btn.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      document.querySelectorAll(".admin-panel").forEach(function (panel) {
+        panel.classList.toggle("is-active", panel.id === "tab-" + id);
+      });
+      try { sessionStorage.setItem("gfwAdminTab", id); } catch (err) {}
+      if (history.replaceState) {
+        history.replaceState(null, "", "#" + id);
+      }
+    }
+    document.querySelectorAll(".admin-tab").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        showAdminTab(btn.getAttribute("data-tab") || "campaign");
+      });
+    });
+    (function initAdminTab() {
+      var fromHash = (location.hash || "").replace("#", "");
+      var fromStore = "";
+      try { fromStore = sessionStorage.getItem("gfwAdminTab") || ""; } catch (err) {}
+      var q = new URLSearchParams(location.search);
+      var fromQuery = (q.get("scan") === "1" || q.get("email_queued") === "1" || q.get("email_kind"))
+        ? "tests"
+        : "";
+      showAdminTab(fromHash || fromQuery || fromStore || "campaign");
+    })();
     setTimeout(function () {
       var el = document.activeElement;
       var tag = el && el.tagName ? String(el.tagName).toLowerCase() : "";
