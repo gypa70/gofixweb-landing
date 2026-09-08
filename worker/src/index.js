@@ -5445,6 +5445,7 @@ const SURVEY_PAGE_COPY = {
     months: "Odhadovaná ztráta za měsíc",
     priority: "Řešte nejdřív",
     cta: "Chci opravit sám",
+    ctaAuto: "Chci opravit automaticky",
     missing: "Data k tomuto odkazu se nepodařilo načíst. Zkuste to za chvíli, nebo napište na info@gofixweb.com.",
     payfailTitle: "Platba se nepodařila dokončit",
     payfailLead: "Otevřete znovu platbu — odkaz vygeneruje novou Stripe session na stejnou objednávku 1 990 Kč. Alternativně můžete zaplatit převodem.",
@@ -5510,6 +5511,7 @@ const SURVEY_PAGE_COPY = {
     months: "Odhadovaná strata za mesiac",
     priority: "Riešte najskôr",
     cta: "Chcem opraviť sám",
+    ctaAuto: "Chcem opraviť automaticky",
     missing: "Dáta k tomuto odkazu sa nepodarilo načítať. Skúste to o chvíľu, alebo napíšte na info@gofixweb.com.",
     payfailTitle: "Platba sa nepodarila dokončiť",
     payfailLead: "Otvorte znova platbu — odkaz vygeneruje novú Stripe session na rovnakú objednávku 1 990 Kč. Alternatívne môžete zaplatiť prevodom.",
@@ -5603,8 +5605,14 @@ function surveyPageShell(lang, title, inner) {
 
 function surveyCtaRow(payload, copy) {
   const href = escapeHtml(String(payload?.checkout_url || "/checkout?product=manual_fix"));
+  const auto = surveyAutoCheckoutUrl(payload);
+  const autoLabel = copy.ctaAuto || copy.cta;
+  const autoBtn = auto
+    ? `<div style="margin-top:10px;"><a href="${escapeHtml(auto)}" style="display:inline-block;background:#1a2332;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;text-decoration:none;padding:12px 18px;border-radius:8px;">${escapeHtml(autoLabel)}</a></div>`
+    : "";
   return `<tr><td style="padding:8px 0 0 0;">
     <a href="${href}" style="display:inline-block;background:#16a34a;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;text-decoration:none;padding:12px 18px;border-radius:8px;">${escapeHtml(copy.cta)}</a>
+    ${autoBtn}
   </td></tr>`;
 }
 
@@ -5682,7 +5690,7 @@ function surveySnoozePresetButton(actionUrl, label, isoDate) {
           </form>`;
 }
 
-function surveySnoozeFormHtml(actionUrl, lang) {
+function surveySnoozeFormHtml(actionUrl, lang, payload) {
   const copy = SURVEY_PAGE_COPY[lang] || SURVEY_PAGE_COPY.cs;
   const tomorrow = surveyIsoDatePlusDays(1);
   const week = surveyIsoDatePlusDays(7);
@@ -5703,7 +5711,8 @@ function surveySnoozeFormHtml(actionUrl, lang) {
               <button type="submit" style="border:0;border-radius:8px;padding:10px 16px;background:#16a34a;color:#fff;font-weight:700;cursor:pointer;">${escapeHtml(copy.laterSubmit)}</button>
             </p>
           </form>
-        </td></tr>`;
+        </td></tr>
+        ${surveyCtaRow(payload && typeof payload === "object" ? payload : {}, copy)}`;
   return surveyPageShell(lang, copy.laterTitle, inner);
 }
 
@@ -6408,7 +6417,8 @@ async function handleSurvey(request, env) {
   const clickPage = source === "click_48h" && CLICK_PAGE_REASONS.has(reason);
 
   if (openPage && reason === "later" && request.method === "GET") {
-    return new Response(surveySnoozeFormHtml(url.toString(), lang), { status: 200, headers: htmlHeaders });
+    const payload = await fetchSurveyExplain(env, id);
+    return new Response(surveySnoozeFormHtml(url.toString(), lang, payload), { status: 200, headers: htmlHeaders });
   }
   if (reason === "other" && request.method === "GET") {
     return new Response(surveyOtherFormHtml(url.toString(), lang), { status: 200, headers: htmlHeaders });
@@ -6431,7 +6441,7 @@ async function handleSurvey(request, env) {
       note = "";
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(note)) {
-      return new Response(surveySnoozeFormHtml(url.toString(), lang), { status: 400, headers: htmlHeaders });
+      return new Response(surveySnoozeFormHtml(url.toString(), lang, await fetchSurveyExplain(env, id)), { status: 400, headers: htmlHeaders });
     }
   }
   if (request.method === "HEAD") {
