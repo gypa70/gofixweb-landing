@@ -5842,18 +5842,34 @@ function surveyDataCacheKey(trackingId) {
   return `https://survey-data.gofixweb/${String(trackingId || "").trim()}`;
 }
 
-async function fetchSurveyExplain(env, trackingId) {
-  const cache = caches.default;
-  const hit = await cache.match(surveyDataCacheKey(trackingId));
-  if (hit) {
-    try {
-      return await hit.json();
-    } catch {
-      /* fallback GitHub */
-    }
+function isSurveyExplainPayload(data) {
+  return Boolean(
+    data &&
+      typeof data === "object" &&
+      !Array.isArray(data) &&
+      (data.domain || Array.isArray(data.findings)),
+  );
+}
+
+async function rememberSurveyExplain(trackingId, payload) {
+  try {
+    await caches.default.put(
+      surveyDataCacheKey(trackingId),
+      new Response(JSON.stringify(payload), {
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": `public, max-age=${ENG_CACHE_TTL}`,
+        },
+      }),
+    );
+  } catch (err) {
+    console.error("survey_explain_cache_put_failed", err);
   }
+}
+
+async function fetchSurveyExplainFromGithub(env, trackingId) {
   const repo = env.GITHUB_REPO || "gypa70/gofixweb-scanner";
-  const token = env.GITHUB_TOKEN;
+  const token = String(env.GITHUB_TOKEN || "").trim();
   if (!token) return null;
   const res = await fetch(
     `https://api.github.com/repos/${repo}/contents/data/survey_pages/${encodeURIComponent(trackingId)}.json?ref=main`,
@@ -5863,17 +5879,47 @@ async function fetchSurveyExplain(env, trackingId) {
         Authorization: `Bearer ${token}`,
         Accept: "application/vnd.github.raw",
         "User-Agent": "gofixweb-report-worker",
-        "Cache-Control": "no-cache",
+        "Cache-Control": "no-store",
+        Pragma: "no-cache",
+        "X-Gofixweb-Bust": String(Date.now()),
       },
       cf: { cacheTtl: 0, cacheEverything: false },
     },
   );
-  if (!res.ok) return null;
-  try {
-    return await res.json();
-  } catch {
+  if (!res.ok) {
+    console.error("survey_explain_github_http", res.status, trackingId);
     return null;
   }
+  let parsed;
+  try {
+    parsed = await res.json();
+  } catch (err) {
+    console.error("survey_explain_github_parse_failed", err);
+    return null;
+  }
+  const raw =
+    parsed && parsed.encoding && parsed.content && parsed.findings == null
+      ? decodeGithubContentsWrapper(parsed)
+      : parsed;
+  return isSurveyExplainPayload(raw) ? raw : null;
+}
+
+async function fetchSurveyExplain(env, trackingId) {
+  const fromGithub = await fetchSurveyExplainFromGithub(env, trackingId);
+  if (fromGithub) {
+    await rememberSurveyExplain(trackingId, fromGithub);
+    return fromGithub;
+  }
+  const hit = await caches.default.match(surveyDataCacheKey(trackingId));
+  if (hit) {
+    try {
+      const cached = await hit.json();
+      if (isSurveyExplainPayload(cached)) return cached;
+    } catch {
+      /* miss */
+    }
+  }
+  return null;
 }
 
 async function handleSurveyDataPut(request, env) {
@@ -5894,11 +5940,7 @@ async function handleSurveyDataPut(request, env) {
   } catch {
     return jsonResponse({ ok: false, error: "invalid_json" }, 400);
   }
-  await caches.default.put(
-    surveyDataCacheKey(id),
-    new Response(JSON.stringify(payload), { headers: { "Content-Type": "application/json" } }),
-    { expirationTtl: ENG_CACHE_TTL },
-  );
+  await rememberSurveyExplain(id, payload);
   return jsonResponse({ ok: true }, 200);
 }
 
