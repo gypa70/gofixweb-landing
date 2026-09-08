@@ -1763,6 +1763,7 @@ async function handleWpOnboarding(request, env, origin) {
   const appPassword = String(body.app_password || "");
   const consentSteps = body.consent_steps === true || body.consent_steps === "1" || body.consent_steps === "on";
   const consentInstall = body.consent_install_plugins === true || body.consent_install_plugins === "1" || body.consent_install_plugins === "on";
+  const consentSlider = body.consent_deactivate_slider === true || body.consent_deactivate_slider === "1" || body.consent_deactivate_slider === "on";
   const copy = wpCopy(siteUrl);
 
   if (!siteUrl || !username || !EMAIL_RE.test(email) || !appPassword.trim() || !consentSteps) {
@@ -1809,6 +1810,7 @@ async function handleWpOnboarding(request, env, origin) {
       app_password: appPassword,
       consent_steps: true,
       consent_install_plugins: consentInstall,
+      consent_deactivate_slider: consentSlider,
     });
   } catch (err) {
     console.error("wp_onboarding_dispatch_failed", err);
@@ -2068,6 +2070,8 @@ const CHECKOUT_COPY = {
     manualHomepageLabel: "úprava vzhledu a rozvržení homepage (slider, sekce)",
     targetedShop: "E-shop: {shop}.",
     targetedFinding: "Tato objednávka je na návod k nálezu: {findings}.",
+    sliderConsent:
+      "Souhlasím s deaktivací slider pluginu na homepage (Slider Revolution, MetaSlider nebo LayerSlider). Po deaktivaci zůstane na jeho místě prázdná tmavá sekce (asi 420 px) s viditelným textem shortcode [metaslider] — slider zmizí, ale rezervované místo v šabloně ne. Sekci jde odstranit ručně ze šablony/builderu, nebo requestem na podporu. Tuto změnu lze kdykoliv vrátit zpět. Bez tohoto souhlasu slider nevypínáme.",
     alreadyPaid: "Tento nález už máte objednaný. Návod jsme poslali e-mailem — druhá platba není potřeba.",
     unknownProduct: "Neznámý produkt.",
     stripeMissing: "Stripe Checkout není nakonfigurovaný (STRIPE_SECRET_KEY).",
@@ -2114,6 +2118,8 @@ const CHECKOUT_COPY = {
     manualHomepageLabel: "úprava vzhľadu a rozloženia homepage (slider, sekcie)",
     targetedShop: "E-shop: {shop}.",
     targetedFinding: "Táto objednávka je na návod k zisteniu: {findings}.",
+    sliderConsent:
+      "Súhlasím s deaktiváciou slider pluginu na homepage (Slider Revolution, MetaSlider alebo LayerSlider). Po deaktivácii ostane na jeho mieste prázdna tmavá sekcia (asi 420 px) s viditeľným textom shortcode [metaslider] — slider zmizne, ale rezervované miesto v šablóne nie. Sekciu možno odstrániť ručne zo šablóny/buildera, alebo requestom na podporu. Túto zmenu možno kedykoľvek vrátiť späť. Bez tohto súhlasu slider nevypíname.",
     alreadyPaid: "Toto zistenie už máte objednané. Návod sme poslali e-mailom — druhá platba nie je potrebná.",
     unknownProduct: "Neznámy produkt.",
     stripeMissing: "Stripe Checkout nie je nakonfigurovaný (STRIPE_SECRET_KEY).",
@@ -2167,10 +2173,11 @@ function checkoutPayGateScript() {
   </script>`;
 }
 
-async function persistCheckoutConsent(env, request, { email, domain, product, vop, consentAt, ip }) {
+async function persistCheckoutConsent(env, request, { email, domain, product, vop, consentAt, ip, slider }) {
   const loc = checkoutLocale(domain, email);
   // GitHub repository_dispatch: max 10 top-level keys. `kind` defaults to
   // "checkout" in wp-vop-consent.yml — do not add an 11th field here.
+  // Slider consent is packed into `vop` as "1|slider".
   const payload = {
     email: email || "",
     domain: domain || "",
@@ -2180,7 +2187,7 @@ async function persistCheckoutConsent(env, request, { email, domain, product, vo
     locale: loc,
     withdrawal: "1",
     withdrawal_version: WITHDRAWAL_CONSENT_VERSION,
-    vop: vop ? "1" : "",
+    vop: vop ? (isVopConsented(slider) ? "1|slider" : "1") : "",
     vop_version: vop ? VOP_VERSION : "",
   };
   await dispatchGithubEvent(env, "wp-vop-consent", payload);
@@ -2534,6 +2541,12 @@ function checkoutOfferPage({
         </span>
       </label>`
     : "";
+  const sliderBlock = isAuto
+    ? `<label for="consent-slider">
+        <input type="checkbox" id="consent-slider" name="consent_slider" value="1">
+        <span>${escapeHtml(copy.sliderConsent)}</span>
+      </label>`
+    : "";
   const withdrawalBlock = alreadyPaid ? "" : withdrawalConsentBlock(domain, email);
   const payDisabled = alreadyPaid ? "" : " disabled";
   const payScript = alreadyPaid ? "" : checkoutPayGateScript();
@@ -2594,6 +2607,7 @@ function checkoutOfferPage({
       <input type="hidden" name="tid" value="${escapeHtml(trackingId)}">
       ${issuesHidden}
       ${vopBlock}
+      ${sliderBlock}
       ${withdrawalBlock}
       ${findingsBlock}
       <button type="submit" id="pay-btn"${payDisabled}>${escapeHtml(copy.pay)}</button>
@@ -2702,6 +2716,10 @@ function subscriptionOfferPage({
           <a href="${VOP_AUTOFIX_SECTION_URL}" target="_blank" rel="noopener">${escapeHtml(copy.vopArticle)}</a>
         </span>
       </label>
+      <label for="consent-slider">
+        <input type="checkbox" id="consent-slider" name="consent_slider" value="1">
+        <span>${escapeHtml(copy.sliderConsent)}</span>
+      </label>
       ${withdrawalConsentBlock(domain, email)}
       <button type="submit" id="pay-btn" disabled>${escapeHtml(copy.pay)}</button>
     </form>
@@ -2718,7 +2736,7 @@ function subscriptionOfferPage({
   });
 }
 
-async function handleSubscriptionCheckout(request, env, { plan, domain, email, consent, withdrawal, tid }) {
+async function handleSubscriptionCheckout(request, env, { plan, domain, email, consent, withdrawal, tid, slider }) {
   const copy = checkoutCopy(domain, email);
   const spec = SUBSCRIPTION_PLANS[plan];
   const consented = isVopConsented(consent);
@@ -2757,6 +2775,7 @@ async function handleSubscriptionCheckout(request, env, { plan, domain, email, c
       vop: true,
       consentAt,
       ip,
+      slider,
     });
   } catch (err) {
     console.error("vop_consent_dispatch_failed", String(err && err.message ? err.message : err));
@@ -2781,6 +2800,10 @@ async function handleSubscriptionCheckout(request, env, { plan, domain, email, c
   body.set("subscription_data[metadata][product]", plan);
   body.set("subscription_data[metadata][plan]", plan);
   body.set("subscription_data[metadata][domain]", domain);
+  if (isVopConsented(slider)) {
+    body.set("metadata[consent_slider]", "1");
+    body.set("subscription_data[metadata][consent_slider]", "1");
+  }
   body.set("customer_email", email);
   body.set("line_items[0][quantity]", "1");
   if (priceId) {
@@ -2823,6 +2846,7 @@ async function handleCheckout(request, env) {
   let email = String(url.searchParams.get("email") || "").trim().toLowerCase();
   let consent = "";
   let withdrawal = "";
+  let slider = "";
   let tid = String(url.searchParams.get("tid") || "").trim();
   let issues = String(url.searchParams.get("i") || url.searchParams.get("issues") || "").trim();
 
@@ -2833,6 +2857,7 @@ async function handleCheckout(request, env) {
     email = String(form.get("email") || email).trim().toLowerCase();
     consent = String(form.get("vop_consent") || "").trim();
     withdrawal = String(form.get("withdrawal_consent") || "").trim();
+    slider = String(form.get("consent_slider") || "").trim();
     tid = String(form.get("tid") || tid).trim();
     issues = String(form.get("i") || form.get("issues") || issues).trim();
   }
@@ -2849,6 +2874,7 @@ async function handleCheckout(request, env) {
       consent,
       withdrawal,
       tid,
+      slider,
     });
   }
 
@@ -2908,6 +2934,7 @@ async function handleCheckout(request, env) {
       vop: product === "wp_autofix",
       consentAt,
       ip,
+      slider,
     });
   } catch (err) {
     console.error("vop_consent_dispatch_failed", String(err && err.message ? err.message : err));
@@ -2935,6 +2962,7 @@ async function handleCheckout(request, env) {
   if (product === "wp_autofix") {
     body.set("metadata[vop_consent]", "1");
     body.set("metadata[vop_version]", VOP_VERSION);
+    if (isVopConsented(slider)) body.set("metadata[consent_slider]", "1");
   }
   if (domain) body.set("metadata[domain]", domain);
   if (issues) body.set("metadata[issues]", parseCheckoutIssueTypes(issues).join(","));

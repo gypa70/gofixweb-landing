@@ -159,6 +159,12 @@
             <span data-i18n="consentPlugins">Souhlasím, že GoFixWeb může na mém WordPressu nainstalovat pluginy z oficiálního adresáře wordpress.org (komprese obrázků Smush a v případě chybějícího SEO nástroje Slim SEO) a že tyto zásahy mohu vzít zpět odinstalací pluginu.</span>
           </label>
         </div>
+        <div class="consent-box consent-slider">
+          <label class="consent-check">
+            <input id="consent_deactivate_slider" name="consent_deactivate_slider" type="checkbox" value="1">
+            <span data-i18n="consentSlider">Souhlasím s deaktivací slider pluginu na homepage (Slider Revolution, MetaSlider nebo LayerSlider). Po deaktivaci zůstane na jeho místě prázdná tmavá sekce (asi 420 px) s viditelným textem shortcode [metaslider] — slider zmizí, ale rezervované místo v šabloně ne. Sekci jde odstranit ručně ze šablony/builderu, nebo requestem na podporu. Tuto změnu lze kdykoliv vrátit zpět.</span>
+          </label>
+        </div>
         <button type="submit" id="submit-btn">Ověřit připojení</button>
       </form>
     </div>
@@ -201,7 +207,8 @@
           c4: "Zkontrolujeme líné načítání obrázků (lazy loading) a doporučíme úpravy.",
           c5: "Se souhlasem nainstalujeme nástroj na kompresi obrázků (Smush) a spustíme kompresi.",
           consentSteps: "Souhlasím s výše uvedenými kroky",
-          consentPlugins: "Souhlasím, že GoFixWeb může na mém WordPressu nainstalovat pluginy z oficiálního adresáře wordpress.org (komprese obrázků Smush a v případě chybějícího SEO nástroje Slim SEO) a že tyto zásahy mohu vzít zpět odinstalací pluginu."
+          consentPlugins: "Souhlasím, že GoFixWeb může na mém WordPressu nainstalovat pluginy z oficiálního adresáře wordpress.org (komprese obrázků Smush a v případě chybějícího SEO nástroje Slim SEO) a že tyto zásahy mohu vzít zpět odinstalací pluginu.",
+          consentSlider: "Souhlasím s deaktivací slider pluginu na homepage (Slider Revolution, MetaSlider nebo LayerSlider). Po deaktivaci zůstane na jeho místě prázdná tmavá sekce (asi 420 px) s viditelným textem shortcode [metaslider] — slider zmizí, ale rezervované místo v šabloně ne. Sekci jde odstranit ručně ze šablony/builderu, nebo requestem na podporu. Tuto změnu lze kdykoliv vrátit zpět."
         },
         sk: {
           title: "Pripojenie e-shopu · GoFixWeb",
@@ -233,7 +240,8 @@
           c4: "Skontrolujeme lenivé načítanie obrázkov (lazy loading) a odporučíme úpravy.",
           c5: "So súhlasom nainštalujeme nástroj na kompresiu obrázkov (Smush) a spustíme kompresiu.",
           consentSteps: "Súhlasím s vyššie uvedenými krokmi",
-          consentPlugins: "Súhlasím, že GoFixWeb môže na mojom WordPress nainštalovať pluginy z oficiálneho adresára wordpress.org (kompresia obrázkov Smush a v prípade chýbajúceho SEO nástroja Slim SEO) a že tieto zásahy môžem vziať späť odinštaláciou pluginu."
+          consentPlugins: "Súhlasím, že GoFixWeb môže na mojom WordPress nainštalovať pluginy z oficiálneho adresára wordpress.org (kompresia obrázkov Smush a v prípade chýbajúceho SEO nástroja Slim SEO) a že tieto zásahy môžem vziať späť odinštaláciou pluginu.",
+          consentSlider: "Súhlasím s deaktiváciou slider pluginu na homepage (Slider Revolution, MetaSlider alebo LayerSlider). Po deaktivácii ostane na jeho mieste prázdna tmavá sekcia (asi 420 px) s viditeľným textom shortcode [metaslider] — slider zmizne, ale rezervované miesto v šablóne nie. Sekciu možno odstrániť ručne zo šablóny/buildera, alebo requestom na podporu. Túto zmenu možno kedykoľvek vrátiť späť."
         }
       };
       function detectLang() {
@@ -312,7 +320,8 @@
             username: document.getElementById("username").value.trim(),
             app_password: document.getElementById("app_password").value,
             consent_steps: true,
-            consent_install_plugins: document.getElementById("consent_install_plugins").checked
+            consent_install_plugins: document.getElementById("consent_install_plugins").checked,
+            consent_deactivate_slider: document.getElementById("consent_deactivate_slider").checked
           })
         }).then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
           .then(function (out) {
