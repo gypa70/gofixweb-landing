@@ -3021,11 +3021,13 @@ const OUTREACH_SERIES = [
   { id: "nulte-kolo", name: "Nulté kolo" },
   { id: "vlna-1", name: "Vlna 1" },
   { id: "vlna-2", name: "Vlna 2" },
+  { id: "vlna-3", name: "Vlna 3" },
 ];
 const WAVE_GROUPS = [
   { id: "nulte-kolo", name: "Nulté kolo", campaign: true },
   { id: "vlna-1", name: "Vlna 1", campaign: true },
   { id: "vlna-2", name: "Vlna 2", campaign: true },
+  { id: "vlna-3", name: "Vlna 3", campaign: true },
   { id: "ostatni", name: "Ostatní", campaign: true },
   { id: "ops", name: "QC / testy", campaign: false },
 ];
@@ -3036,7 +3038,8 @@ const RESEND_FILTERS = [
 ];
 const MAX_BATCH = 20;
 const DEFAULT_BATCH = 5;
-const AUTO_INTERVAL_MIN = 30;
+const AUTO_INTERVAL_MIN = 60;
+const AUTO_DAILY_CAP = 40;
 const COOLDOWN_MS = 5 * 60 * 1000;
 const HALT_BLOCK_TEXT = "Kampaň je zastavená (bounce rate). Nejdřív odemkni halt výše.";
 const RUNNING_BLOCK_TEXT = "Právě běží jiná dávka, počkej na dokončení.";
@@ -3214,7 +3217,7 @@ async function githubApi(env, path) {
 
 function parseSeriesFromRunName(name) {
   const raw = String(name || "");
-  const match = raw.match(/\b(nulte-kolo|vlna-1|vlna-2)\b/i);
+  const match = raw.match(/\b(nulte-kolo|vlna-1|vlna-2|vlna-3)\b/i);
   return match ? match[1].toLowerCase() : "";
 }
 
@@ -3393,11 +3396,12 @@ function seriesView(snapshot, runState, seriesDef) {
   const untilMs = until ? new Date(until).getTime() : 0;
   const cooldownActive = Boolean(untilMs && untilMs > Date.now());
   const halted = Boolean(snapshot?.halt?.halted || snapshot?.stats?.halted || fromSnap.halted);
+  const lockAfterHalt = fromSnap.lock_after_halt_during !== false;
   const nulte = snapshot?.series?.["nulte-kolo"] || {};
   const nulteDone =
     Number(nulte.contacted || 0) >= Number(nulte.total || 20) &&
     Number(nulte.total || 0) > 0 &&
-    !nulte.halt_during &&
+    (!nulte.halt_during || !lockAfterHalt) &&
     !halted;
   const waveLocked = seriesDef.id !== "nulte-kolo" && !nulteDone;
   const lastSuccess = runState?.lastSuccessBySeries?.[seriesDef.id] || null;
@@ -3934,7 +3938,7 @@ function renderAdminHtml(snapshot, {
       const btnClass = autoOn ? "auto-off-btn" : "auto-on-btn";
       autoBlock = `${formOpen}
         <p class="hint">Automatické odesílání: <strong class="${autoClass}">${autoLabel}</strong>
-        — každých ${AUTO_INTERVAL_MIN} min, Po–Pá 8:00–18:00 (Praha). Změna velikosti platí od další naplánované dávky.</p>
+        — každých ${AUTO_INTERVAL_MIN} min, max ${AUTO_DAILY_CAP} e-mailů / den, Po–Pá 8:00–18:00 (Praha). Změna velikosti platí od další naplánované dávky.</p>
         ${sizeRow}
           <button class="${btnClass}" type="submit" name="intent" value="toggle">${btnLabel}</button>
         </div>
@@ -4361,7 +4365,7 @@ function renderAdminHtml(snapshot, {
         var input = form.querySelector('input[name="auto_batch"]');
         var n = Number(input && input.value);
         if (!Number.isFinite(n) || n < 1) n = ${DEFAULT_BATCH};
-        var msg = "Zapnout automatické odesílání série " + name + "? Dávky po " + n + " e-mailech každých 30 min, pracovní dny 8:00–18:00 (Praha).";
+        var msg = "Zapnout automatické odesílání série " + name + "? Dávky po " + n + " e-mailech každých 60 min, strop 40 e-mailů / den, pracovní dny 8:00–18:00 (Praha).";
         if (!window.confirm(msg)) event.preventDefault();
       });
     });
