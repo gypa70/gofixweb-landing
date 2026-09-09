@@ -18,7 +18,10 @@ export function useScannedShops(): number | null {
 
     const load = async () => {
       try {
-        const response = await fetch(PUBLIC_STATS_URL, { signal: controller.signal });
+        const response = await fetch(PUBLIC_STATS_URL, {
+          signal: controller.signal,
+          cache: 'no-store',
+        });
         if (!response.ok) return;
 
         const data: unknown = await response.json();
