@@ -10,6 +10,9 @@ permissions:
   pages: write
   id-token: write
 
+# Keep cancel-in-progress false: Pages publish can take most of the 10 min
+# deploy-pages ceiling. Cancelling an in-flight deploy to start another
+# one leaves both unfinished (GitHub then aborts with "Timeout reached").
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -18,8 +21,9 @@ jobs:
   deploy:
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.d1.outputs.page_url || steps.d2.outputs.page_url || steps.d3.outputs.page_url }}
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -53,5 +57,37 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: publish
-      - id: deployment
+
+      # deploy-pages polls Pages until status is success, then hard-caps at
+      # 10 minutes and cancels the deployment. GitHub's publish step can sit
+      # on updating_pages past that cap. Retry after the cancelled
+      # deployment has settled — a second create for the same SHA while the
+      # first is still live is rejected immediately.
+      - id: d1
         uses: actions/deploy-pages@v4
+        continue-on-error: true
+        with:
+          error_count: 30
+          reporting_interval: 8000
+          timeout: 600000
+      - name: Back off after Pages deploy timeout
+        if: steps.d1.outcome == 'failure'
+        run: sleep 45
+      - id: d2
+        if: steps.d1.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+        with:
+          error_count: 30
+          reporting_interval: 8000
+          timeout: 600000
+      - name: Back off before final Pages deploy
+        if: steps.d1.outcome == 'failure' && steps.d2.outcome == 'failure'
+        run: sleep 60
+      - id: d3
+        if: steps.d1.outcome == 'failure' && steps.d2.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        with:
+          error_count: 30
+          reporting_interval: 8000
+          timeout: 600000
