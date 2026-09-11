@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "model": "claude-sonnet-4-5",
+  "cta": "Chcete stejný typ kontroly na svém e-shopu? [Bezplatný report do 10 minut](/#analyza) — nebo se podívejte na [FAQ](/#faq) a [ceník](/#ceny).",
+  "existing_manual_posts": [
+    {
+      "slug": "woocommerce-seo-pagespeed-case-study",
+      "title": "WooCommerce e-shop: SEO 65→100, PageSpeed 76→97, obrázky 2,45 MB→0,59 MB",
+      "summary": "Jedna konkrétní Auto oprava: lab čísla SEO, PageSpeed a váha obrázků. Co z case study nevyplývá."
+    },
+    {
+      "slug": "5-nejcastejsich-seo-chyb-woocommerce",
+      "title": "5 nejčastějších SEO chyb, které zpomalují váš WooCommerce e-shop",
+      "summary": "Checklist z prohlížeče: stejný title, H1, těžké fotky, tenké kategorie, indexace filtrů."
+    },
+    {
+      "slug": "proc-je-rychlost-eshopu-dulezita-pro-trzby",
+      "title": "Proč je rychlost e-shopu důležitá pro tržby",
+      "summary": "LCP/INP a odchod z košíku. Lab vs field data. Rychlost není estetika."
+    },
+    {
+      "slug": "jak-zkontrolovat-seo-eshopu-za-5-minut",
+      "title": "Jak zkontrolovat, jestli má váš e-shop problém s SEO, za 5 minut",
+      "summary": "Pětiminutový postup: title, H1, PageSpeed, obrázky, site: vyhledávání."
+    },
+    {
+      "slug": "woocommerce-vs-jine-platformy-manual-auto",
+      "title": "WooCommerce vs. jiné platformy: co to znamená pro automatické opravy",
+      "summary": "Auto jen WooCommerce přes Application Password. Manuál na ostatní CMS."
+    }
+  ],
+  "queue": [
+    {
+      "id": "ai-onpage-seo-male-eshopy",
+      "title": "Jak AI mění on-page SEO — a co z toho plyne pro malý e-shop",
+      "angle": "Generované title/meta vs. unikátní pole na každé URL. AI jako návrh, ne jako hromadný overwrite katalogu.",
+      "avoid": "Neopakovat pět WooCommerce chyb ani pětiminutový checklist.",
+      "tags": ["AI", "SEO"]
+    },
+    {
+      "id": "ai-nastroje-vs-omezene-autofix",
+      "title": "AI nástroje slibují opravu webu. GoFixWeb sahá jen tam, kam smí",
+      "angle": "Rozdíl mezi obecným AI pluginem a omezeným zápisem (SEO pole, komprese, doporučené pluginy).",
+      "avoid": "Neopakovat srovnání platforem Auto vs Manuál jako hlavní téma.",
+      "tags": ["AI", "Opravy"]
+    },
+    {
+      "id": "ai-a-pagespeed",
+      "title": "AI PageSpeed nezrychlí, dokud prohlížeč stahuje megabajtové fotky",
+      "angle": "Modely nepíšou LCP. Komprese, slider, třetí strany. Kde AI může navrhnout postup a kde jen měříme.",
+      "avoid": "Neopakovat článek o tržbách a rychlosti ani case study čísla jako slib.",
+      "tags": ["AI", "PageSpeed"]
+    },
+    {
+      "id": "budoucnost-automatizovanych-oprav",
+      "title": "Budoucnost automatizovaných oprav e-shopů: víc měření, míň magie",
+      "angle": "Co půjde dál automatizovat bezpečně a co zůstane na člověku (checkout, doprava, právní texty).",
+      "avoid": "Žádné sci-fi sliby o plně autonomním e-shopu.",
+      "tags": ["AI", "Automatizace"]
+    },
+    {
+      "id": "ai-generovane-title-meta",
+      "title": "AI umí napsat title. Nestojí to za nic, když je na stu URL stejný",
+      "angle": "Hromadné šablony z chatu vs. pole po stránkách. Jak poznat, že AI jen přepsala slogan firmy.",
+      "avoid": "Neopakovat pětiminutovou kontrolu krok za krokem.",
+      "tags": ["AI", "SEO"]
+    },
+    {
+      "id": "chatbot-vs-technicky-sken",
+      "title": "Chatbot vám poradí plugin. Sken vám řekne, co je na URL rozbité",
+      "angle": "Konverzace s modelem vs. veřejné HTML + PageSpeed. Proč rada bez měření špatně sedí.",
+      "avoid": "Nehanit AI obecně; držet se diagnostiky e-shopu.",
+      "tags": ["AI", "Sken"]
+    },
+    {
+      "id": "kde-ai-neopravi-eshop",
+      "title": "Kam AI ani automatická oprava sahat nesmí: platby, košík, doprava",
+      "angle": "Hranice bezpečného zápisu. Proč GoFixWeb neřeší checkout skriptem.",
+      "avoid": "Neopakovat seznam Auto funkcí jako recenzi WordPressu.",
+      "tags": ["AI", "Bezpečnost"]
+    },
+    {
+      "id": "ai-obrazky-vs-komprese",
+      "title": "AI umí vygenerovat fotku. LCP spíš spraví komprese té, kterou už máte",
+      "angle": "Generativní obrázky vs. bajty na homepage. Kdy nová grafika škodí víc než stará těžká.",
+      "avoid": "Neopakovat case study 2,45 MB→0,59 MB jako univerzální výsledek.",
+      "tags": ["AI", "Obrázky"]
+    },
+    {
+      "id": "ai-copy-kategorii",
+      "title": "AI text do kategorie nevyřeší desítky prázdných archivů",
+      "angle": "Tenké kategorie a duplicitní copy. Generovaný odstavec nestačí, když je URL zbytečná.",
+      "avoid": "Neopisovat bod o tenkých kategoriích z WooCommerce checklistu 1:1.",
+      "tags": ["AI", "Katalog"]
+    },
+    {
+      "id": "mereni-pred-po-ai-zasahu",
+      "title": "Než pustíte AI do šablony, změřte homepage. Potom znovu",
+      "angle": "Před/po stejnou metodikou. Bez druhého měření je „optimalizace“ jen pocit.",
+      "avoid": "Neopakovat case study jako důkaz, že každé AI zlepší skóre.",
+      "tags": ["AI", "Měření"]
+    },
+    {
+      "id": "ai-a-core-web-vitals",
+      "title": "Core Web Vitals se nepromptují. Počítá je prohlížeč zákazníka",
+      "angle": "LCP, INP, CLS vs. text, který AI vygeneruje do článku. Field data zůstanou rozhodující.",
+      "avoid": "Neopakovat celý článek o tržbách a rychlosti.",
+      "tags": ["AI", "Core Web Vitals"]
+    },
+    {
+      "id": "duveryhodnost-ai-pdf",
+      "title": "AI PDF o čtyřiceti stranách pořád není vyčíslená ztráta v korunách",
+      "angle": "Proč GoFixWeb řadí nálezy podle modelu dopadu, ne podle délky reportu.",
+      "avoid": "Neútočit na konkrétní nástroje jménem; držet se formátu výstupu.",
+      "tags": ["AI", "Report"]
+    },
+    {
+      "id": "application-password-vs-ai-plugin",
+      "title": "Application Password jde smazat. AI plugin v administraci zůstane, dokud ho někdo neodebere",
+      "angle": "Model přístupu: dočasný token vs. trvalý plugin s vlastním modelem a právy.",
+      "avoid": "Neopakovat celý článek Auto vs Manuál; jen úhel přístupu a rizik.",
+      "tags": ["AI", "WordPress"]
+    },
+    {
+      "id": "ai-halucinace-v-navodech",
+      "title": "AI návod často kliká na obrazovku, která v šabloně není",
+      "angle": "Halucinované cesty v administraci. Proč má Manuál vazbu na konkrétní nález, ne na obecný chat.",
+      "avoid": "Neopakovat pětiminutový DIY audit.",
+      "tags": ["AI", "Návod"]
+    },
+    {
+      "id": "automatizace-skenu-ne-obsahu",
+      "title": "Automatizovat sken dává smysl. Automatizovat celý katalog obvykle ne",
+      "angle": "Opakované měření vs. hromadné přepsání produktů modelem. Riziko duplicit a nesmyslných atributů.",
+      "avoid": "Nezakládat článek na case study číslech.",
+      "tags": ["AI", "Automatizace"]
+    },
+    {
+      "id": "ai-sitemap-a-filtry",
+      "title": "AI plugin umí vyrobit sitemapu. Neumí rozhodnout, které filtry mají být v indexu",
+      "angle": "Facetovaná navigace a automaticky generované mapy webu. Lidské pravidlo vs. model.",
+      "avoid": "Neopisovat checklist bod 5 o orderby jako hlavní strukturu článku.",
+      "tags": ["AI", "Indexace"]
+    },
+    {
+      "id": "lidsky-dohled-nad-ai-opravou",
+      "title": "Automatická oprava bez záznamu původního stavu je špatný trade",
+      "angle": "Audit trail, rollback, dohled. Proč GoFixWeb ukládá původní hodnoty.",
+      "avoid": "Technický dump logů; držet se provozovatele e-shopu.",
+      "tags": ["AI", "Audit trail"]
+    },
+    {
+      "id": "ai-v-agenturach-vs-majitel",
+      "title": "Agentura s AI reportem pořád může poslat 40 stran bez jediné koruny",
+      "angle": "Pro koho je výstup: majitel čte ztrátu v Kč, ne skóre nástroje.",
+      "avoid": "Hanění agentur jako celku; kontrast formátu.",
+      "tags": ["AI", "Report"]
+    },
+    {
+      "id": "kdy-nestaci-ai-ani-sken",
+      "title": "Kdy nestačí AI ani sken a potřebujete vývojáře",
+      "angle": "Rozbitá šablona, custom checkout, caching vrstvy. Hranice produktu GoFixWeb.",
+      "avoid": "Slibovat, že Auto nahradí vývojáře ve všem.",
+      "tags": ["AI", "Hranice"]
+    }
+  ],
+  "published": [
+    {
+      "id": "ai-diagnoza-vs-lidske-audit",
+      "slug": "ai-diagnoza-eshopu-neni-lidske-audit",
+      "title": "AI diagnostika e-shopu není totéž co lidský audit",
+      "date": "2026-09-08",
+      "source": "review-draft",
+      "url": "/blog/ai-diagnoza-eshopu-neni-lidske-audit/"
+    }
+  ]
+}
