@@ -17,6 +17,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
   pages: write
   id-token: write
 
@@ -85,6 +86,25 @@ jobs:
           git add frontend/seo/content blog worker/src/blog-posts.generated.js
           git commit -m "Publish weekly blog post ${{ steps.gen.outputs.slug }}"
           git push origin HEAD
+
+      - name: Open GitHub issue if generate/publish failed
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh issue create \
+            --title "Weekly AI blog run failed" \
+            --body "$(cat <<EOF
+          Workflow **Weekly AI blog post** spadl před publikací na main.
+
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          Event: ${{ github.event_name }}
+          Ref: ${{ github.ref }}
+
+          Článek se na web nedostal. Otevři log kroku Generate / Push.
+          EOF
+          )"
 
   deploy-pages:
     needs: publish
