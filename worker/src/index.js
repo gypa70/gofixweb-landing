@@ -3693,15 +3693,63 @@ const LEGAL_SCAN_RULES = [
   ["checkout_button", "g", "Potvrzovací tlačítko"],
 ];
 
-async function readLegalScanCache() {
-  const hit = await caches.default.match(LEGAL_SCAN_CACHE);
-  if (!hit) return null;
+async function fetchLegalScanGithub(env) {
+  const repo = env.GITHUB_REPO || "gypa70/gofixweb-scanner";
+  const token = env.GITHUB_TOKEN;
+  if (!token) return null;
+  const res = await fetch(
+    `https://api.github.com/repos/${repo}/contents/data/legal_scan_last.json?ref=main`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github.raw",
+        "User-Agent": "gofixweb-report-worker",
+        "Cache-Control": "no-cache",
+      },
+      cf: { cacheTtl: 0, cacheEverything: false },
+    },
+  );
+  if (!res.ok) return null;
   try {
-    const raw = await hit.json();
+    const raw = await res.json();
     return raw && typeof raw === "object" ? raw : null;
   } catch {
     return null;
   }
+}
+
+async function readLegalScanCache(env) {
+  let local = null;
+  const hit = await caches.default.match(LEGAL_SCAN_CACHE);
+  if (hit) {
+    try {
+      const raw = await hit.json();
+      if (raw && typeof raw === "object") local = raw;
+    } catch {
+      local = null;
+    }
+  }
+  let remote = null;
+  try {
+    remote = await fetchLegalScanGithub(env);
+  } catch (err) {
+    console.error("legal_scan_github_failed", err);
+  }
+  if (local && local.status === "pending") {
+    if (
+      remote
+      && String(remote.shop_url || "") === String(local.shop_url || "")
+      && String(remote.at || "") >= String(local.at || "")
+    ) {
+      return remote;
+    }
+    return local;
+  }
+  if (remote && (!local || String(remote.at || "") >= String(local.at || ""))) {
+    return remote;
+  }
+  return local;
 }
 
 async function writeLegalScanCache(body) {
@@ -4742,7 +4790,7 @@ async function handleAdminPage(request, env) {
     snapshot = { stats: {}, halt: {}, rows: [], series: {} };
   }
   snapshot = await applyDeletedLandingLeads(snapshot);
-  const legalScan = await readLegalScanCache();
+  const legalScan = await readLegalScanCache(env);
   if (runResult.status === "fulfilled") {
     runState = runResult.value;
   } else {
