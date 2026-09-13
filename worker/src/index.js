@@ -3691,6 +3691,9 @@ const LEGAL_SCAN_RULES = [
   ["complaint_info", "e", "Reklamační informace"],
   ["withdrawal", "f", "Odstoupení od smlouvy"],
   ["checkout_button", "g", "Potvrzovací tlačítko"],
+  ["epr_packaging", "h", "EPR / obalové právo"],
+  ["greenwashing_claims", "i", "Tvrzení o udržitelnosti"],
+  ["eaa_accessibility", "j", "Přístupnost (EAA)"],
 ];
 
 async function fetchLegalScanGithub(env) {
@@ -3765,13 +3768,16 @@ async function writeLegalScanCache(body) {
 }
 
 function legalVerdictClass(result) {
-  if (result === "ano") return "ok";
-  if (result === "ne") return "bad";
+  if (result === "ano" || result === "nenalezeno") return "ok";
+  if (result === "ne" || result === "nalezeno") return "bad";
   return "warn";
 }
 
 function legalVerdictLabel(result) {
   if (result === "nelze_overit") return "nelze ověřit";
+  if (result === "castecne") return "částečně";
+  if (result === "nalezeno") return "nalezeno riziko";
+  if (result === "nenalezeno") return "nenalezeno";
   return String(result || "—");
 }
 
@@ -3788,6 +3794,12 @@ function renderLegalRuleCard(ruleId, letter, title, block) {
   }
   if (block && block.button_text) {
     extra.push(`<div class="hint">Tlačítko: ${escapeHtml(block.button_text)}</div>`);
+  }
+  if (block && Array.isArray(block.phrases) && block.phrases.length) {
+    extra.push(`<div class="hint">Fráze: ${escapeHtml(block.phrases.join(", "))}</div>`);
+  }
+  if (block && Array.isArray(block.missing) && block.missing.length) {
+    extra.push(`<div class="hint">Chybí: ${escapeHtml(block.missing.join("; "))}</div>`);
   }
   let tmpl = "";
   if (fix && typeof fix === "object") {
@@ -3843,7 +3855,7 @@ function renderLegalScanBox(legalScan, { queued = false, error = "" } = {}) {
   return `<div class="suppress-box legal-scan-box" id="legal-scan">
     <h2>Legal Scanner (demo)</h2>
     <p class="mode-tag mode-tag-safe">Interní — ne zákazník, ne outreach, ne DB</p>
-    <p class="hint">Ruční detekce gofix-legal-scanner (pravidla a–g). Jen statické HTML. Šablony u ne / nelze ověřit nejsou právní radou. Průběh: <a href="${ADMIN_LINKS.legalScan}" target="_blank" rel="noopener">GitHub Actions</a>.</p>
+    <p class="hint">Ruční detekce gofix-legal-scanner (pravidla a–j). Jen statické HTML. Šablony u ne / nelze ověřit / částečně / nalezeno riziko nejsou právní radou. Průběh: <a href="${ADMIN_LINKS.legalScan}" target="_blank" rel="noopener">GitHub Actions</a>.</p>
     ${err}
     ${wait}
     <form class="suppress-form" method="post" action="/admin/legal-scan">
