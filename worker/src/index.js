@@ -4725,7 +4725,7 @@ function renderAdminHtml(snapshot, {
       var q = new URLSearchParams(location.search);
       var fromQuery = (q.get("scan") === "1" || q.get("email_queued") === "1" || q.get("email_kind"))
         ? "tests"
-        : (q.get("legal") === "1" ? "legal" : (q.get("resend") === "1" ? "emails" : ""));
+        : (q.get("legal") === "1" || q.get("legal_queued") === "1" ? "legal" : (q.get("resend") === "1" ? "emails" : ""));
       showAdminTab(fromHash || fromQuery || (${legalError ? "true" : "false"} ? "legal" : "") || fromStore || "campaign");
     })();
     setTimeout(function () {
@@ -4773,7 +4773,7 @@ async function handleAdminPage(request, env) {
   const emailKind = String(url.searchParams.get("email_kind") || "").trim();
   const emailTo = String(url.searchParams.get("email_to") || "").trim().toLowerCase();
   const resendQueued = url.searchParams.get("resend") === "1";
-  const legalQueued = url.searchParams.get("legal") === "1";
+  const legalQueued = url.searchParams.get("legal_queued") === "1";
   const legalError = String(url.searchParams.get("legal_error") || "").trim();
   let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
   let error = "";
@@ -5324,6 +5324,7 @@ async function handleAdminLegalScan(request, env) {
   }
   const next = new URL("/admin", request.url);
   next.searchParams.set("legal", "1");
+  next.searchParams.set("legal_queued", "1");
   return Response.redirect(next.toString(), 303);
 }
 
