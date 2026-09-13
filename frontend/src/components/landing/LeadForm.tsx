@@ -204,7 +204,11 @@ export default function LeadForm({ variant = 'hero' }: { variant?: Variant }) {
         <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/15">
           <CheckCircle2 className="h-6 w-6 text-primary" aria-hidden="true" />
         </div>
-        <h3 className="mt-4 text-xl">Máme to, {firstName}.</h3>
+        {variant === 'hero' ? (
+          <h2 className="mt-4 text-xl">Máme to, {firstName}.</h2>
+        ) : (
+          <h3 className="mt-4 text-xl">Máme to, {firstName}.</h3>
+        )}
         <p className="mt-2 text-sm text-muted-foreground">{done.message}</p>
         {isScan ? (
           <ol className="mt-5 space-y-3 text-sm">
@@ -261,7 +265,11 @@ export default function LeadForm({ variant = 'hero' }: { variant?: Variant }) {
         <FileText className="h-4 w-4 text-primary" aria-hidden="true" />
         <span className="text-xs font-bold uppercase tracking-wider text-primary">Bezplatná analýza</span>
       </div>
-      <h3 className="mt-3 text-xl">Zjistěte, kolik vás chyby stojí</h3>
+      {variant === 'hero' ? (
+        <h2 className="mt-3 text-xl">Zjistěte, kolik vás chyby stojí</h2>
+      ) : (
+        <h3 className="mt-3 text-xl">Zjistěte, kolik vás chyby stojí</h3>
+      )}
       <p className="mt-1.5 text-sm text-muted-foreground">
         Report do 10 minut. Bez platební karty, bez přístupů do administrace.
       </p>

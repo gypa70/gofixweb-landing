@@ -97,6 +97,12 @@ const BlogChrome = ({ children }: BlogChromeProps) => (
             >
               Ochrana osobních údajů
             </Link>
+            <Link
+              to="/nahlasit-obsah"
+              className="text-muted-foreground transition-colors duration-200 hover:md:text-foreground"
+            >
+              Nahlásit nezákonný obsah
+            </Link>
           </nav>
         </div>
 
