@@ -3014,6 +3014,7 @@ const ADMIN_LINKS = {
   survey: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-click-survey.yml",
   openSurvey: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-open-survey.yml",
   exitIntent: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-exit-intent.yml",
+  legalScan: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/legal-scan.yml",
   actions: "https://github.com/gypa70/gofixweb-scanner/actions",
 };
 
@@ -3022,12 +3023,14 @@ const OUTREACH_SERIES = [
   { id: "vlna-1", name: "Vlna 1" },
   { id: "vlna-2", name: "Vlna 2" },
   { id: "vlna-3", name: "Vlna 3" },
+  { id: "vlna-4", name: "Vlna 4" },
 ];
 const WAVE_GROUPS = [
   { id: "nulte-kolo", name: "Nulté kolo", campaign: true },
   { id: "vlna-1", name: "Vlna 1", campaign: true },
   { id: "vlna-2", name: "Vlna 2", campaign: true },
   { id: "vlna-3", name: "Vlna 3", campaign: true },
+  { id: "vlna-4", name: "Vlna 4", campaign: true },
   { id: "ostatni", name: "Ostatní", campaign: true },
   { id: "ops", name: "QC / testy", campaign: false },
 ];
@@ -3217,7 +3220,7 @@ async function githubApi(env, path) {
 
 function parseSeriesFromRunName(name) {
   const raw = String(name || "");
-  const match = raw.match(/\b(nulte-kolo|vlna-1|vlna-2|vlna-3)\b/i);
+  const match = raw.match(/\b(nulte-kolo|vlna-1|vlna-2|vlna-3|vlna-4)\b/i);
   return match ? match[1].toLowerCase() : "";
 }
 
@@ -3678,6 +3681,134 @@ function adminTabButton(id, label, badgeHtml = "") {
   return `<button type="button" class="admin-tab" role="tab" id="tabbtn-${id}" data-tab="${id}" aria-controls="tab-${id}">${escapeHtml(label)}${badgeHtml}</button>`;
 }
 
+const LEGAL_SCAN_CACHE = "https://admin.gofixweb/legal-scan-last";
+const LEGAL_SCAN_TTL = 86400;
+const LEGAL_SCAN_RULES = [
+  ["omnibus_30_days", "a", "Nejnižší cena za 30 dní"],
+  ["odr_link", "b", "Odkaz na EU ODR"],
+  ["reviews_verification", "c", "Ověření recenzí"],
+  ["dsa_report_form", "d", "Hlášení nezákonného obsahu (DSA)"],
+  ["complaint_info", "e", "Reklamační informace"],
+  ["withdrawal", "f", "Odstoupení od smlouvy"],
+  ["checkout_button", "g", "Potvrzovací tlačítko"],
+];
+
+async function readLegalScanCache() {
+  const hit = await caches.default.match(LEGAL_SCAN_CACHE);
+  if (!hit) return null;
+  try {
+    const raw = await hit.json();
+    return raw && typeof raw === "object" ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeLegalScanCache(body) {
+  await caches.default.put(
+    LEGAL_SCAN_CACHE,
+    new Response(JSON.stringify(body), {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": `public, max-age=${LEGAL_SCAN_TTL}`,
+      },
+    }),
+  );
+}
+
+function legalVerdictClass(result) {
+  if (result === "ano") return "ok";
+  if (result === "ne") return "bad";
+  return "warn";
+}
+
+function legalVerdictLabel(result) {
+  if (result === "nelze_overit") return "nelze ověřit";
+  return String(result || "—");
+}
+
+function renderLegalRuleCard(ruleId, letter, title, block) {
+  const result = String((block && block.result) || "");
+  const evidence = (block && block.evidence) || "";
+  const fix = block && block.fix_template;
+  const extra = [];
+  if (block && block.url) {
+    extra.push(`<div class="hint">Odkaz: <a href="${escapeHtml(block.url)}" target="_blank" rel="noopener">${escapeHtml(block.url)}</a></div>`);
+  }
+  if (block && block.form_url) {
+    extra.push(`<div class="hint">Formulář: <a href="${escapeHtml(block.form_url)}" target="_blank" rel="noopener">${escapeHtml(block.form_url)}</a></div>`);
+  }
+  if (block && block.button_text) {
+    extra.push(`<div class="hint">Tlačítko: ${escapeHtml(block.button_text)}</div>`);
+  }
+  let tmpl = "";
+  if (fix && typeof fix === "object") {
+    tmpl = `<div class="legal-template">
+      <p class="legal-disc">${escapeHtml(fix.disclaimer || "")}</p>
+      <p class="hint"><strong>Kam:</strong> ${escapeHtml(fix.place || "")}</p>
+      <p>${escapeHtml(fix.suggested_text || "")}</p>
+    </div>`;
+  }
+  return `<article class="legal-rule">
+    <h3>(${escapeHtml(letter)}) ${escapeHtml(title)}
+      <span class="${legalVerdictClass(result)}">${escapeHtml(legalVerdictLabel(result))}</span>
+    </h3>
+    <p class="hint">${escapeHtml(evidence)}</p>
+    ${extra.join("")}
+    ${tmpl}
+  </article>`;
+}
+
+function renderLegalScanBox(legalScan, { queued = false, error = "" } = {}) {
+  const err = error ? `<p class="banner-err">${escapeHtml(error)}</p>` : "";
+  const wait = queued || (legalScan && legalScan.status === "pending")
+    ? `<p class="banner-wait"><span class="pulse-dot"></span><span>Legal scan běží v GitHub Actions (statické HTML, obvykle do minuty). Stránka se sama obnoví.</span></p>`
+    : "";
+  let resultHtml = `<p class="muted">Zatím žádný scan. Zadej URL a spusť.</p>`;
+  if (legalScan && legalScan.status === "error") {
+    resultHtml = `<p class="banner-err">${escapeHtml(legalScan.error || "Scan selhal.")}</p>
+      <p class="hint">${escapeHtml(legalScan.shop_url || "")}</p>`;
+  } else if (legalScan && legalScan.payload) {
+    const p = legalScan.payload;
+    const terms = p.terms || {};
+    const termsLine = terms.found && terms.url
+      ? `<a href="${escapeHtml(terms.url)}" target="_blank" rel="noopener">${escapeHtml(terms.url)}</a>`
+      : (terms.found ? "nalezeny (bez URL)" : "nenalezeny");
+    const shop = (p.homepage && p.homepage.final_url) || p.url || legalScan.shop_url || "";
+    const emailed = legalScan.email_sent_to
+      ? `<p class="hint">HTML report odeslán na ${escapeHtml(legalScan.email_sent_to)}.</p>`
+      : (legalScan.email_error
+        ? `<p class="banner-err">Scan hotov, e-mail se nepodařilo odeslat: ${escapeHtml(legalScan.email_error)}</p>`
+        : "");
+    const cards = LEGAL_SCAN_RULES.map(([id, letter, title]) => (
+      renderLegalRuleCard(id, letter, title, p[id] || {})
+    )).join("");
+    resultHtml = `<div class="legal-result">
+      <p><strong>E-shop:</strong> ${shop ? `<a href="${escapeHtml(shop)}" target="_blank" rel="noopener">${escapeHtml(shop)}</a>` : "—"}</p>
+      <p><strong>Obchodní podmínky:</strong> ${termsLine}</p>
+      <p class="hint">HTTP ${escapeHtml(p.homepage && p.homepage.status_code != null ? p.homepage.status_code : "—")}
+        · ${escapeHtml(legalScan.at || "")}</p>
+      ${emailed}
+      ${cards}
+    </div>`;
+  }
+  return `<div class="suppress-box legal-scan-box" id="legal-scan">
+    <h2>Legal Scanner (demo)</h2>
+    <p class="mode-tag mode-tag-safe">Interní — ne zákazník, ne outreach, ne DB</p>
+    <p class="hint">Ruční detekce gofix-legal-scanner (pravidla a–g). Jen statické HTML. Šablony u ne / nelze ověřit nejsou právní radou. Průběh: <a href="${ADMIN_LINKS.legalScan}" target="_blank" rel="noopener">GitHub Actions</a>.</p>
+    ${err}
+    ${wait}
+    <form class="suppress-form" method="post" action="/admin/legal-scan">
+      <label>URL e-shopu
+        <input type="text" name="shop_url" required placeholder="https://example.cz" autocomplete="off" value="${escapeHtml((legalScan && legalScan.shop_url) || "")}">
+      </label>
+      <button class="launch" type="submit">Spustit scan</button>
+      <button class="launch" type="submit" name="send_email" value="1">Spustit a poslat na trueforexway@gmail.com</button>
+    </form>
+    ${resultHtml}
+  </div>`;
+}
+
 function waveFilterCount(wave, filterId) {
   const filters = wave?.filters || {};
   return Number(filters[filterId] ?? 0);
@@ -3689,6 +3820,35 @@ function resendEtaMinutes(count, batchSize) {
   if (n <= 0) return 0;
   const batches = Math.ceil(n / size);
   return (batches - 1) * 5 + batches * 2;
+}
+
+function renderSendingDomainStrip(snapshot) {
+  const rows = Array.isArray(snapshot?.sending_domains) ? snapshot.sending_domains : [];
+  if (!rows.length) {
+    return `<p class="hint">Odesílací From se ukládá od teď (sloupec <code>sending_domain</code>). Historie bez sloupce = gofixweb.com.</p>`;
+  }
+  const cards = rows.map((row) => {
+    const host = row.sending_domain || "gofixweb.com";
+    const bounce = Number(row.bounce_rate ?? 0);
+    return `<div class="card"><div class="k">${escapeHtml(host)}</div><div class="v ${bounce >= 3 ? "bad" : ""}">${escapeHtml(row.sent ?? 0)}</div><p class="hint">bounce ${escapeHtml(row.bounced ?? 0)} (${escapeHtml(bounce)} %)</p></div>`;
+  }).join("");
+  return `<div class="cards sending-domain-cards">${cards}</div>`;
+}
+
+function renderWaveSendingDomain(wave) {
+  const host = wave?.sending_domain || "gofixweb.com";
+  const byHost = wave?.sending_domains && typeof wave.sending_domains === "object"
+    ? wave.sending_domains
+    : {};
+  const extra = Object.entries(byHost)
+    .map(([name, rec]) => {
+      const sent = Number(rec?.sent || 0);
+      const bounced = Number(rec?.bounced || 0);
+      const rate = Number(rec?.bounce_rate || 0);
+      return `<code>${escapeHtml(name)}</code> ${sent} odesláno, bounce ${bounced} (${rate} %)`;
+    })
+    .join(" · ");
+  return `<p class="hint">Odesílací From: <code>${escapeHtml(host)}</code>${extra ? ` — ${extra}` : ""}</p>`;
 }
 
 function renderWaveKindBreakdown(wave) {
@@ -3760,6 +3920,7 @@ function renderWaveEmailsSection(snapshot, { halted = false, runState = {} } = {
         <div class="card"><div class="k">Proklik</div><div class="v">${escapeHtml(wave.clicked ?? 0)} (${escapeHtml(wave.click_rate ?? 0)} %)</div></div>
         <div class="card"><div class="k">Konverze</div><div class="v">${escapeHtml(wave.conversions ?? 0)}</div></div>
       </div>
+      ${renderWaveSendingDomain(wave)}
       ${renderWaveKindBreakdown(wave)}
       ${qcNote}
       ${jobNote}
@@ -3784,7 +3945,8 @@ function renderWaveEmailsSection(snapshot, { halted = false, runState = {} } = {
   }).join("");
   return `<div class="wave-box">
     <h2>Odeslané e-maily podle skupiny</h2>
-    <p class="hint">Vlny z <code>campaign_series_progress</code>, doručení z <code>email_delivery_log</code> (jen outreach). QC/testy zvlášť. Nespárované outreach řádky jsou v záložce Ostatní.</p>
+    <p class="hint">Vlny z <code>campaign_series_progress</code>, doručení z <code>email_delivery_log</code> (jen outreach). QC/testy zvlášť. Nespárované outreach řádky jsou v záložce Ostatní. Filtruj vlnu záložkou — u každé je odesílací From (gofixweb.com vs trygofixweb.com).</p>
+    ${renderSendingDomainStrip(snapshot)}
     <nav class="wave-tabs" role="tablist" aria-label="Kampaňové skupiny">${nav}</nav>
     ${panels}
   </div>`;
@@ -3821,6 +3983,9 @@ function renderAdminHtml(snapshot, {
   runState = {},
   orders = null,
   ordersError = "",
+  legalScan = null,
+  legalQueued = false,
+  legalError = "",
 } = {}) {
   const stats = snapshot?.stats || {};
   const halt = snapshot?.halt || {};
@@ -3838,6 +4003,7 @@ function renderAdminHtml(snapshot, {
       ${adminTabButton("campaign", "Stav kampaně", `${adminTabBadge(remainingSend, campaignBadgeCls)}${halted ? adminTabBadge("HALT", "bad") : ""}`)}
       ${adminTabButton("emails", "Odeslané e-maily", adminTabBadge(stats.sent ?? 0))}
       ${adminTabButton("tests", "Testovací sken")}
+      ${adminTabButton("legal", "Legal Scanner (demo)")}
       ${adminTabButton("leads", "Poptávky", adminTabBadge(leadsInfo.newCount, leadsInfo.newCount > 0 ? "warn" : ""))}
       ${adminTabButton("orders", "Objednávky", adminTabBadge(orderCount))}
       ${adminTabButton("feedback", "Zpětná vazba", adminTabBadge(whyPending, whyPending > 0 ? "warn" : ""))}
@@ -3847,6 +4013,8 @@ function renderAdminHtml(snapshot, {
   const batchBusy = Boolean((runState?.active || []).length)
     || (launched && (!launchedRun || isActiveRun(launchedRun)));
   const refreshSec = batchBusy ? 20 : 60;
+  const legalBusy = Boolean(legalQueued) || (legalScan && legalScan.status === "pending");
+  const adminRefreshSec = legalBusy ? 20 : refreshSec;
   const generated = snapshot?.generated_at
     ? formatWhen(snapshot.generated_at)
     : "—";
@@ -4061,6 +4229,7 @@ function renderAdminHtml(snapshot, {
           return `<tr${trClass}>
             <td>${escapeHtml(row.email)}</td>
             <td>${escapeHtml(row.domain || "—")}</td>
+            <td>${escapeHtml(row.sending_domain || "gofixweb.com")}</td>
             <td>${formatWhen(row.sent_at)}</td>
             <td class="${statusClass("smtp", row.smtp_status)}">${escapeHtml(row.smtp_status || "—")}</td>
             <td class="${statusClass("bounce", row.bounce_status)}">${escapeHtml(row.bounce_status || "—")}</td>
@@ -4068,7 +4237,7 @@ function renderAdminHtml(snapshot, {
           </tr>`;
         })
         .join("")
-    : `<tr><td colspan="6" class="muted">Zatím žádné outreach odeslání.</td></tr>`;
+    : `<tr><td colspan="7" class="muted">Zatím žádné outreach odeslání.</td></tr>`;
 
   return `<!DOCTYPE html>
 <html lang="cs">
@@ -4128,6 +4297,13 @@ function renderAdminHtml(snapshot, {
     .dev-email-box h2 { color: #4ade80; }
     .dev-scan-live { border: 1px solid rgba(251,191,36,0.55); background: rgba(251,191,36,0.10); }
     .dev-scan-live h2 { color: #fbbf24; }
+    .legal-scan-box { border: 1px solid rgba(45,212,191,0.45); background: rgba(13,148,136,0.10); }
+    .legal-scan-box h2 { color: #5eead4; }
+    .legal-rule { background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 0.85rem; margin-top: 0.7rem; }
+    .legal-rule h3 { font-size: 0.95rem; margin: 0 0 0.35rem; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: baseline; justify-content: space-between; }
+    .legal-template { margin-top: 0.65rem; padding: 0.65rem 0.75rem; border-radius: 8px; background: rgba(15,23,42,0.7); border: 1px dashed rgba(94,234,212,0.35); }
+    .legal-template p { white-space: pre-wrap; margin: 0.35rem 0 0; font-size: 0.88rem; }
+    .legal-disc { color: #fde68a; font-size: 0.8rem !important; font-style: italic; }
     .mode-tag { display: inline-block; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.2rem 0.5rem; border-radius: 999px; margin: 0 0 0.55rem; }
     .mode-tag-safe { background: rgba(22,163,74,0.2); color: #86efac; }
     .mode-tag-live { background: rgba(251,191,36,0.22); color: #fde68a; }
@@ -4197,7 +4373,7 @@ function renderAdminHtml(snapshot, {
 <body>
   <div class="wrap">
     <h1>GoFix<span>Web</span> — stav kampaně</h1>
-    <p class="sub">Interní přehled. Snapshot z DB: ${generated}. Obnova každých ${refreshSec} s (stejná čísla i na záložkách).</p>
+    <p class="sub">Interní přehled. Snapshot z DB: ${generated}. Obnova každých ${adminRefreshSec} s (stejná čísla i na záložkách).</p>
     ${err}${queuedNote}${launchedNote}${autoNote}${suppressedNote}${emailNote}${emailErr}${resendNote}${scanNote}${scanErr}${launchErr}
     ${tabsNav}
     <section class="admin-panel is-active" id="tab-campaign" role="tabpanel" aria-labelledby="tabbtn-campaign">
@@ -4246,7 +4422,7 @@ function renderAdminHtml(snapshot, {
     <table>
       <thead>
         <tr>
-          <th>E-mail</th><th>Doména</th><th>Odesláno</th>
+          <th>E-mail</th><th>Doména</th><th>From</th><th>Odesláno</th>
           <th>SMTP</th><th>Bounce</th><th>Důvod</th>
         </tr>
       </thead>
@@ -4259,6 +4435,9 @@ function renderAdminHtml(snapshot, {
     <section class="admin-panel" id="tab-tests" role="tabpanel" aria-labelledby="tabbtn-tests">
       ${devEmailBox}
       ${devScanBox}
+    </section>
+    <section class="admin-panel" id="tab-legal" role="tabpanel" aria-labelledby="tabbtn-legal">
+      ${renderLegalScanBox(legalScan, { queued: legalQueued, error: legalError })}
     </section>
     <section class="admin-panel" id="tab-leads" role="tabpanel" aria-labelledby="tabbtn-leads">
       ${renderLandingLeadsBox(snapshot)}
@@ -4471,7 +4650,7 @@ function renderAdminHtml(snapshot, {
       });
     });
     function showAdminTab(id) {
-      var known = { campaign: 1, emails: 1, tests: 1, leads: 1, orders: 1, feedback: 1 };
+      var known = { campaign: 1, emails: 1, tests: 1, legal: 1, leads: 1, orders: 1, feedback: 1 };
       if (!known[id]) id = "campaign";
       document.querySelectorAll(".admin-tab").forEach(function (btn) {
         var on = btn.getAttribute("data-tab") === id;
@@ -4498,15 +4677,15 @@ function renderAdminHtml(snapshot, {
       var q = new URLSearchParams(location.search);
       var fromQuery = (q.get("scan") === "1" || q.get("email_queued") === "1" || q.get("email_kind"))
         ? "tests"
-        : (q.get("resend") === "1" ? "emails" : "");
-      showAdminTab(fromHash || fromQuery || fromStore || "campaign");
+        : (q.get("legal") === "1" ? "legal" : (q.get("resend") === "1" ? "emails" : ""));
+      showAdminTab(fromHash || fromQuery || (${legalError ? "true" : "false"} ? "legal" : "") || fromStore || "campaign");
     })();
     setTimeout(function () {
       var el = document.activeElement;
       var tag = el && el.tagName ? String(el.tagName).toLowerCase() : "";
       if (tag === "input" || tag === "select" || tag === "textarea") return;
       location.reload();
-    }, ${refreshSec}000);
+    }, ${adminRefreshSec}000);
   </script>
 </body>
 </html>`;
@@ -4546,6 +4725,8 @@ async function handleAdminPage(request, env) {
   const emailKind = String(url.searchParams.get("email_kind") || "").trim();
   const emailTo = String(url.searchParams.get("email_to") || "").trim().toLowerCase();
   const resendQueued = url.searchParams.get("resend") === "1";
+  const legalQueued = url.searchParams.get("legal") === "1";
+  const legalError = String(url.searchParams.get("legal_error") || "").trim();
   let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
   let error = "";
   let runState = emptyOutreachRunState();
@@ -4561,6 +4742,7 @@ async function handleAdminPage(request, env) {
     snapshot = { stats: {}, halt: {}, rows: [], series: {} };
   }
   snapshot = await applyDeletedLandingLeads(snapshot);
+  const legalScan = await readLegalScanCache();
   if (runResult.status === "fulfilled") {
     runState = runResult.value;
   } else {
@@ -4570,7 +4752,7 @@ async function handleAdminPage(request, env) {
   const ordersError = String(snapshot?.orders?.error || snapshot?.orders_error || "");
   return adminHtmlResponse(renderAdminHtml(snapshot, {
     error, queued, launched, launchedSeries, launchedRunId, autoQueued, autoSizeQueued, suppressed, suppressedAlready, suppressedEmail, scanQueued, scanEmail, scanLead, emailQueued, emailKind, emailTo, resendQueued, runState,
-    orders, ordersError,
+    orders, ordersError, legalScan, legalQueued, legalError,
   }));
 }
 
@@ -5026,6 +5208,111 @@ async function handleAdminDevScan(request, env) {
   next.searchParams.set("to", email);
   if (landingLeadId) next.searchParams.set("lead", "1");
   return Response.redirect(next.toString(), 303);
+}
+
+async function handleAdminLegalScan(request, env) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const denied = await requireAdminAuth(request, env);
+  if (denied) return denied;
+
+  const failRedirect = (message) => {
+    const next = new URL("/admin", request.url);
+    next.searchParams.set("legal", "1");
+    next.searchParams.set("legal_error", String(message || "Legal scan se nepodařilo spustit.").slice(0, 180));
+    return Response.redirect(next.toString(), 303);
+  };
+
+  let shopUrlRaw = "";
+  let sendEmail = false;
+  try {
+    const form = await request.formData();
+    shopUrlRaw = String(form.get("shop_url") || "").trim();
+    sendEmail = String(form.get("send_email") || "") === "1";
+  } catch {
+    return failRedirect("Neplatný formulář.");
+  }
+  if (!shopUrlRaw) {
+    return failRedirect("Zadejte URL e-shopu.");
+  }
+  let shop_url;
+  try {
+    shop_url = normalizeUrl(shopUrlRaw);
+  } catch {
+    return failRedirect("Neplatná URL e-shopu.");
+  }
+
+  const pending = {
+    status: "pending",
+    shop_url,
+    send_email: sendEmail,
+    at: new Date().toISOString(),
+  };
+  try {
+    await writeLegalScanCache(pending);
+  } catch (err) {
+    console.error("admin_legal_scan_cache_failed", err);
+  }
+
+  try {
+    await dispatchGithubEvent(env, "legal-scan", {
+      source: "admin",
+      shop_url,
+      send_email: sendEmail ? "1" : "0",
+      at: pending.at,
+    });
+  } catch (err) {
+    console.error("admin_legal_scan_dispatch_failed", err);
+    try {
+      await writeLegalScanCache({
+        status: "error",
+        shop_url,
+        error: "Legal scan se nepodařilo spustit v GitHub Actions.",
+        at: new Date().toISOString(),
+      });
+    } catch {}
+    return failRedirect("Legal scan se nepodařilo spustit v GitHub Actions. Zkuste workflow ručně.");
+  }
+  const next = new URL("/admin", request.url);
+  next.searchParams.set("legal", "1");
+  return Response.redirect(next.toString(), 303);
+}
+
+async function handleAdminLegalScanResult(request, env) {
+  if (request.method !== "POST") {
+    return jsonResponse({ ok: false, error: "method_not_allowed" }, 405);
+  }
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ ok: false, error: "invalid_json" }, 400);
+  }
+  if (!body || typeof body !== "object") {
+    return jsonResponse({ ok: false, error: "invalid_body" }, 400);
+  }
+  const shopUrl = String(body.shop_url || "").trim();
+  if (!shopUrl) {
+    return jsonResponse({ ok: false, error: "missing_shop_url" }, 400);
+  }
+  const url = new URL(request.url);
+  const token = String(url.searchParams.get("t") || "").trim();
+  if (!(await tokenMatchesTracking(env, `legal-scan\n${shopUrl}`, token))) {
+    return jsonResponse({ ok: false, error: "bad_token" }, 403);
+  }
+  const status = String(body.status || "").trim() || (body.payload ? "done" : "error");
+  const stored = {
+    status: status === "done" ? "done" : "error",
+    shop_url: shopUrl,
+    payload: body.payload && typeof body.payload === "object" ? body.payload : null,
+    error: String(body.error || "").slice(0, 500),
+    email_sent_to: String(body.email_sent_to || "").slice(0, 120) || null,
+    email_error: String(body.email_error || "").slice(0, 400) || null,
+    at: String(body.at || new Date().toISOString()),
+  };
+  await writeLegalScanCache(stored);
+  return jsonResponse({ ok: true });
 }
 
 async function handleAdminDevEmail(request, env) {
@@ -6682,6 +6969,14 @@ export default {
 
     if (url.pathname === "/admin/dev-scan") {
       return handleAdminDevScan(request, env);
+    }
+
+    if (url.pathname === "/admin/legal-scan") {
+      return handleAdminLegalScan(request, env);
+    }
+
+    if (url.pathname === "/admin/legal-scan-result") {
+      return handleAdminLegalScanResult(request, env);
     }
 
     if (url.pathname === "/admin/dev-email") {
