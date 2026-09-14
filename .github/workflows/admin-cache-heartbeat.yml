@@ -1,0 +1,41 @@
+name: Admin HTML cache heartbeat
+
+# Cold GET /admin. Does not call the HTML warm endpoint.
+# Alert (GitHub issue + ntfy.sh) if KV is empty/stale > 20 min or the page is the warming stub.
+# Marker: admin-html-cache-alert
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Decide only, do not open a GitHub issue or send ntfy
+        required: false
+        type: boolean
+        default: true
+
+run-name: "Admin HTML cache heartbeat${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && ' dry-run' || '' }}"
+
+concurrency:
+  group: admin-html-cache-heartbeat
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cold-check admin HTML store
+        env:
+          ADMIN_BASIC_PASSWORD: ${{ secrets.ADMIN_BASIC_PASSWORD }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
+        run: python scripts/check_admin_html_cache.py

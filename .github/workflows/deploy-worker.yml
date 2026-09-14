@@ -7,12 +7,15 @@ on:
       - "worker/**"
       - "blog/posts/**"
       - "scripts/build_blog.py"
+      - "scripts/ensure_admin_html_kv.py"
       - ".github/workflows/deploy-worker.yml"
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    outputs:
+      worker_ready: ${{ steps.cf.outputs.present }}
     steps:
       - uses: actions/checkout@v4
 
@@ -36,6 +39,13 @@ jobs:
             exit 1
           fi
           echo "STRIPE_SECRET_KEY GitHub secret is present."
+
+      - name: Ensure ADMIN_HTML KV namespace
+        if: steps.cf.outputs.present == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: python scripts/ensure_admin_html_kv.py
 
       - uses: cloudflare/wrangler-action@v3
         if: steps.cf.outputs.present == 'true'
@@ -390,8 +400,62 @@ jobs:
           print(raw[:12000])
           PY
 
-      - name: Probe /admin?legal=1 five times
+      - name: Probe /admin cache-status then warm then legal=1
         if: steps.cf.outputs.present == 'true'
+        env:
+          ADMIN_BASIC_PASSWORD: ${{ secrets.ADMIN_BASIC_PASSWORD }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          BASE="https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev"
+          URL="$BASE/admin?legal=1"
+          AUTH="gofixweb:${ADMIN_BASIC_PASSWORD}"
+          ACCOUNT="${CLOUDFLARE_ACCOUNT_ID:-47c841c4775065340b62547db3608ea4}"
+          echo "===== GET /admin/cache-status (no warm) ====="
+          curl -sS -D - -o /tmp/cache-status.json --max-time 30 -u "$AUTH" "$BASE/admin/cache-status" || true
+          echo
+          cat /tmp/cache-status.json || true
+          echo
+          echo "===== Cloudflare cron schedules ====="
+          curl -sS --max-time 30 \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/workers/scripts/gofixweb-report-trigger/schedules" \
+            | head -c 4000 || true
+          echo
+          echo "===== POST /admin/warm-html ====="
+          warm_code=$(curl -sS -o /tmp/admin-warm.json -w "%{http_code}" --max-time 30 \
+            -u "$AUTH" -X POST "$BASE/admin/warm-html" || true)
+          echo "warm-html HTTP $warm_code"
+          cat /tmp/admin-warm.json || true
+          echo
+          if [ "$warm_code" != "200" ]; then
+            echo "::error::POST /admin/warm-html returned $warm_code"
+            exit 1
+          fi
+          echo "===== GET /admin?legal=1 within 5s of warm ====="
+          code=$(curl -sS -D /tmp/admin-now.hdr -o /tmp/admin-now.html -w "%{http_code}" --max-time 30 -u "$AUTH" "$URL")
+          bytes=$(wc -c < /tmp/admin-now.html | tr -d ' ')
+          cache=$(awk -F': ' 'tolower($1)=="x-admin-cache"{print $2}' /tmp/admin-now.hdr | tr -d '\r')
+          echo "immediate HTTP $code bytes=$bytes x-admin-cache=${cache:-none}"
+          if [ "$code" != "200" ] || grep -q 'id="admin-cache-warming"' /tmp/admin-now.html; then
+            echo "::error::immediate GET after warm is not the dashboard"
+            head -c 400 /tmp/admin-now.html || true
+            exit 1
+          fi
+          if ! grep -q 'id="tab-legal"' /tmp/admin-now.html; then
+            echo "::error::immediate GET after warm missing tab-legal"
+            exit 1
+          fi
+          echo "immediate dashboard ok"
+
+  cold_admin:
+    needs: deploy
+    if: needs.deploy.outputs.worker_ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Wait 6 minutes then cold-load /admin?legal=1 without warm
         env:
           ADMIN_BASIC_PASSWORD: ${{ secrets.ADMIN_BASIC_PASSWORD }}
         run: |
@@ -399,40 +463,51 @@ jobs:
           BASE="https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev"
           URL="$BASE/admin?legal=1"
           AUTH="gofixweb:${ADMIN_BASIC_PASSWORD}"
-          echo "===== POST /admin/warm-html ====="
-          warm_code=$(curl -sS -o /tmp/admin-warm.json -w "%{http_code}" --max-time 30 \
-            -u "$AUTH" -X POST "$BASE/admin/warm-html" || true)
-          echo "warm-html HTTP $warm_code"
-          head -c 800 /tmp/admin-warm.json || true
+          echo "sleeping 360s (no warm-html) to match a later user load"
+          sleep 360
+          echo "===== GET /admin/cache-status after wait ====="
+          curl -sS -o /tmp/status-wait.json --max-time 30 -u "$AUTH" "$BASE/admin/cache-status"
+          cat /tmp/status-wait.json
           echo
-          if [ "$warm_code" != "200" ]; then
-            echo "::error::POST /admin/warm-html returned $warm_code (dashboard HTML cache was not filled)"
-            exit 1
-          fi
-          sleep 3
+          echo "===== POST /admin/purge-colo-html (simulate other colo) ====="
+          curl -sS -o /tmp/purge.json -w "purge %{http_code}\n" --max-time 30 \
+            -u "$AUTH" -X POST "$BASE/admin/purge-colo-html"
+          cat /tmp/purge.json
+          echo
+          echo "===== GET /admin/cache-status after colo purge ====="
+          curl -sS -o /tmp/status-purged.json --max-time 30 -u "$AUTH" "$BASE/admin/cache-status"
+          cat /tmp/status-purged.json
+          echo
+          python3 - <<'PY'
+          import json
+          status = json.load(open("/tmp/status-purged.json", encoding="utf-8"))
+          kv = status.get("kv") or {}
+          if not kv.get("hit"):
+              raise SystemExit("KV miss after wait+purge — Prague would still see the stub")
+          PY
           for i in 1 2 3 4 5; do
-            code=$(curl -sS -D /tmp/admin-$i.hdr -o /tmp/admin-$i.html -w "%{http_code}" --max-time 30 -u "$AUTH" "$URL")
-            bytes=$(wc -c < /tmp/admin-$i.html | tr -d ' ')
-            cache=$(awk -F': ' 'tolower($1)=="x-admin-cache"{print $2}' /tmp/admin-$i.hdr | tr -d '\r')
-            echo "try $i HTTP $code bytes=$bytes x-admin-cache=${cache:-none}"
+            code=$(curl -sS -D /tmp/cold-$i.hdr -o /tmp/cold-$i.html -w "%{http_code}" --max-time 30 -u "$AUTH" "$URL")
+            bytes=$(wc -c < /tmp/cold-$i.html | tr -d ' ')
+            cache=$(awk -F': ' 'tolower($1)=="x-admin-cache"{print $2}' /tmp/cold-$i.hdr | tr -d '\r')
+            echo "cold $i HTTP $code bytes=$bytes x-admin-cache=${cache:-none}"
             if [ "$code" != "200" ]; then
-              echo "::error::admin?legal=1 try $i returned $code"
-              head -c 800 /tmp/admin-$i.html || true
+              echo "::error::cold admin?legal=1 try $i returned $code"
+              head -c 800 /tmp/cold-$i.html || true
               exit 1
             fi
-            if grep -qiE "Worker exceeded resource limits|Error 1102" /tmp/admin-$i.html; then
-              echo "::error::admin?legal=1 try $i body has Error 1102"
+            if grep -qiE "Worker exceeded resource limits|Error 1102" /tmp/cold-$i.html; then
+              echo "::error::cold try $i has Error 1102"
               exit 1
             fi
-            if grep -q 'id="admin-cache-warming"' /tmp/admin-$i.html; then
-              echo "::error::admin?legal=1 try $i is still the warming stub, not the dashboard"
-              head -c 400 /tmp/admin-$i.html || true
+            if grep -q 'id="admin-cache-warming"' /tmp/cold-$i.html; then
+              echo "::error::cold try $i is still the warming stub"
+              head -c 400 /tmp/cold-$i.html || true
               exit 1
             fi
-            if ! grep -q 'id="tab-legal"' /tmp/admin-$i.html || ! grep -q 'id="legal-scan"' /tmp/admin-$i.html || ! grep -q 'admin-tabs' /tmp/admin-$i.html; then
-              echo "::error::admin?legal=1 try $i is not the full dashboard"
-              head -c 400 /tmp/admin-$i.html || true
+            if ! grep -q 'id="tab-legal"' /tmp/cold-$i.html || ! grep -q 'id="legal-scan"' /tmp/cold-$i.html || ! grep -q 'admin-tabs' /tmp/cold-$i.html; then
+              echo "::error::cold try $i is not the full dashboard"
+              head -c 400 /tmp/cold-$i.html || true
               exit 1
             fi
           done
-          echo "five legal=1 loads ok"
+          echo "cold legal=1 loads ok after 6min wait and colo-cache purge"

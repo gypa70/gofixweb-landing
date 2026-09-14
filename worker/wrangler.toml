@@ -3,10 +3,10 @@ main = "src/index.js"
 compatibility_date = "2024-08-01"
 
 # Production Worker for /submit, /checkout, /stripe-webhook, /wp-onboarding, /wp-rollback, /admin, and /unsubscribe.
-# GET /admin serves pre-rendered HTML from Cache API (cron). Live Stripe/GitHub
-# plus building the dashboard on the request = Error 1102 (CPU, Free plan 10ms).
-# legal=1 only switches the tab; legal_queued=1 is a flash, not a live fetch.
+# GET /admin serves pre-rendered HTML from Workers KV (global) then colo Cache API.
+# Cache API alone is per-datacenter: a GHA warm in LAX leaves Prague on the stub.
 # Do not set [limits] cpu_ms — Free plan rejects it (API 100328).
+# GHA injects [[kv_namespaces]] binding ADMIN_HTML before wrangler deploy.
 
 [triggers]
 crons = ["*/5 * * * *"]

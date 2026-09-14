@@ -3096,9 +3096,20 @@ async function requireAdminAuth(request, env) {
 const ADMIN_SNAPSHOT_CACHE = "https://admin.gofixweb/campaign-snapshot-v2";
 const ADMIN_RUNSTATE_CACHE = "https://admin.gofixweb/outreach-runs-v2";
 const ADMIN_HTML_CACHE = "https://admin.gofixweb/page-html-v1";
+const ADMIN_HTML_KV_KEY = "page-html-v1";
 const ADMIN_HTML_FLASH = "<!--ADMIN_FLASH-->";
-const ADMIN_PAGE_CACHE_TTL_SEC = 300;
+// Colo Cache API only. KV has no expiry — that is what Prague GET must read
+// when this colo was never warmed (GHA probe hits a different datacenter).
+const ADMIN_PAGE_CACHE_TTL_SEC = 3600;
+const ADMIN_HTML_STALE_SEC = 20 * 60;
 const ADMIN_LIST_LIMIT = 50;
+
+function isAdminDashboardHtml(html) {
+  const text = String(html || "");
+  return text.includes('id="tab-legal"')
+    && text.includes("admin-tabs")
+    && !text.includes('id="admin-cache-warming"');
+}
 
 async function readJsonCache(key) {
   const hit = await caches.default.match(key);
@@ -3238,6 +3249,100 @@ async function buildAdminPageModel(env, { allowGithub = false } = {}) {
   return { snapshot, runState, legalScan, orders, ordersError };
 }
 
+async function putAdminHtmlStore(env, html, generatedAt) {
+  const stamp = generatedAt || new Date().toISOString();
+  await caches.default.put(
+    ADMIN_HTML_CACHE,
+    new Response(html, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": `max-age=${ADMIN_PAGE_CACHE_TTL_SEC}`,
+        "X-Admin-Generated": stamp,
+      },
+    }),
+  );
+  if (env.ADMIN_HTML) {
+    await env.ADMIN_HTML.put(ADMIN_HTML_KV_KEY, html, {
+      metadata: { generated_at: stamp, bytes: String(html.length) },
+    });
+  }
+  return stamp;
+}
+
+async function peekAdminHtmlStore(env) {
+  const out = {
+    cache_api: { hit: false, bytes: 0, stub: false },
+    kv: { bound: Boolean(env.ADMIN_HTML), hit: false, bytes: 0, generated_at: "", stub: false },
+  };
+  try {
+    const hit = await caches.default.match(ADMIN_HTML_CACHE);
+    if (hit) {
+      const text = await hit.text();
+      out.cache_api.bytes = text.length;
+      out.cache_api.stub = text.includes('id="admin-cache-warming"');
+      out.cache_api.hit = isAdminDashboardHtml(text);
+      out.cache_api.generated = hit.headers.get("X-Admin-Generated") || "";
+    }
+  } catch (err) {
+    out.cache_api.error = String((err && err.message) || err);
+  }
+  if (env.ADMIN_HTML) {
+    try {
+      const row = await env.ADMIN_HTML.getWithMetadata(ADMIN_HTML_KV_KEY);
+      if (row && row.value) {
+        const meta = row.metadata && typeof row.metadata === "object" ? row.metadata : {};
+        out.kv.bytes = row.value.length;
+        out.kv.stub = row.value.includes('id="admin-cache-warming"');
+        out.kv.hit = isAdminDashboardHtml(row.value);
+        out.kv.generated_at = String(meta.generated_at || "");
+      }
+    } catch (err) {
+      out.kv.error = String((err && err.message) || err);
+    }
+  }
+  out.would_serve_stub = !out.cache_api.hit && !out.kv.hit;
+  out.stale_after_sec = ADMIN_HTML_STALE_SEC;
+  out.cron = "*/5 * * * *";
+  out.note = "Cache API is per-colo. KV is global. A GHA cache hit does not prove Prague.";
+  return out;
+}
+
+async function readAdminHtmlStore(env) {
+  try {
+    const hit = await caches.default.match(ADMIN_HTML_CACHE);
+    if (hit) {
+      const text = await hit.text();
+      if (isAdminDashboardHtml(text)) return { html: text, source: "cache" };
+    }
+  } catch (err) {
+    console.error("admin_html_cache_read_failed", err);
+  }
+  if (env.ADMIN_HTML) {
+    try {
+      const value = await env.ADMIN_HTML.get(ADMIN_HTML_KV_KEY);
+      if (isAdminDashboardHtml(value)) {
+        try {
+          await caches.default.put(
+            ADMIN_HTML_CACHE,
+            new Response(value, {
+              headers: {
+                "Content-Type": "text/html; charset=utf-8",
+                "Cache-Control": `max-age=${ADMIN_PAGE_CACHE_TTL_SEC}`,
+              },
+            }),
+          );
+        } catch (err) {
+          console.error("admin_html_colo_fill_failed", err);
+        }
+        return { html: value, source: "kv" };
+      }
+    } catch (err) {
+      console.error("admin_html_kv_read_failed", err);
+    }
+  }
+  return { html: "", source: "miss" };
+}
+
 async function renderAndCacheAdminHtml(env, { allowGithub = true } = {}) {
   const model = await buildAdminPageModel(env, { allowGithub });
   const html = renderAdminHtml(model.snapshot, {
@@ -3246,15 +3351,7 @@ async function renderAndCacheAdminHtml(env, { allowGithub = true } = {}) {
     ordersError: model.ordersError,
     legalScan: model.legalScan,
   });
-  await caches.default.put(
-    ADMIN_HTML_CACHE,
-    new Response(html, {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": `max-age=${ADMIN_PAGE_CACHE_TTL_SEC}`,
-      },
-    }),
-  );
+  await putAdminHtmlStore(env, html, new Date().toISOString());
   return html;
 }
 
@@ -3337,11 +3434,8 @@ async function warmAdminPageCaches(env) {
   } catch (err) {
     console.error("admin_legal_warm_failed", err);
   }
-  try {
-    await renderAndCacheAdminHtml(env, { allowGithub: false });
-  } catch (err) {
-    console.error("admin_html_warm_failed", err);
-  }
+  const html = await renderAndCacheAdminHtml(env, { allowGithub: false });
+  return html;
 }
 
 async function githubApi(env, path) {
@@ -4936,13 +5030,14 @@ function renderAdminHtml(snapshot, {
 </html>`;
 }
 
-function adminHtmlResponse(html, status = 200) {
+function adminHtmlResponse(html, status = 200, extraHeaders = {}) {
   return new Response(html, {
     status,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store, no-cache, must-revalidate",
       "X-Robots-Tag": "noindex, nofollow",
+      ...extraHeaders,
     },
   });
 }
@@ -4956,37 +5051,55 @@ async function handleAdminPage(request, env, _ctx) {
   const url = new URL(request.url);
   const flash = parseAdminFlash(url);
   const flashHtml = renderAdminFlashHtml(flash);
-  // GET /admin nesmí skládat dashboard, volat GitHub, ani zahřívat cache
-  // na tomhle requestu (Free plán 10 ms CPU = Error 1102).
-  // legal=1 jen přepíná záložku v prohlížeči; bez flash banneru jen stream cache.
-  let hit = null;
-  try {
-    hit = await caches.default.match(ADMIN_HTML_CACHE);
-  } catch (err) {
-    console.error("admin_html_cache_read_failed", err);
-  }
+  // GET /admin nesmí skládat dashboard. Colo Cache API miss is normal in
+  // Prague after a GHA warm in another datacenter — read global KV instead.
+  const stored = await readAdminHtmlStore(env);
   console.log("admin_page", {
-    cached: Boolean(hit),
+    source: stored.source,
     legal: flash.legal,
     legalQueued: flash.legalQueued,
     flash: Boolean(flashHtml),
+    htmlBytes: stored.html.length,
   });
-  if (!hit) {
-    return adminHtmlResponse(renderAdminWarmingHtml(flash));
+  if (!stored.html) {
+    return adminHtmlResponse(renderAdminWarmingHtml(flash), 200, { "X-Admin-Cache": "miss" });
   }
-  if (!flashHtml) {
-    return new Response(hit.body, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-store, no-cache, must-revalidate",
-        "X-Robots-Tag": "noindex, nofollow",
-        "X-Admin-Cache": "hit",
-      },
-    });
+  const html = flashHtml
+    ? stored.html.replace(ADMIN_HTML_FLASH, flashHtml)
+    : stored.html;
+  return adminHtmlResponse(html, 200, { "X-Admin-Cache": stored.source });
+}
+
+async function handleAdminCacheStatus(request, env) {
+  if (request.method !== "GET") {
+    return new Response("Method Not Allowed", { status: 405 });
   }
-  const html = await hit.text();
-  return adminHtmlResponse(html.replace(ADMIN_HTML_FLASH, flashHtml));
+  const denied = await requireAdminAuth(request, env);
+  if (denied) return denied;
+  const peek = await peekAdminHtmlStore(env);
+  let ageSec = null;
+  if (peek.kv.generated_at) {
+    const ts = Date.parse(peek.kv.generated_at);
+    if (Number.isFinite(ts)) ageSec = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  }
+  peek.kv.age_sec = ageSec;
+  peek.kv.stale = ageSec == null ? !peek.kv.hit : ageSec > ADMIN_HTML_STALE_SEC;
+  return jsonResponse({ ok: true, ...peek });
+}
+
+async function handleAdminPurgeColoHtml(request, env) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const denied = await requireAdminAuth(request, env);
+  if (denied) return denied;
+  let deleted = false;
+  try {
+    deleted = await caches.default.delete(ADMIN_HTML_CACHE);
+  } catch (err) {
+    console.error("admin_html_colo_purge_failed", err);
+  }
+  return jsonResponse({ ok: true, purged: "cache_api_only", deleted });
 }
 
 async function handleAdminWarmHtml(request, env) {
@@ -4996,8 +5109,12 @@ async function handleAdminWarmHtml(request, env) {
   const denied = await requireAdminAuth(request, env);
   if (denied) return denied;
   try {
-    await warmAdminPageCaches(env);
-    return jsonResponse({ ok: true });
+    const html = await warmAdminPageCaches(env);
+    return jsonResponse({
+      ok: true,
+      bytes: html.length,
+      kv: Boolean(env.ADMIN_HTML),
+    });
   } catch (err) {
     console.error("admin_html_warm_post_failed", err);
     return jsonResponse({ ok: false, error: String((err && err.message) || err) }, 500);
@@ -7223,6 +7340,14 @@ export default {
 
     if (url.pathname === "/admin/warm-html") {
       return handleAdminWarmHtml(request, env);
+    }
+
+    if (url.pathname === "/admin/cache-status") {
+      return handleAdminCacheStatus(request, env);
+    }
+
+    if (url.pathname === "/admin/purge-colo-html") {
+      return handleAdminPurgeColoHtml(request, env);
     }
 
     if (url.pathname === "/admin/legal-status") {
