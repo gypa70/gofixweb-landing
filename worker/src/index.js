@@ -5081,13 +5081,18 @@ function renderAdminHtml(snapshot, {
       }
       var terms = p.terms || {};
       var shop = (p.homepage && p.homepage.final_url) || p.url || d.shop_url || "";
-      var extraTerms = (terms.urls || []).filter(function (u) { return u && u !== terms.url; });
-      if (terms.found && extraTerms.length) {
-        termsLine += ' <span class="hint">(+ '
+      var extraTerms = (Array.isArray(terms.urls) ? terms.urls : []).filter(function (u) {
+        return u && u !== terms.url;
+      });
+      var extraTermsHtml = extraTerms.length
+        ? ' <span class="hint">(+ '
           + extraTerms.map(function (u) {
             return '<a href="' + escHtml(u) + '" target="_blank" rel="noopener">' + escHtml(u) + "</a>";
-          }).join(", ") + ")</span>";
-      }
+          }).join(", ") + ")</span>"
+        : "";
+      var termsLine = terms.found && terms.url
+        ? '<a href="' + escHtml(terms.url) + '" target="_blank" rel="noopener">' + escHtml(terms.url) + "</a>" + extraTermsHtml
+        : (terms.found ? "nalezeny (bez URL)" : "nenalezeny");
       var cards = LEGAL_RULES.map(function (row) {
         var block = p[row[0]] || {};
         var result = String(block.result || "");
