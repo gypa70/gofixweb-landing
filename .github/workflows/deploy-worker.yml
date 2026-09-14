@@ -329,11 +329,11 @@ jobs:
           python3 - <<'PY'
           import json, os, urllib.request
           token = os.environ.get("CLOUDFLARE_API_TOKEN") or ""
-          account = os.environ.get("CLOUDFLARE_ACCOUNT_ID") or ""
+          account = os.environ.get("CLOUDFLARE_ACCOUNT_ID") or "47c841c4775065340b62547db3608ea4"
           if not token:
               print("no CLOUDFLARE_API_TOKEN")
               raise SystemExit(0)
-          if not account:
+          if not os.environ.get("CLOUDFLARE_ACCOUNT_ID"):
               req = urllib.request.Request(
                   "https://api.cloudflare.com/client/v4/accounts?per_page=5",
                   headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
@@ -343,26 +343,23 @@ jobs:
               print("accounts", json.dumps(payload.get("result") or payload, ensure_ascii=False)[:2000])
               rows = payload.get("result") or []
               if rows:
-                  account = rows[0].get("id") or ""
-          if not account:
-              print("no account id")
-              raise SystemExit(0)
+                  account = rows[0].get("id") or account
           query = {
               "query": """
                 query WorkerOverLimit($accountTag: string!, $datetimeStart: Time!, $datetimeEnd: Time!) {
                   viewer {
                     accounts(filter: {accountTag: $accountTag}) {
-                      workersInvocationsAdaptive(
+                      workersInvocationsAdaptiveGroups(
                         filter: {
                           scriptName: "gofixweb-report-trigger"
                           datetime_geq: $datetimeStart
                           datetime_lt: $datetimeEnd
                         }
-                        limit: 20
+                        limit: 50
                       ) {
-                        avg { cpuTimeMs, wallTime }
-                        dimensions { status, datetimeHour }
-                        sum { requests, errors }
+                        avg { cpuTimeMs, wallTimeMs }
+                        dimensions { status, datetimeHour, clientRequestHTTPHost }
+                        sum { requests, errors, subrequests }
                       }
                     }
                   }
@@ -390,7 +387,7 @@ jobs:
           except Exception as err:
               print("graphql_failed", err)
               raise SystemExit(0)
-          print(raw[:8000])
+          print(raw[:12000])
           PY
 
       - name: Probe /admin?legal=1 five times
@@ -399,14 +396,25 @@ jobs:
           ADMIN_BASIC_PASSWORD: ${{ secrets.ADMIN_BASIC_PASSWORD }}
         run: |
           set -euo pipefail
-          URL="https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev/admin?legal=1"
+          BASE="https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev"
+          URL="$BASE/admin?legal=1"
           AUTH="gofixweb:${ADMIN_BASIC_PASSWORD}"
-          curl -sS -o /tmp/admin-warm.html -w "warm %{http_code}\n" --max-time 30 -u "$AUTH" "$URL" || true
-          sleep 12
+          echo "===== POST /admin/warm-html ====="
+          warm_code=$(curl -sS -o /tmp/admin-warm.json -w "%{http_code}" --max-time 30 \
+            -u "$AUTH" -X POST "$BASE/admin/warm-html" || true)
+          echo "warm-html HTTP $warm_code"
+          head -c 800 /tmp/admin-warm.json || true
+          echo
+          if [ "$warm_code" != "200" ]; then
+            echo "::error::POST /admin/warm-html returned $warm_code (dashboard HTML cache was not filled)"
+            exit 1
+          fi
+          sleep 3
           for i in 1 2 3 4 5; do
-            code=$(curl -sS -o /tmp/admin-$i.html -w "%{http_code}" --max-time 30 -u "$AUTH" "$URL")
+            code=$(curl -sS -D /tmp/admin-$i.hdr -o /tmp/admin-$i.html -w "%{http_code}" --max-time 30 -u "$AUTH" "$URL")
             bytes=$(wc -c < /tmp/admin-$i.html | tr -d ' ')
-            echo "try $i HTTP $code bytes=$bytes"
+            cache=$(awk -F': ' 'tolower($1)=="x-admin-cache"{print $2}' /tmp/admin-$i.hdr | tr -d '\r')
+            echo "try $i HTTP $code bytes=$bytes x-admin-cache=${cache:-none}"
             if [ "$code" != "200" ]; then
               echo "::error::admin?legal=1 try $i returned $code"
               head -c 800 /tmp/admin-$i.html || true
@@ -416,8 +424,13 @@ jobs:
               echo "::error::admin?legal=1 try $i body has Error 1102"
               exit 1
             fi
-            if ! grep -q 'id="legal-scan"' /tmp/admin-$i.html; then
-              echo "::error::admin?legal=1 try $i is not the full dashboard (cache still warming?)"
+            if grep -q 'id="admin-cache-warming"' /tmp/admin-$i.html; then
+              echo "::error::admin?legal=1 try $i is still the warming stub, not the dashboard"
+              head -c 400 /tmp/admin-$i.html || true
+              exit 1
+            fi
+            if ! grep -q 'id="tab-legal"' /tmp/admin-$i.html || ! grep -q 'id="legal-scan"' /tmp/admin-$i.html || ! grep -q 'admin-tabs' /tmp/admin-$i.html; then
+              echo "::error::admin?legal=1 try $i is not the full dashboard"
               head -c 400 /tmp/admin-$i.html || true
               exit 1
             fi

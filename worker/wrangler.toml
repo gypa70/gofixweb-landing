@@ -4,14 +4,12 @@ compatibility_date = "2024-08-01"
 
 # Production Worker for /submit, /checkout, /stripe-webhook, /wp-onboarding, /wp-rollback, /admin, and /unsubscribe.
 # GET /admin serves pre-rendered HTML from Cache API (cron). Live Stripe/GitHub
-# plus building the dashboard on the request = Error 1102 (CPU).
+# plus building the dashboard on the request = Error 1102 (CPU, Free plan 10ms).
 # legal=1 only switches the tab; legal_queued=1 is a flash, not a live fetch.
+# Do not set [limits] cpu_ms — Free plan rejects it (API 100328).
 
 [triggers]
 crons = ["*/5 * * * *"]
-
-[limits]
-cpu_ms = 300
 
 [vars]
 GITHUB_REPO = "gypa70/gofixweb-scanner"

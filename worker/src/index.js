@@ -3097,7 +3097,7 @@ const ADMIN_SNAPSHOT_CACHE = "https://admin.gofixweb/campaign-snapshot-v2";
 const ADMIN_RUNSTATE_CACHE = "https://admin.gofixweb/outreach-runs-v2";
 const ADMIN_HTML_CACHE = "https://admin.gofixweb/page-html-v1";
 const ADMIN_HTML_FLASH = "<!--ADMIN_FLASH-->";
-const ADMIN_PAGE_CACHE_TTL_SEC = 60;
+const ADMIN_PAGE_CACHE_TTL_SEC = 300;
 const ADMIN_LIST_LIMIT = 50;
 
 async function readJsonCache(key) {
@@ -3123,13 +3123,16 @@ async function putJsonCache(key, value, ttlSec) {
   );
 }
 
-// GET /admin query params (none trigger a live Legal scan except flash banners):
-//   legal=1              client tab only
-//   legal_queued=1       flash "scan běží"; polls /admin/legal-status
+// GET /admin query params — none rebuild HTML or call GitHub on the GET:
+// Legal Scanner:
+//   legal=1              client tab only (same Worker work as bare /admin)
+//   legal_queued=1       flash + client poll GET /admin/legal-status
 //   legal_error=         flash error
+// Other flash/state (inject banners into cached HTML only):
 //   queued, launched, series, run, auto, auto_size, suppressed, already, email,
 //   scan, to, lead, email_queued, email_kind, email_to, resend
 // Hash #legal / #emails is client-only and is not sent to the Worker.
+// Unmapped on this route (ignored, same cache path): halt, debug, product, token, etc.
 function parseAdminFlash(url) {
   const q = url.searchParams;
   return {
@@ -3194,14 +3197,15 @@ function renderAdminFlashHtml(flash) {
   return parts.join("");
 }
 
-function renderAdminWarmingHtml() {
+function renderAdminWarmingHtml(flash) {
+  const banners = renderAdminFlashHtml(flash);
   return `<!DOCTYPE html>
-<html lang="cs"><head><meta charset="UTF-8"><meta http-equiv="refresh" content="3">
+<html lang="cs"><head><meta charset="UTF-8"><meta http-equiv="refresh" content="15">
 <title>Admin — zahřívám cache</title></head>
 <body style="font-family:sans-serif;background:#1a2332;color:#fff;padding:2rem">
 <h1>GoFixWeb admin</h1>
-<p>Snapshot cache se zahřívá (Legal Scanner i kampaně). Stránka se sama obnoví.</p>
-<p class="hint">Legal Scanner (demo) — pravidla a–j.</p>
+${banners}
+<p id="admin-cache-warming">Dashboard HTML se skládá na cron (Free plan 10 ms CPU — ne na tento GET). Stránka se sama obnoví.</p>
 </body></html>`;
 }
 
@@ -4943,7 +4947,7 @@ function adminHtmlResponse(html, status = 200) {
   });
 }
 
-async function handleAdminPage(request, env, ctx) {
+async function handleAdminPage(request, env, _ctx) {
   if (request.method !== "GET") {
     return new Response("Method Not Allowed", { status: 405 });
   }
@@ -4951,32 +4955,53 @@ async function handleAdminPage(request, env, ctx) {
   if (denied) return denied;
   const url = new URL(request.url);
   const flash = parseAdminFlash(url);
-  // GET /admin nesmí skládat dashboard ani volat GitHub — to je Error 1102
-  // (CPU). legal=1 jen přepíná záložku v prohlížeči, serverová práce je stejná.
-  let html = "";
+  const flashHtml = renderAdminFlashHtml(flash);
+  // GET /admin nesmí skládat dashboard, volat GitHub, ani zahřívat cache
+  // na tomhle requestu (Free plán 10 ms CPU = Error 1102).
+  // legal=1 jen přepíná záložku v prohlížeči; bez flash banneru jen stream cache.
+  let hit = null;
   try {
-    const hit = await caches.default.match(ADMIN_HTML_CACHE);
-    if (hit) html = await hit.text();
+    hit = await caches.default.match(ADMIN_HTML_CACHE);
   } catch (err) {
     console.error("admin_html_cache_read_failed", err);
   }
   console.log("admin_page", {
-    cached: Boolean(html),
+    cached: Boolean(hit),
     legal: flash.legal,
     legalQueued: flash.legalQueued,
-    htmlBytes: html.length,
+    flash: Boolean(flashHtml),
   });
-  if (!html) {
-    if (ctx && typeof ctx.waitUntil === "function") {
-      ctx.waitUntil(
-        renderAndCacheAdminHtml(env, { allowGithub: true }).catch((err) => {
-          console.error("admin_html_warm_failed", err);
-        }),
-      );
-    }
-    return adminHtmlResponse(renderAdminWarmingHtml());
+  if (!hit) {
+    return adminHtmlResponse(renderAdminWarmingHtml(flash));
   }
-  return adminHtmlResponse(html.replace(ADMIN_HTML_FLASH, renderAdminFlashHtml(flash)));
+  if (!flashHtml) {
+    return new Response(hit.body, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        "X-Robots-Tag": "noindex, nofollow",
+        "X-Admin-Cache": "hit",
+      },
+    });
+  }
+  const html = await hit.text();
+  return adminHtmlResponse(html.replace(ADMIN_HTML_FLASH, flashHtml));
+}
+
+async function handleAdminWarmHtml(request, env) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const denied = await requireAdminAuth(request, env);
+  if (denied) return denied;
+  try {
+    await warmAdminPageCaches(env);
+    return jsonResponse({ ok: true });
+  } catch (err) {
+    console.error("admin_html_warm_post_failed", err);
+    return jsonResponse({ ok: false, error: String((err && err.message) || err) }, 500);
+  }
 }
 
 async function handleAdminLegalStatus(request, env) {
@@ -5556,6 +5581,11 @@ async function handleAdminLegalScanResult(request, env) {
     at: String(body.at || new Date().toISOString()),
   };
   await writeLegalScanCache(stored);
+  try {
+    await renderAndCacheAdminHtml(env, { allowGithub: false });
+  } catch (err) {
+    console.error("admin_html_rebuild_after_legal_failed", err);
+  }
   return jsonResponse({ ok: true });
 }
 
@@ -7189,6 +7219,10 @@ export default {
 
     if (url.pathname === "/admin" || url.pathname === "/admin/") {
       return handleAdminPage(request, env, ctx);
+    }
+
+    if (url.pathname === "/admin/warm-html") {
+      return handleAdminWarmHtml(request, env);
     }
 
     if (url.pathname === "/admin/legal-status") {
