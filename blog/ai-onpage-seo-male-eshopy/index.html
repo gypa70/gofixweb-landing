@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jak AI mění on-page SEO — a co z toho plyne pro malý e-shop — GoFixWeb</title>
+  <meta name="description" content="Generované title a meta vs. unikátní pole na každé URL. AI jako návrh, ne jako hromadný overwrite katalogu.">
+  <link rel="canonical" href="https://gofixweb.com/blog/ai-onpage-seo-male-eshopy/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="GoFixWeb">
+  <meta property="og:locale" content="cs_CZ">
+  <meta property="og:title" content="Jak AI mění on-page SEO — a co z toho plyne pro malý e-shop — GoFixWeb">
+  <meta property="og:description" content="Generované title a meta vs. unikátní pole na každé URL. AI jako návrh, ne jako hromadný overwrite katalogu.">
+  <meta property="og:url" content="https://gofixweb.com/blog/ai-onpage-seo-male-eshopy/">
+  <meta property="og:image" content="https://gofixweb.com/blog/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Jak AI mění on-page SEO — a co z toho plyne pro malý e-shop — GoFixWeb">
+  <meta name="twitter:description" content="Generované title a meta vs. unikátní pole na každé URL. AI jako návrh, ne jako hromadný overwrite katalogu.">
+  <meta name="twitter:image" content="https://gofixweb.com/blog/og.png">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Jak AI mění on-page SEO — a co z toho plyne pro malý e-shop", "description": "Generované title a meta vs. unikátní pole na každé URL. AI jako návrh, ne jako hromadný overwrite katalogu.", "datePublished": "2026-09-14", "dateModified": "2026-09-14", "inLanguage": "cs", "url": "https://gofixweb.com/blog/ai-onpage-seo-male-eshopy/", "image": "https://gofixweb.com/blog/og.png", "author": {"@type": "Organization", "name": "GoFixWeb", "url": "https://gofixweb.com"}, "publisher": {"@type": "Organization", "name": "FinalEdge s.r.o.", "url": "https://gofixweb.com"}, "mainEntityOfPage": "https://gofixweb.com/blog/ai-onpage-seo-male-eshopy/"}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2332;
+      --navy-light: #243044;
+      --navy-card: #2a3548;
+      --white: #ffffff;
+      --text-light: #cbd5e1;
+      --text-muted: #94a3b8;
+      --green: #16a34a;
+      --green-light: #22c55e;
+      --green-bg: rgba(22, 163, 74, 0.12);
+      --border: rgba(255, 255, 255, 0.08);
+      --max: 1080px;
+      --header-h: 4.5rem;
+    }
+    html { scroll-behavior: smooth; scroll-padding-top: var(--header-h); }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--navy);
+      color: var(--white);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    .container { width: min(var(--max), 92vw); margin: 0 auto; }
+    header {
+      padding: 0.7rem 0;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: rgba(26, 35, 50, 0.92);
+      backdrop-filter: blur(8px);
+      z-index: 20;
+    }
+    .header-inner {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem 1.25rem;
+      min-width: 0;
+    }
+    .brand { flex-shrink: 0; }
+    .logo {
+      font-size: 1.55rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+    }
+    .logo span { color: var(--green); }
+    .site-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.1rem;
+      margin-left: auto;
+      min-width: 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+    }
+    .site-nav::-webkit-scrollbar { display: none; }
+    .site-nav a {
+      flex: 0 0 auto;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+    }
+    .site-nav a:hover {
+      color: var(--white);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .site-nav a.is-active {
+      color: var(--green-light);
+      border-bottom-color: var(--green);
+    }
+    main { flex: 1; padding: 3.5rem 0 4.5rem; }
+    footer {
+      padding: 2.25rem 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    footer a { color: var(--green); font-weight: 500; }
+    footer a:hover { text-decoration: underline; }
+    .footer-links {
+      margin-top: 0.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem 1rem;
+    }
+    .blog-kicker {
+      color: var(--green-light);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.82rem;
+      margin-bottom: 0.65rem;
+    }
+    .blog-index h1, .article h1 {
+      font-size: clamp(1.65rem, 3.2vw, 2.15rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+      max-width: 22ch;
+    }
+    .blog-lead {
+      color: var(--text-muted);
+      max-width: 48ch;
+      margin-bottom: 2.25rem;
+    }
+    .blog-list {
+      display: grid;
+      gap: 1rem;
+    }
+    .blog-card {
+      display: block;
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.35rem 1.4rem 1.4rem;
+    }
+    .blog-card:hover { border-color: rgba(34, 197, 94, 0.35); }
+    .blog-card.featured { padding: 1.6rem 1.55rem 1.7rem; }
+    .blog-card time, .article-meta {
+      display: block;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 0.45rem;
+    }
+    .blog-card h2 {
+      font-size: 1.22rem;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.45rem;
+    }
+    .blog-card.featured h2 { font-size: 1.45rem; }
+    .blog-card p { color: var(--text-light); }
+    .article { max-width: 42rem; }
+    .article-meta { margin-bottom: 1.5rem; }
+    .article h2 {
+      font-size: 1.25rem;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      margin: 2rem 0 0.7rem;
+    }
+    .article h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 1.4rem 0 0.5rem;
+    }
+    .article p, .article li { color: var(--text-light); }
+    .article p { margin-bottom: 0.95rem; }
+    .article ul, .article ol { padding-left: 1.25rem; margin: 0 0 1.1rem; }
+    .article li { margin-bottom: 0.4rem; }
+    .article a { color: var(--green); font-weight: 600; }
+    .article a:hover { text-decoration: underline; }
+    .article strong { color: var(--white); }
+    .article code {
+      font-size: 0.9em;
+      background: rgba(255,255,255,0.06);
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+    .article hr {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: 1.75rem 0;
+    }
+    .article-back {
+      display: inline-block;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 1.35rem;
+    }
+    .article-back:hover { color: var(--green-light); }
+    .article-cta {
+      margin-top: 2.25rem;
+      padding: 1.2rem 1.3rem;
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .article-cta p { margin: 0; }
+    @media (max-width: 768px) {
+      :root { --header-h: 4.15rem; }
+      .logo { font-size: 1.28rem; }
+      .site-nav a { font-size: 0.95rem; padding: 0.42rem 0.55rem; }
+      main { padding: 2.5rem 0 3.25rem; }
+      .blog-card, .blog-card.featured { padding: 1.15rem 1.1rem; }
+      .blog-card.featured h2 { font-size: 1.22rem; }
+    }
+</style>
+</head>
+<body>
+<header>
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="GoFixWeb — úvod">
+        <div class="logo">GoFix<span>Web</span></div>
+      </a>
+      <nav class="site-nav" aria-label="Sekce stránky">
+        <a href="/#signup-form">Report zdarma</a>
+        <a href="/#reseni">Jak to funguje</a>
+        <a href="/#tarify">Ceník</a>
+        <a href="/blog/" class="is-active" aria-current="page">Blog</a>
+        <a href="/#faq">FAQ</a>
+        <a href="/#kontakt">Kontakt</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <div class="container">
+      <article class="article">
+        <a class="article-back" href="/blog/">← Všechny články</a>
+        <p class="blog-kicker">Blog</p>
+        <h1>Jak AI mění on-page SEO — a co z toho plyne pro malý e-shop</h1>
+        <time class="article-meta" datetime="2026-09-14">14. září 2026</time>
+        <p>AI nástroje dnes umí napsat title, meta description i H1 za pár sekund. Otázka zní: má je nechat přepsat celý katalog najednou, nebo použít jako návrh a ručně zkontrolovat každou URL?</p>
+<p>Odpověď závisí na tom, jak velký máte e-shop a jak moc znáte své produkty. Automatické generování šetří čas, ale zároveň může vytvořit generické texty, které se liší jen názvem produktu. A to Google pozná.</p>
+<h2>Co AI skutečně změní v on-page SEO</h2>
+<p>AI nástroje dnes analyzují obsah stránky a navrhnou title, meta description nebo H1 podle klíčových slov a struktury textu. Některé pluginy to umí přímo ve WordPressu, jiné fungují jako samostatná služba.</p>
+<p>Výhoda: nemusíte vymýšlet formulace pro stovky produktů ručně. AI vezme název, kategorii, případně popis a sestaví větu, která dává smysl.</p>
+<p>Nevýhoda: AI neví, co dělá vaše produkty unikátní. Neví, že zákazníci hledají „termo ponožky na běžky", ne jen „ponožky". Neví, že máte na skladě jen tři kusy a že se vyplatí zdůraznit rychlé dodání.</p>
+<p>Proto je AI užitečná jako návrh, ne jako finální řešení.</p>
+<h2>Generované pole vs. unikátní pole na každé URL</h2>
+<p>WooCommerce i jiné platformy umožňují nastavit šablonu pro title a meta description. Například: <code>{název produktu} | {kategorie} | {název e-shopu}</code>.</p>
+<p>To funguje, pokud máte stovky podobných produktů a chcete alespoň základní strukturu. Ale všechny title pak vypadají stejně, liší se jen názvem produktu.</p>
+<p>AI může jít o krok dál: vezme název, kategorii, cenu, dostupnost a vytvoří unikátní větu. Problém nastává, když AI generuje text pro celý katalog najednou a vy ho publikujete bez kontroly.</p>
+<p>Pak se stane, že máte 300 produktů s title ve stylu „Objevte {název produktu} – kvalita a styl v jednom". Google takové vzory pozná a může je ignorovat.</p>
+<p>Lepší postup: nechat AI vygenerovat návrhy, projít je ručně a upravit tam, kde to dává smysl. U hlavních kategorií a produktů s nejvyšší návštěvností napsat title ručně. U zbytku použít AI návrh, ale zkontrolovat, že není generický.</p>
+<h2>Proč hromadný overwrite katalogu není dobrý nápad</h2>
+<p>Představte si, že máte 500 produktů a AI vám za hodinu vygeneruje title a meta description pro všechny. Publikujete to a čekáte, že se pozice zlepší.</p>
+<p>Co se ale stane: Google vidí, že se změnilo 500 title najednou. Začne stránky znovu indexovat. Pokud byly nové title horší než původní, pozice klesnou. Pokud byly lepší, trvá týdny, než se změna projeví.</p>
+<p>A pokud AI použila stejnou šablonu pro všechny produkty, Google může nové title ignorovat a zobrazovat vlastní, které si vygeneruje z obsahu stránky.</p>
+<p>Proto je lepší postupovat po částech: vybrat 20–30 produktů, vygenerovat návrhy, zkontrolovat je, publikovat a počkat týden. Pak se podívat do Search Console, jestli se pozice změnily, a pokračovat dál.</p>
+<p>U malého e-shopu do 100 produktů má smysl napsat title a meta description ručně. U většího katalogu použít AI jako pomoc, ale ne jako nástroj na hromadné přepsání.</p>
+<h2>Jak AI návrhy ověřit, než je publikujete</h2>
+<p>Otevřete si Search Console a podívejte se na stránky s nejvyšší návštěvností. To jsou URL, kde změna title může mít největší dopad.</p>
+<p>Vygenerujte AI návrh pro každou z nich. Porovnejte ho s aktuálním title. Zeptejte se:</p>
+<ul>
+<li>Je nový title konkrétnější?</li>
+<li>Obsahuje klíčové slovo, které lidé skutečně hledají?</li>
+<li>Není příliš dlouhý? (Google zobrazuje cca 60 znaků.)</li>
+<li>Neznějí všechny title stejně?</li>
+</ul>
+<p>Pokud si nejste jistí, publikujte změnu jen na jedné stránce a počkejte týden. V Search Console se podívejte, jestli se změnily imprese nebo CTR. Pokud ano, pokračujte dál. Pokud ne, zkuste jiný návrh.</p>
+<p>U meta description je to podobné: AI umí napsat větu, která shrnuje obsah stránky. Ale neví, co zákazníka přesvědčí ke kliknutí. Proto má smysl AI návrh upravit a přidat konkrétní výhodu: „Skladem 50 ks, dodání do 24 hodin" funguje lépe než „Kvalitní produkty za skvělé ceny".</p>
+<h2>Co z toho plyne pro malý e-shop</h2>
+<p>AI nástroje jsou užitečné, když šetří čas a zároveň zachovávají kvalitu. U on-page SEO to znamená:</p>
+<ul>
+<li>Použít AI jako návrh, ne jako finální řešení.</li>
+<li>Nekopírovat AI text do katalogu bez kontroly.</li>
+<li>Začít u stránek s nejvyšší návštěvností.</li>
+<li>Publikovat změny postupně a měřit dopad.</li>
+</ul>
+<p>Pokud máte e-shop do 100 produktů, napište title a meta description ručně. Pokud máte větší katalog, použijte AI, ale projděte si alespoň hlavní kategorie a produkty s nejvyšším obratem.</p>
+<p>A pokud nevíte, kde začít, podívejte se nejdřív do Search Console, které stránky mají nízké CTR. Tam má smysl začít s úpravou title.</p>
+<p>Chcete stejný typ kontroly na svém e-shopu? <a href="/#analyza">Bezplatný report do 10 minut</a> — nebo se podívejte na <a href="/#faq">FAQ</a> a <a href="/#ceny">ceník</a>.</p>
+        <div class="article-cta">
+          <p>Chcete stejný typ kontroly na svém e-shopu? <a href="/#signup-form">Bezplatný report do 10 minut</a> — nebo se podívejte na <a href="/#faq">FAQ</a> a <a href="/#tarify">ceník</a>.</p>
+        </div>
+      </article>
+    </div>
+  </main>
+<footer>
+    <div class="container">
+      <p>© 2026 FinalEdge s.r.o. / GoFixWeb</p>
+      <div class="footer-links">
+        <a href="/">gofixweb.com</a>
+        <span aria-hidden="true">|</span>
+        <a href="mailto:info@gofixweb.com">info@gofixweb.com</a>
+        <span aria-hidden="true">|</span>
+        <a href="/terms.html?v=20260902">Obchodní podmínky</a>
+        <span aria-hidden="true">|</span>
+        <a href="/privacy.html?v=20260815">Ochrana osobních údajů</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
