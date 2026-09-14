@@ -3430,7 +3430,8 @@ async function warmAdminPageCaches(env) {
     console.error("admin_run_state_warm_failed", err);
   }
   try {
-    await readLegalScanCache(env, { allowGithub: true });
+    const legal = await readLegalScanCache(env, { allowGithub: true });
+    if (legal) await writeLegalScanCache(legal, env);
   } catch (err) {
     console.error("admin_legal_warm_failed", err);
   }
@@ -3923,6 +3924,7 @@ function adminTabButton(id, label, badgeHtml = "") {
 }
 
 const LEGAL_SCAN_CACHE = "https://admin.gofixweb/legal-scan-last";
+const LEGAL_SCAN_KV_KEY = "legal-scan-last";
 const LEGAL_SCAN_TTL = 86400;
 const LEGAL_SCAN_RULES = [
   ["omnibus_30_days", "a", "Nejnižší cena za 30 dní"],
@@ -3964,16 +3966,29 @@ async function fetchLegalScanGithub(env) {
 }
 
 async function readLegalScanCache(env, { allowGithub = false } = {}) {
-  let local = null;
+  let colo = null;
   const hit = await caches.default.match(LEGAL_SCAN_CACHE);
   if (hit) {
     try {
       const raw = await hit.json();
-      if (raw && typeof raw === "object") local = raw;
+      if (raw && typeof raw === "object") colo = raw;
     } catch {
-      local = null;
+      colo = null;
     }
   }
+  let kv = null;
+  if (env && env.ADMIN_HTML) {
+    try {
+      const raw = await env.ADMIN_HTML.get(LEGAL_SCAN_KV_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") kv = parsed;
+      }
+    } catch (err) {
+      console.error("legal_scan_kv_read_failed", err);
+    }
+  }
+  let local = newerLegalScan(kv, colo);
   const needRemote = allowGithub && (!local || local.status === "pending" || local.status === "error");
   let remote = null;
   if (needRemote) {
@@ -3983,23 +3998,22 @@ async function readLegalScanCache(env, { allowGithub = false } = {}) {
       console.error("legal_scan_github_failed", err);
     }
   }
-  if (local && local.status === "pending") {
-    if (
-      remote
-      && String(remote.shop_url || "") === String(local.shop_url || "")
-      && String(remote.at || "") >= String(local.at || "")
-    ) {
-      return remote;
-    }
-    return local;
-  }
-  if (remote && (!local || String(remote.at || "") >= String(local.at || ""))) {
-    return remote;
-  }
-  return local;
+  return newerLegalScan(local, remote);
 }
 
-async function writeLegalScanCache(body) {
+function newerLegalScan(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  const atA = String(a.at || "");
+  const atB = String(b.at || "");
+  if (atB > atA) return b;
+  if (atA > atB) return a;
+  if (a.status === "pending" && b.status && b.status !== "pending") return b;
+  if (b.status === "pending" && a.status && a.status !== "pending") return a;
+  return a;
+}
+
+async function writeLegalScanCache(body, env) {
   await caches.default.put(
     LEGAL_SCAN_CACHE,
     new Response(JSON.stringify(body), {
@@ -4009,9 +4023,19 @@ async function writeLegalScanCache(body) {
       },
     }),
   );
-  try {
-    await caches.default.delete(ADMIN_HTML_CACHE);
-  } catch {}
+  if (env && env.ADMIN_HTML) {
+    try {
+      await env.ADMIN_HTML.put(LEGAL_SCAN_KV_KEY, JSON.stringify(body), {
+        metadata: {
+          status: String(body.status || ""),
+          shop_url: String(body.shop_url || ""),
+          at: String(body.at || ""),
+        },
+      });
+    } catch (err) {
+      console.error("legal_scan_kv_put_failed", err);
+    }
+  }
 }
 
 function legalVerdictClass(result) {
@@ -4110,14 +4134,14 @@ function renderLegalScanBox(legalScan, { queued = false, error = "" } = {}) {
     <p class="hint">Ruční detekce gofix-legal-scanner (pravidla a–j). Jen statické HTML. Šablony u ne / nelze ověřit / částečně / nalezeno riziko nejsou právní radou. Průběh: <a href="${ADMIN_LINKS.legalScan}" target="_blank" rel="noopener">GitHub Actions</a>.</p>
     ${err}
     ${wait}
-    <form class="suppress-form" method="post" action="/admin/legal-scan">
+    <form class="suppress-form" method="post" action="/admin/legal-scan" id="legal-scan-form">
       <label>URL e-shopu
         <input type="text" name="shop_url" required placeholder="https://example.cz" autocomplete="off" value="${escapeHtml((legalScan && legalScan.shop_url) || "")}">
       </label>
       <button class="launch" type="submit">Spustit scan</button>
       <button class="launch" type="submit" name="send_email" value="1">Spustit a poslat na trueforexway@gmail.com</button>
     </form>
-    ${resultHtml}
+    <div id="legal-scan-live">${resultHtml}</div>
   </div>`;
 }
 
@@ -4986,6 +5010,90 @@ function renderAdminHtml(snapshot, {
       });
     });
     var skipFullReload = false;
+    var LEGAL_RULES = ${JSON.stringify(LEGAL_SCAN_RULES)};
+    function escHtml(s) {
+      return String(s || "").replace(/[&<>"']/g, function (ch) {
+        return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch];
+      });
+    }
+    function legalClass(result) {
+      if (result === "ano" || result === "nenalezeno") return "ok";
+      if (result === "ne" || result === "nalezeno") return "bad";
+      return "warn";
+    }
+    function legalLabel(result) {
+      if (result === "nelze_overit") return "nelze ověřit";
+      if (result === "castecne") return "částečně";
+      if (result === "nalezeno") return "nalezeno riziko";
+      if (result === "nenalezeno") return "nenalezeno";
+      return String(result || "—");
+    }
+    function paintLegalScan(d) {
+      var live = document.getElementById("legal-scan-live");
+      var input = document.querySelector("#legal-scan input[name=shop_url]");
+      if (input && d && d.shop_url) input.value = d.shop_url;
+      if (!live) return;
+      if (!d || d.status === "none" || d.empty) {
+        live.innerHTML = '<p class="muted">Zatím žádný scan. Zadej URL a spusť.</p>';
+        return;
+      }
+      if (d.status === "pending") {
+        live.innerHTML = '<p class="banner-wait"><span class="pulse-dot"></span><span>Scan spuštěn, čekejte prosím… Legal scan běží v GitHub Actions (obvykle do minuty).</span></p>'
+          + (d.shop_url ? '<p class="hint">' + escHtml(d.shop_url) + "</p>" : "");
+        return;
+      }
+      if (d.status === "error") {
+        live.innerHTML = '<p class="banner-err">Scan selhal: ' + escHtml(d.error || "neznámá chyba") + "</p>"
+          + (d.shop_url ? '<p class="hint">' + escHtml(d.shop_url) + "</p>" : "");
+        return;
+      }
+      var p = d.payload;
+      if (!p) {
+        live.innerHTML = '<p class="banner-wait">Scan dokončen, načítám výsledek…</p>';
+        return;
+      }
+      var terms = p.terms || {};
+      var shop = (p.homepage && p.homepage.final_url) || p.url || d.shop_url || "";
+      var termsLine = terms.found && terms.url
+        ? '<a href="' + escHtml(terms.url) + '" target="_blank" rel="noopener">' + escHtml(terms.url) + "</a>"
+        : (terms.found ? "nalezeny (bez URL)" : "nenalezeny");
+      var cards = LEGAL_RULES.map(function (row) {
+        var block = p[row[0]] || {};
+        var result = String(block.result || "");
+        var extra = "";
+        if (block.url) extra += '<div class="hint">Odkaz: <a href="' + escHtml(block.url) + '" target="_blank" rel="noopener">' + escHtml(block.url) + "</a></div>";
+        var fix = block.fix_template;
+        var tmpl = "";
+        if (fix && typeof fix === "object") {
+          tmpl = '<div class="legal-template"><p class="legal-disc">' + escHtml(fix.disclaimer || "")
+            + '</p><p class="hint"><strong>Kam:</strong> ' + escHtml(fix.place || "")
+            + "</p><p>" + escHtml(fix.suggested_text || "") + "</p></div>";
+        }
+        return '<article class="legal-rule"><h3>(' + escHtml(row[1]) + ") " + escHtml(row[2])
+          + ' <span class="' + legalClass(result) + '">' + escHtml(legalLabel(result))
+          + '</span></h3><p class="hint">' + escHtml(block.evidence || "") + "</p>" + extra + tmpl + "</article>";
+      }).join("");
+      live.innerHTML = '<div class="legal-result"><p><strong>E-shop:</strong> '
+        + (shop ? '<a href="' + escHtml(shop) + '" target="_blank" rel="noopener">' + escHtml(shop) + "</a>" : "—")
+        + "</p><p><strong>Obchodní podmínky:</strong> " + termsLine
+        + "</p><p><strong>OP zdroj:</strong> " + escHtml(terms.source || "—")
+        + '</p><p class="hint">' + escHtml(d.at || "") + "</p>" + cards + "</div>";
+    }
+    function pollLegalScan() {
+      skipFullReload = true;
+      var ticks = 0;
+      var timer = setInterval(function () {
+        ticks += 1;
+        if (ticks > 24) { clearInterval(timer); location.reload(); return; }
+        fetch("/admin/legal-status", { credentials: "same-origin" })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            paintLegalScan(d);
+            if (d && d.status && d.status !== "pending") clearInterval(timer);
+          })
+          .catch(function () {});
+      }, 5000);
+    }
     (function initAdminTab() {
       var fromHash = (location.hash || "").replace("#", "");
       var fromStore = "";
@@ -5001,23 +5109,25 @@ function renderAdminHtml(snapshot, {
         var search = q.toString();
         history.replaceState(null, "", location.pathname + (search ? "?" + search : "") + location.hash);
       }
-      if (legalPoll) {
-        skipFullReload = true;
-        var ticks = 0;
-        var timer = setInterval(function () {
-          ticks += 1;
-          if (ticks > 24) { clearInterval(timer); location.reload(); return; }
-          fetch("/admin/legal-status", { credentials: "same-origin" })
-            .then(function (r) { return r.json(); })
-            .then(function (d) {
-              if (d && d.status && d.status !== "pending") {
-                clearInterval(timer);
-                location.reload();
-              }
-            })
-            .catch(function () {});
-        }, 5000);
+      var form = document.getElementById("legal-scan-form");
+      if (form) {
+        form.addEventListener("submit", function () {
+          var live = document.getElementById("legal-scan-live");
+          if (live) {
+            live.innerHTML = '<p class="banner-wait"><span class="pulse-dot"></span><span>Scan spuštěn, čekejte prosím…</span></p>';
+          }
+          form.querySelectorAll("button").forEach(function (btn) { btn.disabled = true; });
+        });
       }
+      fetch("/admin/legal-status", { credentials: "same-origin" })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          paintLegalScan(d);
+          if (legalPoll || (d && d.status === "pending")) pollLegalScan();
+        })
+        .catch(function () {
+          if (legalPoll) pollLegalScan();
+        });
     })();
     if (!skipFullReload) setTimeout(function () {
       var el = document.activeElement;
@@ -5128,9 +5238,8 @@ async function handleAdminLegalStatus(request, env) {
   const denied = await requireAdminAuth(request, env);
   if (denied) return denied;
   const local = await readLegalScanCache(env, { allowGithub: false });
-  const pending = Boolean(local && local.status === "pending");
   let scan = local;
-  if (pending) {
+  if (!scan || scan.status === "pending" || scan.status === "error") {
     scan = await readLegalScanCache(env, { allowGithub: true });
   }
   return jsonResponse({
@@ -5138,6 +5247,9 @@ async function handleAdminLegalStatus(request, env) {
     status: scan && scan.status ? scan.status : "none",
     shop_url: scan && scan.shop_url ? scan.shop_url : "",
     at: scan && scan.at ? scan.at : "",
+    error: scan && scan.error ? scan.error : "",
+    empty: !scan,
+    payload: scan && scan.payload && typeof scan.payload === "object" ? scan.payload : null,
   });
 }
 
@@ -5635,7 +5747,7 @@ async function handleAdminLegalScan(request, env) {
     at: new Date().toISOString(),
   };
   try {
-    await writeLegalScanCache(pending);
+    await writeLegalScanCache(pending, env);
   } catch (err) {
     console.error("admin_legal_scan_cache_failed", err);
   }
@@ -5655,7 +5767,7 @@ async function handleAdminLegalScan(request, env) {
         shop_url,
         error: "Legal scan se nepodařilo spustit v GitHub Actions.",
         at: new Date().toISOString(),
-      });
+      }, env);
     } catch {}
     return failRedirect("Legal scan se nepodařilo spustit v GitHub Actions. Zkuste workflow ručně.");
   }
@@ -5697,12 +5809,7 @@ async function handleAdminLegalScanResult(request, env) {
     email_error: String(body.email_error || "").slice(0, 400) || null,
     at: String(body.at || new Date().toISOString()),
   };
-  await writeLegalScanCache(stored);
-  try {
-    await renderAndCacheAdminHtml(env, { allowGithub: false });
-  } catch (err) {
-    console.error("admin_html_rebuild_after_legal_failed", err);
-  }
+  await writeLegalScanCache(stored, env);
   return jsonResponse({ ok: true });
 }
 

@@ -449,6 +449,77 @@ jobs:
           fi
           echo "immediate dashboard ok"
 
+  legal_e2e:
+    needs: deploy
+    if: needs.deploy.outputs.worker_ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Scan www.ptacek.cz via POST /admin/legal-scan
+        env:
+          ADMIN_BASIC_PASSWORD: ${{ secrets.ADMIN_BASIC_PASSWORD }}
+        run: |
+          set -euo pipefail
+          BASE="https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev"
+          AUTH="gofixweb:${ADMIN_BASIC_PASSWORD}"
+          echo "===== POST /admin/legal-scan www.ptacek.cz ====="
+          code=$(curl -sS -o /tmp/legal-post.html -w "%{http_code}" --max-time 30 \
+            -u "$AUTH" -X POST -F "shop_url=www.ptacek.cz" \
+            --max-redirs 0 "$BASE/admin/legal-scan" || true)
+          echo "post HTTP $code"
+          if [ "$code" != "303" ]; then
+            echo "::error::legal-scan POST expected 303, got $code"
+            head -c 600 /tmp/legal-post.html || true
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json, time, urllib.request, os, base64
+          from datetime import datetime, timezone
+          base = "https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev"
+          password = os.environ["ADMIN_BASIC_PASSWORD"]
+          token = base64.b64encode(f"gofixweb:{password}".encode()).decode()
+          url = f"{base}/admin/legal-status"
+          started = time.time()
+          last = {}
+          saw_pending = False
+          for i in range(24):
+              req = urllib.request.Request(url, headers={"Authorization": f"Basic {token}"})
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  last = json.loads(resp.read().decode())
+              print(f"poll {i+1} status={last.get('status')} shop={last.get('shop_url')} at={last.get('at')}")
+              if last.get("status") == "pending":
+                  saw_pending = True
+              if last.get("status") == "error" and saw_pending:
+                  raise SystemExit(f"scan error: {last.get('error')}")
+              if last.get("status") == "done" and (last.get("payload") or {}).get("url"):
+                  at = str(last.get("at") or "")
+                  try:
+                      stamp = datetime.fromisoformat(at.replace("Z", "+00:00")).timestamp()
+                  except ValueError:
+                      stamp = 0
+                  if stamp < started - 30 and not saw_pending:
+                      print("stale done, waiting for this POST")
+                      time.sleep(5)
+                      continue
+                  payload = last["payload"]
+                  print("RESULT_SHOP", payload.get("url"))
+                  print("RESULT_TERMS", (payload.get("terms") or {}).get("url"), (payload.get("terms") or {}).get("source"))
+                  for key in (
+                      "omnibus_30_days", "odr_link", "reviews_verification", "dsa_report_form",
+                      "complaint_info", "withdrawal", "checkout_button", "epr_packaging",
+                      "greenwashing_claims", "eaa_accessibility",
+                  ):
+                      block = payload.get(key) or {}
+                      print(f"RULE {key} {block.get('result')}")
+                  shop = str(payload.get("url") or last.get("shop_url") or "")
+                  if "ptacek.cz" not in shop:
+                      raise SystemExit(f"expected ptacek.cz, got {shop}")
+                  raise SystemExit(0)
+              time.sleep(5)
+          raise SystemExit(f"scan did not finish: {json.dumps(last)[:800]}")
+          PY
+
+
   cold_admin:
     needs: deploy
     if: needs.deploy.outputs.worker_ready == 'true'
