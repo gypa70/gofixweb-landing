@@ -473,19 +473,24 @@ jobs:
             exit 1
           fi
           python3 - <<'PY'
-          import json, time, urllib.request, os, base64
+          import json, subprocess, time, os
           from datetime import datetime, timezone
           base = "https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev"
           password = os.environ["ADMIN_BASIC_PASSWORD"]
-          token = base64.b64encode(f"gofixweb:{password}".encode()).decode()
-          url = f"{base}/admin/legal-status"
           started = time.time()
           last = {}
           saw_pending = False
           for i in range(24):
-              req = urllib.request.Request(url, headers={"Authorization": f"Basic {token}"})
-              with urllib.request.urlopen(req, timeout=30) as resp:
-                  last = json.loads(resp.read().decode())
+              raw = subprocess.check_output(
+                  [
+                      "curl", "-sS", "--max-time", "30",
+                      "-u", f"gofixweb:{password}",
+                      "-A", "gofixweb-gha-legal-e2e",
+                      f"{base}/admin/legal-status",
+                  ],
+                  text=True,
+              )
+              last = json.loads(raw)
               print(f"poll {i+1} status={last.get('status')} shop={last.get('shop_url')} at={last.get('at')}")
               if last.get("status") == "pending":
                   saw_pending = True
