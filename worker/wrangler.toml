@@ -3,12 +3,15 @@ main = "src/index.js"
 compatibility_date = "2024-08-01"
 
 # Production Worker for /submit, /checkout, /stripe-webhook, /wp-onboarding, /wp-rollback, /admin, and /unsubscribe.
+# GET /admin serves pre-rendered HTML from Cache API (cron). Live Stripe/GitHub
+# plus building the dashboard on the request = Error 1102 (CPU).
+# legal=1 only switches the tab; legal_queued=1 is a flash, not a live fetch.
 
 [triggers]
-# GET /admin čte GHA snapshot + Cache API. Cron jen zahřívá cache (bez živého Stripe).
-# Živé Stripe na page load / cron = Error 1102.
-# legal_queued=1 nesmí držet 20s reload — to taky umí 1102 (CPU na celém HTML).
 crons = ["*/5 * * * *"]
+
+[limits]
+cpu_ms = 300
 
 [vars]
 GITHUB_REPO = "gypa70/gofixweb-scanner"

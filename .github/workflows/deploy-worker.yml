@@ -317,3 +317,109 @@ jobs:
           printf '%s' "$STRIPE_BASIC_PRICE_ID" | npx wrangler secret put STRIPE_BASIC_PRICE_ID --name gofixweb-report-trigger
           printf '%s' "$STRIPE_PRO_PRICE_ID" | npx wrangler secret put STRIPE_PRO_PRICE_ID --name gofixweb-report-trigger
           printf '%s' "$STRIPE_PREMIUM_PRICE_ID" | npx wrangler secret put STRIPE_PREMIUM_PRICE_ID --name gofixweb-report-trigger
+
+      - name: Dump Workers logs around Error 1102
+        if: steps.cf.outputs.present == 'true'
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, urllib.request
+          token = os.environ.get("CLOUDFLARE_API_TOKEN") or ""
+          account = os.environ.get("CLOUDFLARE_ACCOUNT_ID") or ""
+          if not token:
+              print("no CLOUDFLARE_API_TOKEN")
+              raise SystemExit(0)
+          if not account:
+              req = urllib.request.Request(
+                  "https://api.cloudflare.com/client/v4/accounts?per_page=5",
+                  headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+              )
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  payload = json.loads(resp.read().decode("utf-8", "replace"))
+              print("accounts", json.dumps(payload.get("result") or payload, ensure_ascii=False)[:2000])
+              rows = payload.get("result") or []
+              if rows:
+                  account = rows[0].get("id") or ""
+          if not account:
+              print("no account id")
+              raise SystemExit(0)
+          query = {
+              "query": """
+                query WorkerOverLimit($accountTag: string!, $datetimeStart: Time!, $datetimeEnd: Time!) {
+                  viewer {
+                    accounts(filter: {accountTag: $accountTag}) {
+                      workersInvocationsAdaptive(
+                        filter: {
+                          scriptName: "gofixweb-report-trigger"
+                          datetime_geq: $datetimeStart
+                          datetime_lt: $datetimeEnd
+                        }
+                        limit: 20
+                      ) {
+                        avg { cpuTimeMs, wallTime }
+                        dimensions { status, datetimeHour }
+                        sum { requests, errors }
+                      }
+                    }
+                  }
+                }
+              """,
+              "variables": {
+                  "accountTag": account,
+                  "datetimeStart": "2026-09-14T11:45:00Z",
+                  "datetimeEnd": "2026-09-14T11:55:00Z",
+              },
+          }
+          body = json.dumps(query).encode("utf-8")
+          req = urllib.request.Request(
+              "https://api.cloudflare.com/client/v4/graphql",
+              data=body,
+              headers={
+                  "Authorization": f"Bearer {token}",
+                  "Content-Type": "application/json",
+              },
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  raw = resp.read().decode("utf-8", "replace")
+          except Exception as err:
+              print("graphql_failed", err)
+              raise SystemExit(0)
+          print(raw[:8000])
+          PY
+
+      - name: Probe /admin?legal=1 five times
+        if: steps.cf.outputs.present == 'true'
+        env:
+          ADMIN_BASIC_PASSWORD: ${{ secrets.ADMIN_BASIC_PASSWORD }}
+        run: |
+          set -euo pipefail
+          URL="https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev/admin?legal=1"
+          AUTH="gofixweb:${ADMIN_BASIC_PASSWORD}"
+          curl -sS -o /tmp/admin-warm.html -w "warm %{http_code}\n" --max-time 30 -u "$AUTH" "$URL" || true
+          sleep 12
+          for i in 1 2 3 4 5; do
+            code=$(curl -sS -o /tmp/admin-$i.html -w "%{http_code}" --max-time 30 -u "$AUTH" "$URL")
+            bytes=$(wc -c < /tmp/admin-$i.html | tr -d ' ')
+            echo "try $i HTTP $code bytes=$bytes"
+            if [ "$code" != "200" ]; then
+              echo "::error::admin?legal=1 try $i returned $code"
+              head -c 800 /tmp/admin-$i.html || true
+              exit 1
+            fi
+            if grep -qiE "Worker exceeded resource limits|Error 1102" /tmp/admin-$i.html; then
+              echo "::error::admin?legal=1 try $i body has Error 1102"
+              exit 1
+            fi
+            if ! grep -q 'id="legal-scan"' /tmp/admin-$i.html; then
+              echo "::error::admin?legal=1 try $i is not the full dashboard (cache still warming?)"
+              head -c 400 /tmp/admin-$i.html || true
+              exit 1
+            fi
+          done
+          echo "five legal=1 loads ok"

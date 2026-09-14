@@ -3095,6 +3095,8 @@ async function requireAdminAuth(request, env) {
 
 const ADMIN_SNAPSHOT_CACHE = "https://admin.gofixweb/campaign-snapshot-v2";
 const ADMIN_RUNSTATE_CACHE = "https://admin.gofixweb/outreach-runs-v2";
+const ADMIN_HTML_CACHE = "https://admin.gofixweb/page-html-v1";
+const ADMIN_HTML_FLASH = "<!--ADMIN_FLASH-->";
 const ADMIN_PAGE_CACHE_TTL_SEC = 60;
 const ADMIN_LIST_LIMIT = 50;
 
@@ -3119,6 +3121,137 @@ async function putJsonCache(key, value, ttlSec) {
       },
     }),
   );
+}
+
+// GET /admin query params (none trigger a live Legal scan except flash banners):
+//   legal=1              client tab only
+//   legal_queued=1       flash "scan běží"; polls /admin/legal-status
+//   legal_error=         flash error
+//   queued, launched, series, run, auto, auto_size, suppressed, already, email,
+//   scan, to, lead, email_queued, email_kind, email_to, resend
+// Hash #legal / #emails is client-only and is not sent to the Worker.
+function parseAdminFlash(url) {
+  const q = url.searchParams;
+  return {
+    queued: q.get("queued") === "1",
+    launched: q.get("launched") === "1",
+    launchedSeries: String(q.get("series") || "").trim(),
+    launchedRunId: String(q.get("run") || "").trim(),
+    autoQueued: q.get("auto") === "1",
+    autoSizeQueued: q.get("auto_size") === "1",
+    suppressed: q.get("suppressed") === "1",
+    suppressedAlready: q.get("already") === "1",
+    suppressedEmail: String(q.get("email") || "").trim().toLowerCase(),
+    scanQueued: q.get("scan") === "1",
+    scanEmail: String(q.get("to") || "").trim().toLowerCase(),
+    scanLead: q.get("lead") === "1",
+    emailQueued: q.get("email_queued") === "1",
+    emailKind: String(q.get("email_kind") || "").trim(),
+    emailTo: String(q.get("email_to") || "").trim().toLowerCase(),
+    resendQueued: q.get("resend") === "1",
+    legal: q.get("legal") === "1",
+    legalQueued: q.get("legal_queued") === "1",
+    legalError: String(q.get("legal_error") || "").trim(),
+  };
+}
+
+function renderAdminFlashHtml(flash) {
+  const f = flash || {};
+  const parts = [];
+  if (f.queued) {
+    parts.push(`<p class="banner-ok">Požadavek na vypnutí halt je ve frontě. Obnovení DB trvá obvykle do minuty — stránka se sama obnoví.</p>`);
+  }
+  if (f.launched) {
+    parts.push(`<p class="banner-ok">Outreach dávka ${escapeHtml(f.launchedSeries || "")} je ve frontě GitHub Actions. Stav se vezme ze snapshotu (obvykle do minuty).</p>`);
+  }
+  if (f.autoQueued) {
+    parts.push(`<p class="banner-ok">Přepínač automatiky je ve frontě. Stav na kartě série se obnoví po persistu DB (obvykle do minuty).</p>`);
+  } else if (f.autoSizeQueued) {
+    parts.push(`<p class="banner-ok">Velikost automatické dávky je ve frontě. Platí od další naplánované dávky této série (obvykle do minuty po persistu).</p>`);
+  }
+  if (f.suppressed) {
+    parts.push(`<p class="banner-ok">${
+      f.suppressedAlready
+        ? `E-mail ${escapeHtml(f.suppressedEmail || "")} už v suppression listu je. Další kampaňové dávky ho přeskočí.`
+        : `E-mail ${escapeHtml(f.suppressedEmail || "")} je odhlášený. Zápis do DB je ve frontě GitHub Actions (obvykle do minuty). Další kampaňové dávky ho přeskočí.`
+    }</p>`);
+  }
+  if (f.emailQueued) {
+    parts.push(`<p class="banner-ok">Testovací e-mail je ve frontě GitHub Actions.</p>`);
+  }
+  if (f.resendQueued) {
+    parts.push(`<p class="banner-ok">Hromadné znovuodeslání teaseru je ve frontě GitHub Actions.</p>`);
+  }
+  if (f.scanQueued) {
+    parts.push(`<p class="banner-ok">Testovací sken je ve frontě GitHub Actions.</p>`);
+  }
+  if (f.legalQueued) {
+    parts.push(`<p class="banner-wait"><span class="pulse-dot"></span><span>Legal scan běží v GitHub Actions (statické HTML, obvykle do minuty). Stav se ověřuje bez znovu-skládání celého dashboardu.</span></p>`);
+  }
+  if (f.legalError) {
+    parts.push(`<p class="banner-err">${escapeHtml(f.legalError)}</p>`);
+  }
+  return parts.join("");
+}
+
+function renderAdminWarmingHtml() {
+  return `<!DOCTYPE html>
+<html lang="cs"><head><meta charset="UTF-8"><meta http-equiv="refresh" content="3">
+<title>Admin — zahřívám cache</title></head>
+<body style="font-family:sans-serif;background:#1a2332;color:#fff;padding:2rem">
+<h1>GoFixWeb admin</h1>
+<p>Snapshot cache se zahřívá (Legal Scanner i kampaně). Stránka se sama obnoví.</p>
+<p class="hint">Legal Scanner (demo) — pravidla a–j.</p>
+</body></html>`;
+}
+
+async function buildAdminPageModel(env, { allowGithub = false } = {}) {
+  let snapshot = await readJsonCache(ADMIN_SNAPSHOT_CACHE);
+  if ((!snapshot || !snapshot.stats) && allowGithub) {
+    snapshot = await fetchCampaignSnapshot(env);
+    try {
+      await putJsonCache(ADMIN_SNAPSHOT_CACHE, snapshot, ADMIN_PAGE_CACHE_TTL_SEC);
+    } catch (err) {
+      console.error("admin_snapshot_cache_put_failed", err);
+    }
+  }
+  snapshot = slimAdminSnapshot(snapshot || { stats: {}, halt: {}, rows: [], series: {} });
+  snapshot = await applyDeletedLandingLeads(snapshot);
+  let runState = await readJsonCache(ADMIN_RUNSTATE_CACHE);
+  if ((!runState || !Array.isArray(runState.recent)) && allowGithub) {
+    try {
+      runState = await fetchOutreachRunState(env);
+      await putJsonCache(ADMIN_RUNSTATE_CACHE, runState, ADMIN_PAGE_CACHE_TTL_SEC);
+    } catch (err) {
+      console.error("admin_run_state_warm_failed", err);
+      runState = emptyOutreachRunState();
+    }
+  }
+  if (!runState || !Array.isArray(runState.recent)) runState = emptyOutreachRunState();
+  const legalScan = await readLegalScanCache(env, { allowGithub });
+  const orders = await resolveAdminOrders(snapshot);
+  const ordersError = String(snapshot?.orders?.error || snapshot?.orders_error || "");
+  return { snapshot, runState, legalScan, orders, ordersError };
+}
+
+async function renderAndCacheAdminHtml(env, { allowGithub = true } = {}) {
+  const model = await buildAdminPageModel(env, { allowGithub });
+  const html = renderAdminHtml(model.snapshot, {
+    runState: model.runState,
+    orders: model.orders,
+    ordersError: model.ordersError,
+    legalScan: model.legalScan,
+  });
+  await caches.default.put(
+    ADMIN_HTML_CACHE,
+    new Response(html, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": `max-age=${ADMIN_PAGE_CACHE_TTL_SEC}`,
+      },
+    }),
+  );
+  return html;
 }
 
 function slimAdminSnapshot(snapshot) {
@@ -3194,6 +3327,16 @@ async function warmAdminPageCaches(env) {
     await putJsonCache(ADMIN_RUNSTATE_CACHE, runState, ADMIN_PAGE_CACHE_TTL_SEC);
   } catch (err) {
     console.error("admin_run_state_warm_failed", err);
+  }
+  try {
+    await readLegalScanCache(env, { allowGithub: true });
+  } catch (err) {
+    console.error("admin_legal_warm_failed", err);
+  }
+  try {
+    await renderAndCacheAdminHtml(env, { allowGithub: false });
+  } catch (err) {
+    console.error("admin_html_warm_failed", err);
   }
 }
 
@@ -3722,7 +3865,7 @@ async function fetchLegalScanGithub(env) {
   }
 }
 
-async function readLegalScanCache(env) {
+async function readLegalScanCache(env, { allowGithub = false } = {}) {
   let local = null;
   const hit = await caches.default.match(LEGAL_SCAN_CACHE);
   if (hit) {
@@ -3733,9 +3876,7 @@ async function readLegalScanCache(env) {
       local = null;
     }
   }
-  // Hotový výsledek v Cache API stačí — GitHub fetch na každém GET /admin
-  // (včetně 20s reloadu po legal_queued=1) žere CPU a umí Error 1102.
-  const needRemote = !local || local.status === "pending" || local.status === "error";
+  const needRemote = allowGithub && (!local || local.status === "pending" || local.status === "error");
   let remote = null;
   if (needRemote) {
     try {
@@ -3770,6 +3911,9 @@ async function writeLegalScanCache(body) {
       },
     }),
   );
+  try {
+    await caches.default.delete(ADMIN_HTML_CACHE);
+  } catch {}
 }
 
 function legalVerdictClass(result) {
@@ -4446,6 +4590,7 @@ function renderAdminHtml(snapshot, {
   <div class="wrap">
     <h1>GoFix<span>Web</span> — stav kampaně</h1>
     <p class="sub">Interní přehled. Snapshot z DB: ${generated}. Obnova každých ${adminRefreshSec} s (stejná čísla i na záložkách).</p>
+    ${ADMIN_HTML_FLASH}
     ${err}${queuedNote}${launchedNote}${autoNote}${suppressedNote}${emailNote}${emailErr}${resendNote}${scanNote}${scanErr}${launchErr}
     ${tabsNav}
     <section class="admin-panel is-active" id="tab-campaign" role="tabpanel" aria-labelledby="tabbtn-campaign">
@@ -4742,6 +4887,7 @@ function renderAdminHtml(snapshot, {
         showAdminTab(btn.getAttribute("data-tab") || "campaign");
       });
     });
+    var skipFullReload = false;
     (function initAdminTab() {
       var fromHash = (location.hash || "").replace("#", "");
       var fromStore = "";
@@ -4751,13 +4897,31 @@ function renderAdminHtml(snapshot, {
         ? "tests"
         : (q.get("legal") === "1" || q.get("legal_queued") === "1" ? "legal" : (q.get("resend") === "1" ? "emails" : ""));
       showAdminTab(fromHash || fromQuery || (${legalError ? "true" : "false"} ? "legal" : "") || fromStore || "campaign");
+      var legalPoll = ${legalBusy ? "true" : "false"} || q.get("legal_queued") === "1";
       if (q.get("legal_queued") === "1" && history.replaceState) {
         q.delete("legal_queued");
         var search = q.toString();
         history.replaceState(null, "", location.pathname + (search ? "?" + search : "") + location.hash);
       }
+      if (legalPoll) {
+        skipFullReload = true;
+        var ticks = 0;
+        var timer = setInterval(function () {
+          ticks += 1;
+          if (ticks > 24) { clearInterval(timer); location.reload(); return; }
+          fetch("/admin/legal-status", { credentials: "same-origin" })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              if (d && d.status && d.status !== "pending") {
+                clearInterval(timer);
+                location.reload();
+              }
+            })
+            .catch(function () {});
+        }, 5000);
+      }
     })();
-    setTimeout(function () {
+    if (!skipFullReload) setTimeout(function () {
       var el = document.activeElement;
       var tag = el && el.tagName ? String(el.tagName).toLowerCase() : "";
       if (tag === "input" || tag === "select" || tag === "textarea") return;
@@ -4779,63 +4943,60 @@ function adminHtmlResponse(html, status = 200) {
   });
 }
 
-async function handleAdminPage(request, env) {
+async function handleAdminPage(request, env, ctx) {
   if (request.method !== "GET") {
     return new Response("Method Not Allowed", { status: 405 });
   }
   const denied = await requireAdminAuth(request, env);
   if (denied) return denied;
   const url = new URL(request.url);
-  const queued = url.searchParams.get("queued") === "1";
-  const launched = url.searchParams.get("launched") === "1";
-  const launchedSeries = String(url.searchParams.get("series") || "").trim();
-  const launchedRunId = String(url.searchParams.get("run") || "").trim();
-  const autoQueued = url.searchParams.get("auto") === "1";
-  const autoSizeQueued = url.searchParams.get("auto_size") === "1";
-  const suppressed = url.searchParams.get("suppressed") === "1";
-  const suppressedAlready = url.searchParams.get("already") === "1";
-  const suppressedEmail = String(url.searchParams.get("email") || "").trim().toLowerCase();
-  const scanQueued = url.searchParams.get("scan") === "1";
-  const scanEmail = String(url.searchParams.get("to") || "").trim().toLowerCase();
-  const scanLead = url.searchParams.get("lead") === "1";
-  const emailQueued = url.searchParams.get("email_queued") === "1";
-  const emailKind = String(url.searchParams.get("email_kind") || "").trim();
-  const emailTo = String(url.searchParams.get("email_to") || "").trim().toLowerCase();
-  const resendQueued = url.searchParams.get("resend") === "1";
-  const legalQueued = url.searchParams.get("legal_queued") === "1";
-  const legalError = String(url.searchParams.get("legal_error") || "").trim();
-  let snapshot = { stats: {}, halt: {}, rows: [], series: {} };
-  let error = "";
-  let runState = emptyOutreachRunState();
-  const [snapResult, runResult] = await Promise.allSettled([
-    loadCampaignSnapshot(env),
-    loadOutreachRunState(env, launchedRunId),
-  ]);
-  if (snapResult.status === "fulfilled") {
-    snapshot = snapResult.value;
-  } else {
-    const err = snapResult.reason;
-    error = "Snapshot z DB se nepodařilo načíst: " + String(err && err.message ? err.message : err);
-    snapshot = { stats: {}, halt: {}, rows: [], series: {} };
+  const flash = parseAdminFlash(url);
+  // GET /admin nesmí skládat dashboard ani volat GitHub — to je Error 1102
+  // (CPU). legal=1 jen přepíná záložku v prohlížeči, serverová práce je stejná.
+  let html = "";
+  try {
+    const hit = await caches.default.match(ADMIN_HTML_CACHE);
+    if (hit) html = await hit.text();
+  } catch (err) {
+    console.error("admin_html_cache_read_failed", err);
   }
-  snapshot = await applyDeletedLandingLeads(snapshot);
-  const legalScan = await readLegalScanCache(env);
   console.log("admin_page", {
-    legalQueued,
-    legalStatus: legalScan && legalScan.status,
-    legalBusy: Boolean(legalScan && legalScan.status === "pending"),
+    cached: Boolean(html),
+    legal: flash.legal,
+    legalQueued: flash.legalQueued,
+    htmlBytes: html.length,
   });
-  if (runResult.status === "fulfilled") {
-    runState = runResult.value;
-  } else {
-    console.error("admin_run_state_failed", runResult.reason);
+  if (!html) {
+    if (ctx && typeof ctx.waitUntil === "function") {
+      ctx.waitUntil(
+        renderAndCacheAdminHtml(env, { allowGithub: true }).catch((err) => {
+          console.error("admin_html_warm_failed", err);
+        }),
+      );
+    }
+    return adminHtmlResponse(renderAdminWarmingHtml());
   }
-  const orders = await resolveAdminOrders(snapshot);
-  const ordersError = String(snapshot?.orders?.error || snapshot?.orders_error || "");
-  return adminHtmlResponse(renderAdminHtml(snapshot, {
-    error, queued, launched, launchedSeries, launchedRunId, autoQueued, autoSizeQueued, suppressed, suppressedAlready, suppressedEmail, scanQueued, scanEmail, scanLead, emailQueued, emailKind, emailTo, resendQueued, runState,
-    orders, ordersError, legalScan, legalQueued, legalError,
-  }));
+  return adminHtmlResponse(html.replace(ADMIN_HTML_FLASH, renderAdminFlashHtml(flash)));
+}
+
+async function handleAdminLegalStatus(request, env) {
+  if (request.method !== "GET") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const denied = await requireAdminAuth(request, env);
+  if (denied) return denied;
+  const local = await readLegalScanCache(env, { allowGithub: false });
+  const pending = Boolean(local && local.status === "pending");
+  let scan = local;
+  if (pending) {
+    scan = await readLegalScanCache(env, { allowGithub: true });
+  }
+  return jsonResponse({
+    ok: true,
+    status: scan && scan.status ? scan.status : "none",
+    shop_url: scan && scan.shop_url ? scan.shop_url : "",
+    at: scan && scan.at ? scan.at : "",
+  });
 }
 
 async function handleAdminResume(request, env) {
@@ -7027,7 +7188,11 @@ export default {
     }
 
     if (url.pathname === "/admin" || url.pathname === "/admin/") {
-      return handleAdminPage(request, env);
+      return handleAdminPage(request, env, ctx);
+    }
+
+    if (url.pathname === "/admin/legal-status") {
+      return handleAdminLegalStatus(request, env);
     }
 
     if (url.pathname === "/admin/resume") {
