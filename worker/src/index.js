@@ -5032,6 +5032,12 @@ function renderAdminHtml(snapshot, {
       var live = document.getElementById("legal-scan-live");
       var input = document.querySelector("#legal-scan input[name=shop_url]");
       if (input && d && d.shop_url) input.value = d.shop_url;
+      if (d && d.status && d.status !== "pending") {
+        document.querySelectorAll(".banner-wait").forEach(function (el) {
+          if (live && live.contains(el)) return;
+          el.remove();
+        });
+      }
       if (!live) return;
       if (!d || d.status === "none" || d.empty) {
         live.innerHTML = '<p class="muted">Zatím žádný scan. Zadej URL a spusť.</p>';
@@ -5086,12 +5092,20 @@ function renderAdminHtml(snapshot, {
         ticks += 1;
         if (ticks > 24) { clearInterval(timer); location.reload(); return; }
         fetch("/admin/legal-status", { credentials: "same-origin" })
-          .then(function (r) { return r.json(); })
+          .then(function (r) {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            return r.json();
+          })
           .then(function (d) {
             paintLegalScan(d);
             if (d && d.status && d.status !== "pending") clearInterval(timer);
           })
-          .catch(function () {});
+          .catch(function (err) {
+            var live = document.getElementById("legal-scan-live");
+            if (live) {
+              live.innerHTML = '<p class="banner-err">Scan selhal: nepodařilo se ověřit stav (' + escHtml(err && err.message ? err.message : "síť") + ").</p>";
+            }
+          });
       }, 5000);
     }
     (function initAdminTab() {
@@ -5120,16 +5134,24 @@ function renderAdminHtml(snapshot, {
         });
       }
       fetch("/admin/legal-status", { credentials: "same-origin" })
-        .then(function (r) { return r.json(); })
+        .then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })
         .then(function (d) {
           paintLegalScan(d);
           if (legalPoll || (d && d.status === "pending")) pollLegalScan();
         })
-        .catch(function () {
+        .catch(function (err) {
+          var live = document.getElementById("legal-scan-live");
+          if (live) {
+            live.innerHTML = '<p class="banner-err">Scan selhal: nepodařilo se načíst stav (' + escHtml(err && err.message ? err.message : "síť") + ").</p>";
+          }
           if (legalPoll) pollLegalScan();
         });
     })();
-    if (!skipFullReload) setTimeout(function () {
+    setTimeout(function () {
+      if (skipFullReload) return;
       var el = document.activeElement;
       var tag = el && el.tagName ? String(el.tagName).toLowerCase() : "";
       if (tag === "input" || tag === "select" || tag === "textarea") return;
