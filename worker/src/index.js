@@ -5044,7 +5044,11 @@ function renderAdminHtml(snapshot, {
         return;
       }
       if (d.status === "pending") {
-        live.innerHTML = '<p class="banner-wait"><span class="pulse-dot"></span><span>Scan spuštěn, čekejte prosím… Legal scan běží v GitHub Actions (obvykle do minuty).</span></p>'
+        var pendingMail = d.send_email
+          ? " Po dokončení odešleme HTML report na trueforexway@gmail.com."
+          : "";
+        live.innerHTML = '<p class="banner-wait"><span class="pulse-dot"></span><span>Scan spuštěn, čekejte prosím… Legal scan běží v GitHub Actions (obvykle do minuty).'
+          + pendingMail + "</span></p>"
           + (d.shop_url ? '<p class="hint">' + escHtml(d.shop_url) + "</p>" : "");
         return;
       }
@@ -5079,18 +5083,34 @@ function renderAdminHtml(snapshot, {
           + ' <span class="' + legalClass(result) + '">' + escHtml(legalLabel(result))
           + '</span></h3><p class="hint">' + escHtml(block.evidence || "") + "</p>" + extra + tmpl + "</article>";
       }).join("");
+      var emailed = "";
+      if (d.email_sent_to) {
+        emailed = '<p class="hint">HTML report odeslán na ' + escHtml(d.email_sent_to) + ".</p>";
+      } else if (d.email_error) {
+        emailed = '<p class="banner-err">Scan hotov, e-mail se nepodařilo odeslat: ' + escHtml(d.email_error) + "</p>";
+      }
       live.innerHTML = '<div class="legal-result"><p><strong>E-shop:</strong> '
         + (shop ? '<a href="' + escHtml(shop) + '" target="_blank" rel="noopener">' + escHtml(shop) + "</a>" : "—")
         + "</p><p><strong>Obchodní podmínky:</strong> " + termsLine
         + "</p><p><strong>OP zdroj:</strong> " + escHtml(terms.source || "—")
-        + '</p><p class="hint">' + escHtml(d.at || "") + "</p>" + cards + "</div>";
+        + '</p><p class="hint">' + escHtml(d.at || "") + "</p>" + emailed + cards + "</div>";
+    }
+    function setLegalScanButtonsDisabled(on) {
+      var form = document.getElementById("legal-scan-form");
+      if (!form) return;
+      form.querySelectorAll("button").forEach(function (btn) { btn.disabled = !!on; });
     }
     function pollLegalScan() {
       skipFullReload = true;
       var ticks = 0;
       var timer = setInterval(function () {
         ticks += 1;
-        if (ticks > 24) { clearInterval(timer); location.reload(); return; }
+        if (ticks > 24) {
+          clearInterval(timer);
+          setLegalScanButtonsDisabled(false);
+          location.reload();
+          return;
+        }
         fetch("/admin/legal-status", { credentials: "same-origin" })
           .then(function (r) {
             if (!r.ok) throw new Error("HTTP " + r.status);
@@ -5098,13 +5118,17 @@ function renderAdminHtml(snapshot, {
           })
           .then(function (d) {
             paintLegalScan(d);
-            if (d && d.status && d.status !== "pending") clearInterval(timer);
+            if (d && d.status && d.status !== "pending") {
+              clearInterval(timer);
+              setLegalScanButtonsDisabled(false);
+            }
           })
           .catch(function (err) {
             var live = document.getElementById("legal-scan-live");
             if (live) {
               live.innerHTML = '<p class="banner-err">Scan selhal: nepodařilo se ověřit stav (' + escHtml(err && err.message ? err.message : "síť") + ").</p>";
             }
+            setLegalScanButtonsDisabled(false);
           });
       }, 5000);
     }
@@ -5125,12 +5149,44 @@ function renderAdminHtml(snapshot, {
       }
       var form = document.getElementById("legal-scan-form");
       if (form) {
-        form.addEventListener("submit", function () {
+        form.addEventListener("submit", function (ev) {
+          ev.preventDefault();
+          skipFullReload = true;
+          var fd = new FormData(form);
+          var submitter = ev.submitter;
+          if (submitter && submitter.name) fd.set(submitter.name, submitter.value);
+          var sendEmail = String(fd.get("send_email") || "") === "1";
           var live = document.getElementById("legal-scan-live");
+          var waitText = sendEmail
+            ? "Scan spuštěn, čekejte prosím… Po dokončení odešleme HTML report na trueforexway@gmail.com."
+            : "Scan spuštěn, čekejte prosím…";
           if (live) {
-            live.innerHTML = '<p class="banner-wait"><span class="pulse-dot"></span><span>Scan spuštěn, čekejte prosím…</span></p>';
+            live.innerHTML = '<p class="banner-wait"><span class="pulse-dot"></span><span>' + waitText + "</span></p>";
           }
-          form.querySelectorAll("button").forEach(function (btn) { btn.disabled = true; });
+          setLegalScanButtonsDisabled(true);
+          fetch("/admin/legal-scan", {
+            method: "POST",
+            body: fd,
+            credentials: "same-origin",
+            headers: { Accept: "application/json", "X-Requested-With": "gofixweb-admin" },
+          })
+            .then(function (r) {
+              return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }, function () {
+                return { ok: r.ok, status: r.status, d: {} };
+              });
+            })
+            .then(function (pair) {
+              if (!pair.ok || (pair.d && pair.d.ok === false)) {
+                throw new Error((pair.d && pair.d.error) || ("HTTP " + pair.status));
+              }
+              pollLegalScan();
+            })
+            .catch(function (err) {
+              if (live) {
+                live.innerHTML = '<p class="banner-err">Scan selhal: ' + escHtml(err && err.message ? err.message : "neznámá chyba") + "</p>";
+              }
+              setLegalScanButtonsDisabled(false);
+            });
         });
       }
       fetch("/admin/legal-status", { credentials: "same-origin" })
@@ -5264,6 +5320,9 @@ async function handleAdminLegalStatus(request, env) {
   if (!scan || scan.status === "pending" || scan.status === "error") {
     scan = await readLegalScanCache(env, { allowGithub: true });
   }
+  const sendEmail = Boolean(
+    scan && (scan.send_email === true || scan.send_email === "1" || scan.email_sent_to),
+  );
   return jsonResponse({
     ok: true,
     status: scan && scan.status ? scan.status : "none",
@@ -5271,6 +5330,9 @@ async function handleAdminLegalStatus(request, env) {
     at: scan && scan.at ? scan.at : "",
     error: scan && scan.error ? scan.error : "",
     empty: !scan,
+    send_email: sendEmail,
+    email_sent_to: scan && scan.email_sent_to ? String(scan.email_sent_to) : "",
+    email_error: scan && scan.email_error ? String(scan.email_error) : "",
     payload: scan && scan.payload && typeof scan.payload === "object" ? scan.payload : null,
   });
 }
@@ -5736,10 +5798,15 @@ async function handleAdminLegalScan(request, env) {
   const denied = await requireAdminAuth(request, env);
   if (denied) return denied;
 
-  const failRedirect = (message) => {
+  const wantsJson = String(request.headers.get("Accept") || "").includes("application/json");
+  const failRedirect = (message, status = 400) => {
+    const text = String(message || "Legal scan se nepodařilo spustit.");
+    if (wantsJson) {
+      return jsonResponse({ ok: false, error: text.slice(0, 180) }, status);
+    }
     const next = new URL("/admin", request.url);
     next.searchParams.set("legal", "1");
-    next.searchParams.set("legal_error", String(message || "Legal scan se nepodařilo spustit.").slice(0, 180));
+    next.searchParams.set("legal_error", text.slice(0, 180));
     return Response.redirect(next.toString(), 303);
   };
 
@@ -5791,7 +5858,16 @@ async function handleAdminLegalScan(request, env) {
         at: new Date().toISOString(),
       }, env);
     } catch {}
-    return failRedirect("Legal scan se nepodařilo spustit v GitHub Actions. Zkuste workflow ručně.");
+    return failRedirect("Legal scan se nepodařilo spustit v GitHub Actions. Zkuste workflow ručně.", 502);
+  }
+  if (wantsJson) {
+    return jsonResponse({
+      ok: true,
+      queued: true,
+      status: "pending",
+      shop_url,
+      send_email: sendEmail,
+    });
   }
   const next = new URL("/admin", request.url);
   next.searchParams.set("legal", "1");
@@ -5827,6 +5903,7 @@ async function handleAdminLegalScanResult(request, env) {
     shop_url: shopUrl,
     payload: body.payload && typeof body.payload === "object" ? body.payload : null,
     error: String(body.error || "").slice(0, 500),
+    send_email: body.send_email === true || body.send_email === "1" || Boolean(body.email_sent_to),
     email_sent_to: String(body.email_sent_to || "").slice(0, 120) || null,
     email_error: String(body.email_error || "").slice(0, 400) || null,
     at: String(body.at || new Date().toISOString()),

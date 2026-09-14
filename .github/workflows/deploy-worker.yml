@@ -462,14 +462,30 @@ jobs:
           set -euo pipefail
           BASE="https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev"
           AUTH="gofixweb:${ADMIN_BASIC_PASSWORD}"
-          echo "===== POST /admin/legal-scan www.ptacek.cz ====="
+          echo "===== POST /admin/legal-scan www.ptacek.cz send_email=1 ====="
           code=$(curl -sS -o /tmp/legal-post.html -w "%{http_code}" --max-time 30 \
-            -u "$AUTH" -X POST -F "shop_url=www.ptacek.cz" \
+            -u "$AUTH" -X POST -F "shop_url=www.ptacek.cz" -F "send_email=1" \
             --max-redirs 0 "$BASE/admin/legal-scan" || true)
           echo "post HTTP $code"
           if [ "$code" != "303" ]; then
             echo "::error::legal-scan POST expected 303, got $code"
             head -c 600 /tmp/legal-post.html || true
+            exit 1
+          fi
+          json_code=""
+          for i in 1 2 3 4 5 6; do
+            json_code=$(curl -sS -o /tmp/legal-post.json -w "%{http_code}" --max-time 30 \
+              -u "$AUTH" -A "gofixweb-gha-legal-e2e" \
+              "$BASE/admin/legal-status" || true)
+            echo "status-after-post try $i HTTP $json_code $(head -c 240 /tmp/legal-post.json || true)"
+            if [ "$json_code" = "200" ] && grep -q '"send_email":true' /tmp/legal-post.json; then
+              break
+            fi
+            sleep 2
+          done
+          if [ "$json_code" != "200" ] || ! grep -q '"send_email":true' /tmp/legal-post.json; then
+            echo "::error::legal-status after send_email POST must have send_email true"
+            cat /tmp/legal-post.json || true
             exit 1
           fi
           python3 - <<'PY'
@@ -491,7 +507,7 @@ jobs:
                   text=True,
               )
               last = json.loads(raw)
-              print(f"poll {i+1} status={last.get('status')} shop={last.get('shop_url')} at={last.get('at')}")
+              print(f"poll {i+1} status={last.get('status')} shop={last.get('shop_url')} send_email={last.get('send_email')} mailed={last.get('email_sent_to')} err={last.get('email_error')}")
               if last.get("status") == "pending":
                   saw_pending = True
               if last.get("status") == "error" and saw_pending:
@@ -502,7 +518,7 @@ jobs:
                       stamp = datetime.fromisoformat(at.replace("Z", "+00:00")).timestamp()
                   except ValueError:
                       stamp = 0
-                  if stamp < started - 30 and not saw_pending:
+                  if stamp < started - 5:
                       print("stale done, waiting for this POST")
                       time.sleep(5)
                       continue
@@ -519,6 +535,11 @@ jobs:
                   shop = str(payload.get("url") or last.get("shop_url") or "")
                   if "ptacek.cz" not in shop:
                       raise SystemExit(f"expected ptacek.cz, got {shop}")
+                  mailed = str(last.get("email_sent_to") or "")
+                  mail_err = str(last.get("email_error") or "")
+                  print("RESULT_EMAIL", mailed or mail_err or "missing")
+                  if "trueforexway@gmail.com" not in mailed:
+                      raise SystemExit(f"email not sent: {mail_err or mailed or json.dumps(last)[:400]}")
                   raise SystemExit(0)
               time.sleep(5)
           raise SystemExit(f"scan did not finish: {json.dumps(last)[:800]}")
