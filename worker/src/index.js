@@ -4102,8 +4102,12 @@ function renderLegalScanBox(legalScan, { queued = false, error = "" } = {}) {
   } else if (legalScan && legalScan.payload) {
     const p = legalScan.payload;
     const terms = p.terms || {};
+    const extraTerms = (Array.isArray(terms.urls) ? terms.urls : []).filter((u) => u && u !== terms.url);
+    const extraTermsHtml = extraTerms.length
+      ? ` <span class="hint">(+ ${extraTerms.map((u) => `<a href="${escapeHtml(u)}" target="_blank" rel="noopener">${escapeHtml(u)}</a>`).join(", ")})</span>`
+      : "";
     const termsLine = terms.found && terms.url
-      ? `<a href="${escapeHtml(terms.url)}" target="_blank" rel="noopener">${escapeHtml(terms.url)}</a>`
+      ? `<a href="${escapeHtml(terms.url)}" target="_blank" rel="noopener">${escapeHtml(terms.url)}</a>${extraTermsHtml}`
       : (terms.found ? "nalezeny (bez URL)" : "nenalezeny");
     const termsSource = String(terms.source || "").trim();
     const termsSourceLine = termsSource
@@ -5064,9 +5068,13 @@ function renderAdminHtml(snapshot, {
       }
       var terms = p.terms || {};
       var shop = (p.homepage && p.homepage.final_url) || p.url || d.shop_url || "";
-      var termsLine = terms.found && terms.url
-        ? '<a href="' + escHtml(terms.url) + '" target="_blank" rel="noopener">' + escHtml(terms.url) + "</a>"
-        : (terms.found ? "nalezeny (bez URL)" : "nenalezeny");
+      var extraTerms = (terms.urls || []).filter(function (u) { return u && u !== terms.url; });
+      if (terms.found && extraTerms.length) {
+        termsLine += ' <span class="hint">(+ '
+          + extraTerms.map(function (u) {
+            return '<a href="' + escHtml(u) + '" target="_blank" rel="noopener">' + escHtml(u) + "</a>";
+          }).join(", ") + ")</span>";
+      }
       var cards = LEGAL_RULES.map(function (row) {
         var block = p[row[0]] || {};
         var result = String(block.result || "");
