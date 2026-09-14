@@ -3834,6 +3834,10 @@ function renderLegalScanBox(legalScan, { queued = false, error = "" } = {}) {
     const termsLine = terms.found && terms.url
       ? `<a href="${escapeHtml(terms.url)}" target="_blank" rel="noopener">${escapeHtml(terms.url)}</a>`
       : (terms.found ? "nalezeny (bez URL)" : "nenalezeny");
+    const termsSource = String(terms.source || "").trim();
+    const termsSourceLine = termsSource
+      ? `<p><strong>OP zdroj:</strong> ${escapeHtml(termsSource)}</p>`
+      : `<p><strong>OP zdroj:</strong> —</p>`;
     const shop = (p.homepage && p.homepage.final_url) || p.url || legalScan.shop_url || "";
     const emailed = legalScan.email_sent_to
       ? `<p class="hint">HTML report odeslán na ${escapeHtml(legalScan.email_sent_to)}.</p>`
@@ -3846,6 +3850,7 @@ function renderLegalScanBox(legalScan, { queued = false, error = "" } = {}) {
     resultHtml = `<div class="legal-result">
       <p><strong>E-shop:</strong> ${shop ? `<a href="${escapeHtml(shop)}" target="_blank" rel="noopener">${escapeHtml(shop)}</a>` : "—"}</p>
       <p><strong>Obchodní podmínky:</strong> ${termsLine}</p>
+      ${termsSourceLine}
       <p class="hint">HTTP ${escapeHtml(p.homepage && p.homepage.status_code != null ? p.homepage.status_code : "—")}
         · ${escapeHtml(legalScan.at || "")}</p>
       ${emailed}
