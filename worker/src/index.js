@@ -3733,11 +3733,16 @@ async function readLegalScanCache(env) {
       local = null;
     }
   }
+  // Hotový výsledek v Cache API stačí — GitHub fetch na každém GET /admin
+  // (včetně 20s reloadu po legal_queued=1) žere CPU a umí Error 1102.
+  const needRemote = !local || local.status === "pending" || local.status === "error";
   let remote = null;
-  try {
-    remote = await fetchLegalScanGithub(env);
-  } catch (err) {
-    console.error("legal_scan_github_failed", err);
+  if (needRemote) {
+    try {
+      remote = await fetchLegalScanGithub(env);
+    } catch (err) {
+      console.error("legal_scan_github_failed", err);
+    }
   }
   if (local && local.status === "pending") {
     if (
@@ -4078,7 +4083,9 @@ function renderAdminHtml(snapshot, {
   const batchBusy = Boolean((runState?.active || []).length)
     || (launched && (!launchedRun || isActiveRun(launchedRun)));
   const refreshSec = batchBusy ? 20 : 60;
-  const legalBusy = Boolean(legalQueued) || (legalScan && legalScan.status === "pending");
+  // Jen skutečně běžící scan — legal_queued=1 musí z URL zmizet, jinak
+  // location.reload() drží 20s smyčku i hodiny po dokončení (Error 1102).
+  const legalBusy = Boolean(legalScan && legalScan.status === "pending");
   const adminRefreshSec = legalBusy ? 20 : refreshSec;
   const generated = snapshot?.generated_at
     ? formatWhen(snapshot.generated_at)
@@ -4744,6 +4751,11 @@ function renderAdminHtml(snapshot, {
         ? "tests"
         : (q.get("legal") === "1" || q.get("legal_queued") === "1" ? "legal" : (q.get("resend") === "1" ? "emails" : ""));
       showAdminTab(fromHash || fromQuery || (${legalError ? "true" : "false"} ? "legal" : "") || fromStore || "campaign");
+      if (q.get("legal_queued") === "1" && history.replaceState) {
+        q.delete("legal_queued");
+        var search = q.toString();
+        history.replaceState(null, "", location.pathname + (search ? "?" + search : "") + location.hash);
+      }
     })();
     setTimeout(function () {
       var el = document.activeElement;
@@ -4808,6 +4820,11 @@ async function handleAdminPage(request, env) {
   }
   snapshot = await applyDeletedLandingLeads(snapshot);
   const legalScan = await readLegalScanCache(env);
+  console.log("admin_page", {
+    legalQueued,
+    legalStatus: legalScan && legalScan.status,
+    legalBusy: Boolean(legalScan && legalScan.status === "pending"),
+  });
   if (runResult.status === "fulfilled") {
     runState = runResult.value;
   } else {
