@@ -4052,14 +4052,6 @@ function legalVerdictLabel(result) {
   return String(result || "—");
 }
 
-function legalUrlList(label, urls) {
-  if (!Array.isArray(urls) || !urls.length) return "";
-  const links = urls.map((u) => (
-    `<a href="${escapeHtml(u)}" target="_blank" rel="noopener">${escapeHtml(u)}</a>`
-  )).join("<br>");
-  return `<div class="hint">${escapeHtml(label)}:<br>${links}</div>`;
-}
-
 function renderLegalRuleCard(ruleId, letter, title, block) {
   const result = String((block && block.result) || "");
   const evidence = (block && block.evidence) || "";
@@ -4080,11 +4072,6 @@ function renderLegalRuleCard(ruleId, letter, title, block) {
   if (block && Array.isArray(block.missing) && block.missing.length) {
     extra.push(`<div class="hint">Chybí: ${escapeHtml(block.missing.join("; "))}</div>`);
   }
-  if (block && Number(block.products_checked) > 0) {
-    extra.push(`<div class="hint">Zkontrolováno ${escapeHtml(block.products_checked)} produktů se slevou, u ${escapeHtml(block.products_missing_omnibus ?? 0)} chybí informace o nejnižší ceně.</div>`);
-  }
-  extra.push(legalUrlList("Bez 30denní ceny", block && block.missing_urls));
-  extra.push(legalUrlList("Zkontrolované produkty", block && block.product_urls));
   let tmpl = "";
   if (fix && typeof fix === "object") {
     tmpl = `<div class="legal-template">
@@ -5093,19 +5080,6 @@ function renderAdminHtml(snapshot, {
         var result = String(block.result || "");
         var extra = "";
         if (block.url) extra += '<div class="hint">Odkaz: <a href="' + escHtml(block.url) + '" target="_blank" rel="noopener">' + escHtml(block.url) + "</a></div>";
-        if (Number(block.products_checked) > 0) {
-          extra += '<div class="hint">Zkontrolováno ' + escHtml(block.products_checked)
-            + ' produktů se slevou, u ' + escHtml(block.products_missing_omnibus == null ? 0 : block.products_missing_omnibus)
-            + ' chybí informace o nejnižší ceně.</div>';
-        }
-        function urlList(label, urls) {
-          if (!urls || !urls.length) return "";
-          return '<div class="hint">' + escHtml(label) + ':<br>' + urls.map(function (u) {
-            return '<a href="' + escHtml(u) + '" target="_blank" rel="noopener">' + escHtml(u) + "</a>";
-          }).join("<br>") + "</div>";
-        }
-        extra += urlList("Bez 30denní ceny", block.missing_urls);
-        extra += urlList("Zkontrolované produkty", block.product_urls);
         var fix = block.fix_template;
         var tmpl = "";
         if (fix && typeof fix === "object") {
