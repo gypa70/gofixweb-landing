@@ -1,0 +1,28 @@
+name: Copy Anthropic key to legal-scanner
+
+# One-shot: zkopíruje ANTHROPIC_API_KEY na gypa70/gofix-legal-scanner.
+# CROSS_REPO_GH_TOKEN = GitHub token s právem secrets:write na cílový repo.
+on:
+  workflow_dispatch:
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Copy secret
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.CROSS_REPO_GH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANTHROPIC_API_KEY}" ]; then
+            echo "::error::ANTHROPIC_API_KEY is empty on gofixweb-landing"
+            exit 1
+          fi
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::CROSS_REPO_GH_TOKEN is missing on gofixweb-landing"
+            exit 1
+          fi
+          printf '%s' "${ANTHROPIC_API_KEY}" | gh secret set ANTHROPIC_API_KEY -R gypa70/gofix-legal-scanner
+          echo "Secret ANTHROPIC_API_KEY set on gypa70/gofix-legal-scanner"
