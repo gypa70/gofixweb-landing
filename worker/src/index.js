@@ -1053,7 +1053,17 @@ function emptySubscribers() {
     by_plan: { basic: 0, pro: 0, premium: 0 },
     mrr_haleru: 0,
     canceled_30d: 0,
+    active_list: [],
   };
+}
+
+function subscriberPlanLabel(plan) {
+  const raw = String(plan || "").trim();
+  const key = raw.toLowerCase();
+  if (key === "basic") return "Basic";
+  if (key === "pro") return "Pro";
+  if (key === "premium") return "Premium";
+  return raw || "—";
 }
 
 function subscribersFromSnapshot(snapshot) {
@@ -1062,6 +1072,9 @@ function subscribersFromSnapshot(snapshot) {
     ? snapshot.subscribers
     : {};
   const byPlan = { ...empty.by_plan, ...(raw.by_plan || raw.byPlan || {}) };
+  const list = Array.isArray(raw.active_list)
+    ? raw.active_list
+    : (Array.isArray(raw.activeList) ? raw.activeList : []);
   return {
     ...empty,
     active: Number(raw.active || 0),
@@ -1072,7 +1085,43 @@ function subscribersFromSnapshot(snapshot) {
     },
     mrr_haleru: Number(raw.mrr_haleru || raw.mrrHaleru || 0),
     canceled_30d: Number(raw.canceled_30d || raw.canceled30d || 0),
+    active_list: list.map((row) => ({
+      email: String((row && (row.email || row.customer_email)) || "").trim(),
+      plan: subscriberPlanLabel(row && row.plan),
+      started_at: String((row && (row.started_at || row.activated_at || row.created_at)) || "").trim(),
+    })),
   };
+}
+
+function renderActiveSubscribersDetail(data) {
+  const rows = Array.isArray(data.active_list) ? data.active_list : [];
+  if (!rows.length) {
+    if (Number(data.active || 0) > 0) {
+      return `<p class="hint">Seznam e-mailů se objeví v příštím DB snapshotu (GHA každých 5 min).</p>`;
+    }
+    return "";
+  }
+  const body = rows.map((row) => `<tr>
+      <td>${escapeHtml(row.email || "—")}</td>
+      <td>${escapeHtml(row.plan || "—")}</td>
+      <td>${formatWhen(row.started_at)}</td>
+    </tr>`).join("");
+  return `<details class="orders-match-details">
+    <summary>Aktivní předplatitelé — ${escapeHtml(rows.length)}</summary>
+    <p class="hint">E-mail, tarif a datum vzniku ze snapshotu tabulky subscriptions (stav active). Není to živý Stripe.</p>
+    <div class="orders-match-table">
+      <table>
+        <thead>
+          <tr>
+            <th>E-mail</th>
+            <th>Tarif</th>
+            <th>Vznik předplatného</th>
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>
+  </details>`;
 }
 
 function renderSubscribersBox(snapshot) {
@@ -1081,7 +1130,8 @@ function renderSubscribersBox(snapshot) {
   return `<div class="orders-box">
     <h2>Předplatitelé</h2>
     <p class="hint">Ze snapshotu DB (GHA každých 5 min), ne živý Stripe při načtení stránky.
-    Aktivní = řádky v tabulce subscriptions se stavem active.
+    Aktivní / MRR = jen live-mode řádky v tabulce subscriptions se stavem active, bez interních QC testů
+    (trueforexway@, audit@gofixweb.com a další QC e-maily, trycloudflare).
     MRR = součet měsíčních cen aktivních tarifů (Basic 1 490 / Pro 3 990 / Premium 6 990 Kč).
     Zrušené / expirované = stav canceled/expired a Stripe customer.subscription.deleted za posledních 30 dní.</p>
     <div class="cards">
@@ -1092,6 +1142,7 @@ function renderSubscribersBox(snapshot) {
       <div class="card"><div class="k">MRR</div><div class="v">${escapeHtml(formatCzkFromHalere(data.mrr_haleru))}</div></div>
       <div class="card"><div class="k">Zrušené / expirované (30 dní)</div><div class="v warn">${escapeHtml(data.canceled_30d)}</div></div>
     </div>
+    ${renderActiveSubscribersDetail(data)}
   </div>`;
 }
 
@@ -1381,6 +1432,7 @@ function subscriptionLifecyclePayload({
     customer_id: customerId || "",
     price_id: priceId || "",
     amount_haleru: amountHaleru || 0,
+    livemode: livemode !== false,
   };
 }
 
@@ -3939,6 +3991,76 @@ const LEGAL_SCAN_RULES = [
   ["eaa_accessibility", "j", "Přístupnost (EAA)"],
 ];
 
+const LEGAL_SCORE_LABEL =
+  "Interní GoFix Legal skóre — vlastní metodika, ne oficiální hodnocení úřadu";
+const LEGAL_SCORE_MIN = 5;
+const LEGAL_SCORE_POINTS = {
+  ano: 1, nenalezeno: 1, castecne: 0.5, ne: 0, nalezeno: 0,
+};
+
+function legalThinNote(evaluated, total) {
+  return `podloženo jen ${evaluated} z ${total} pravidel — nízká vypovídací hodnota`;
+}
+
+function legalIsThinSample(h) {
+  if (!h || h.insufficient) return false;
+  if (h.thin_sample === true) return true;
+  if (h.thin_sample === false) return false;
+  return Number(h.evaluated) === LEGAL_SCORE_MIN;
+}
+
+function legalHealthFromPayload(p, rules = LEGAL_SCAN_RULES) {
+  const stored = p && p.legal_health;
+  if (stored && typeof stored === "object" && ("score" in stored || stored.insufficient)) {
+    return stored;
+  }
+  let points = 0;
+  let evaluated = 0;
+  for (const [id] of rules) {
+    const result = p && p[id] && p[id].result;
+    if (!result || result === "nelze_overit" || !(result in LEGAL_SCORE_POINTS)) continue;
+    evaluated += 1;
+    points += LEGAL_SCORE_POINTS[result];
+  }
+  const insufficient = evaluated < LEGAL_SCORE_MIN;
+  const thin_sample = !insufficient && evaluated === LEGAL_SCORE_MIN;
+  const score = insufficient || evaluated <= 0 ? null : Math.round((100 * points) / evaluated);
+  const total = rules.length;
+  const summary = insufficient
+    ? `nedostatek dat pro spolehlivé skóre (${evaluated} z ${total} vyhodnocených pravidel)`
+    : thin_sample
+      ? `${score} / 100 (${legalThinNote(evaluated, total)})`
+      : `${score} / 100 (${evaluated} z ${total} vyhodnocených pravidel)`;
+  return {
+    score, evaluated, points, insufficient, thin_sample, label: LEGAL_SCORE_LABEL, summary, rules_total: total,
+  };
+}
+
+function renderLegalHealth(p) {
+  const h = legalHealthFromPayload(p);
+  const total = h.rules_total || 10;
+  const thin = legalIsThinSample(h);
+  const boxClass = thin ? "legal-health legal-health-thin" : "legal-health";
+  let main;
+  let extra = "";
+  if (h.insufficient) {
+    main = escapeHtml(h.summary || "nedostatek dat pro spolehlivé skóre");
+  } else {
+    const warn = thin
+      ? ` <span class="legal-health-warn">podloženo jen ${escapeHtml(String(h.evaluated))} z ${escapeHtml(String(total))} pravidel —<br>nízká vypovídací hodnota</span>`
+      : "";
+    main = `<span class="legal-health-num">${escapeHtml(String(h.score))}</span> / 100${warn}`;
+    if (!thin) {
+      extra = `<p class="hint">${escapeHtml(String(h.evaluated))} z ${escapeHtml(String(total))} vyhodnocených pravidel</p>`;
+    }
+  }
+  return `<div class="${boxClass}">
+    <p class="legal-disc">${escapeHtml(h.label || LEGAL_SCORE_LABEL)}</p>
+    <p class="legal-health-value">${main}</p>
+    ${extra}
+  </div>`;
+}
+
 async function fetchLegalScanGithub(env) {
   const repo = env.GITHUB_REPO || "gypa70/gofixweb-scanner";
   const token = env.GITHUB_TOKEN;
@@ -4142,6 +4264,7 @@ function renderLegalScanBox(legalScan, { queued = false, error = "" } = {}) {
       <p class="hint">HTTP ${escapeHtml(p.homepage && p.homepage.status_code != null ? p.homepage.status_code : "—")}
         · ${escapeHtml(legalScan.at || "")}</p>
       ${emailed}
+      ${renderLegalHealth(p)}
       ${cards}
     </div>`;
   }
@@ -4654,6 +4777,12 @@ function renderAdminHtml(snapshot, {
     .dev-scan-live h2 { color: #fbbf24; }
     .legal-scan-box { border: 1px solid rgba(45,212,191,0.45); background: rgba(13,148,136,0.10); }
     .legal-scan-box h2 { color: #5eead4; }
+    .legal-health { margin: 0.75rem 0 0.2rem; padding: 0.75rem 0.85rem; border-radius: 8px; background: rgba(15,23,42,0.65); border: 1px solid rgba(94,234,212,0.35); }
+    .legal-health-thin { border-color: rgba(251,191,36,0.7); background: rgba(251,191,36,0.12); }
+    .legal-health-num { font-size: 1.6rem; font-weight: 800; color: #5eead4; }
+    .legal-health-thin .legal-health-num { color: #fbbf24; }
+    .legal-health-value { margin: 0.35rem 0 0; font-size: 1.05rem; }
+    .legal-health-warn { display: block; margin-top: 0.35rem; font-size: 0.98rem; font-weight: 700; color: #fbbf24; line-height: 1.35; }
     .legal-rule { background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 0.85rem; margin-top: 0.7rem; }
     .legal-rule h3 { font-size: 0.95rem; margin: 0 0 0.35rem; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: baseline; justify-content: space-between; }
     .legal-template { margin-top: 0.65rem; padding: 0.65rem 0.75rem; border-radius: 8px; background: rgba(15,23,42,0.7); border: 1px dashed rgba(94,234,212,0.35); }
@@ -5028,6 +5157,18 @@ function renderAdminHtml(snapshot, {
     });
     var skipFullReload = false;
     var LEGAL_RULES = ${JSON.stringify(LEGAL_SCAN_RULES)};
+    var LEGAL_SCORE_LABEL = ${JSON.stringify("Interní GoFix Legal skóre — vlastní metodika, ne oficiální hodnocení úřadu")};
+    var LEGAL_SCORE_MIN = 5;
+    var LEGAL_SCORE_POINTS = { ano: 1, nenalezeno: 1, castecne: 0.5, ne: 0, nalezeno: 0 };
+    function legalThinNote(evaluated, total) {
+      return "podloženo jen " + evaluated + " z " + total + " pravidel — nízká vypovídací hodnota";
+    }
+    function legalIsThinSample(h) {
+      if (!h || h.insufficient) return false;
+      if (h.thin_sample === true) return true;
+      if (h.thin_sample === false) return false;
+      return Number(h.evaluated) === LEGAL_SCORE_MIN;
+    }
     function escHtml(s) {
       return String(s || "").replace(/[&<>"']/g, function (ch) {
         return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch];
@@ -5044,6 +5185,57 @@ function renderAdminHtml(snapshot, {
       if (result === "nalezeno") return "nalezeno riziko";
       if (result === "nenalezeno") return "nenalezeno";
       return String(result || "—");
+    }
+    function legalHealthHtml(p) {
+      var stored = p && p.legal_health;
+      var h;
+      if (stored && typeof stored === "object" && ("score" in stored || stored.insufficient)) {
+        h = stored;
+      } else {
+        var points = 0;
+        var evaluated = 0;
+        LEGAL_RULES.forEach(function (row) {
+          var result = p && p[row[0]] && p[row[0]].result;
+          if (!result || result === "nelze_overit" || !(result in LEGAL_SCORE_POINTS)) return;
+          evaluated += 1;
+          points += LEGAL_SCORE_POINTS[result];
+        });
+        var insufficient = evaluated < LEGAL_SCORE_MIN;
+        var thin_sample = !insufficient && evaluated === LEGAL_SCORE_MIN;
+        var score = insufficient || evaluated <= 0 ? null : Math.round((100 * points) / evaluated);
+        var total = LEGAL_RULES.length;
+        h = {
+          score: score,
+          evaluated: evaluated,
+          insufficient: insufficient,
+          thin_sample: thin_sample,
+          label: LEGAL_SCORE_LABEL,
+          summary: insufficient
+            ? "nedostatek dat pro spolehlivé skóre (" + evaluated + " z " + total + " vyhodnocených pravidel)"
+            : thin_sample
+              ? score + " / 100 (" + legalThinNote(evaluated, total) + ")"
+              : score + " / 100 (" + evaluated + " z " + total + " vyhodnocených pravidel)",
+          rules_total: total,
+        };
+      }
+      var total = h.rules_total || 10;
+      var thin = legalIsThinSample(h);
+      var main;
+      var extra = "";
+      if (h.insufficient) {
+        main = escHtml(h.summary || "nedostatek dat pro spolehlivé skóre");
+      } else {
+        var warn = thin
+          ? ' <span class="legal-health-warn">podloženo jen ' + escHtml(String(h.evaluated)) + " z " + escHtml(String(total)) + " pravidel —<br>nízká vypovídací hodnota</span>"
+          : "";
+        main = '<span class="legal-health-num">' + escHtml(String(h.score)) + "</span> / 100" + warn;
+        if (!thin) {
+          extra = '<p class="hint">' + escHtml(String(h.evaluated)) + " z " + escHtml(String(total)) + " vyhodnocených pravidel</p>";
+        }
+      }
+      var boxClass = thin ? "legal-health legal-health-thin" : "legal-health";
+      return '<div class="' + boxClass + '"><p class="legal-disc">' + escHtml(h.label || LEGAL_SCORE_LABEL)
+        + '</p><p class="legal-health-value">' + main + "</p>" + extra + "</div>";
     }
     function paintLegalScan(d) {
       var live = document.getElementById("legal-scan-live");
@@ -5132,7 +5324,7 @@ function renderAdminHtml(snapshot, {
         + (shop ? '<a href="' + escHtml(shop) + '" target="_blank" rel="noopener">' + escHtml(shop) + "</a>" : "—")
         + "</p><p><strong>Obchodní podmínky:</strong> " + termsLine
         + "</p><p><strong>OP zdroj:</strong> " + escHtml(terms.source || "—")
-        + '</p><p class="hint">' + escHtml(d.at || "") + "</p>" + emailed + cards + "</div>";
+        + '</p><p class="hint">' + escHtml(d.at || "") + "</p>" + emailed + legalHealthHtml(p) + cards + "</div>";
     }
     function setLegalScanButtonsDisabled(on) {
       var form = document.getElementById("legal-scan-form");
