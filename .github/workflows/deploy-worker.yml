@@ -447,6 +447,14 @@ jobs:
             echo "::error::immediate GET after warm missing tab-legal"
             exit 1
           fi
+          if ! grep -q 'legalHealthHtml' /tmp/admin-now.html; then
+            echo "::error::warmed /admin HTML missing legalHealthHtml (colo cache serving old dashboard?)"
+            exit 1
+          fi
+          if ! grep -q 'legal-health-warn' /tmp/admin-now.html; then
+            echo "::error::warmed /admin HTML missing legal-health-warn"
+            exit 1
+          fi
           echo "immediate dashboard ok"
 
   legal_e2e:

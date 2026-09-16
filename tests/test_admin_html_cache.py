@@ -68,6 +68,16 @@ class AdminHtmlCacheTests(unittest.TestCase):
         self.assertNotIn("warmAdminPageCaches", page_fn)
         self.assertNotIn("ctx.waitUntil", page_fn)
 
+    def test_get_admin_prefers_kv_over_colo_cache(self) -> None:
+        text = WORKER.read_text(encoding="utf-8")
+        store_start = text.index("async function readAdminHtmlStore")
+        store_fn = text[store_start : text.find("\nasync function ", store_start + 1)]
+        kv_at = store_fn.index("ADMIN_HTML.getWithMetadata(ADMIN_HTML_KV_KEY)")
+        cache_at = store_fn.index("caches.default.match(ADMIN_HTML_CACHE)")
+        self.assertLess(kv_at, cache_at)
+        self.assertIn("page-html-v2", text)
+        self.assertIn("hid Legal Health", store_fn)
+
     def test_heartbeat_workflow_exists(self) -> None:
         text = WARM_WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("check_admin_html_cache.py", text)

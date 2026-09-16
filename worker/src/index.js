@@ -3147,7 +3147,7 @@ async function requireAdminAuth(request, env) {
 
 const ADMIN_SNAPSHOT_CACHE = "https://admin.gofixweb/campaign-snapshot-v2";
 const ADMIN_RUNSTATE_CACHE = "https://admin.gofixweb/outreach-runs-v2";
-const ADMIN_HTML_CACHE = "https://admin.gofixweb/page-html-v1";
+const ADMIN_HTML_CACHE = "https://admin.gofixweb/page-html-v2";
 const ADMIN_HTML_KV_KEY = "page-html-v1";
 const ADMIN_HTML_FLASH = "<!--ADMIN_FLASH-->";
 // Colo Cache API only. KV has no expiry — that is what Prague GET must read
@@ -3360,19 +3360,16 @@ async function peekAdminHtmlStore(env) {
 }
 
 async function readAdminHtmlStore(env) {
-  try {
-    const hit = await caches.default.match(ADMIN_HTML_CACHE);
-    if (hit) {
-      const text = await hit.text();
-      if (isAdminDashboardHtml(text)) return { html: text, source: "cache" };
-    }
-  } catch (err) {
-    console.error("admin_html_cache_read_failed", err);
-  }
+  // KV is global and updated on GHA warm. Colo Cache API can keep an older
+  // dashboard for ADMIN_PAGE_CACHE_TTL_SEC (1 h) — that hid Legal Health
+  // Score in Prague after variant A deployed.
   if (env.ADMIN_HTML) {
     try {
-      const value = await env.ADMIN_HTML.get(ADMIN_HTML_KV_KEY);
+      const row = await env.ADMIN_HTML.getWithMetadata(ADMIN_HTML_KV_KEY);
+      const value = row && row.value;
       if (isAdminDashboardHtml(value)) {
+        const meta = row.metadata && typeof row.metadata === "object" ? row.metadata : {};
+        const stamp = String(meta.generated_at || "");
         try {
           await caches.default.put(
             ADMIN_HTML_CACHE,
@@ -3380,6 +3377,7 @@ async function readAdminHtmlStore(env) {
               headers: {
                 "Content-Type": "text/html; charset=utf-8",
                 "Cache-Control": `max-age=${ADMIN_PAGE_CACHE_TTL_SEC}`,
+                "X-Admin-Generated": stamp,
               },
             }),
           );
@@ -3391,6 +3389,15 @@ async function readAdminHtmlStore(env) {
     } catch (err) {
       console.error("admin_html_kv_read_failed", err);
     }
+  }
+  try {
+    const hit = await caches.default.match(ADMIN_HTML_CACHE);
+    if (hit) {
+      const text = await hit.text();
+      if (isAdminDashboardHtml(text)) return { html: text, source: "cache" };
+    }
+  } catch (err) {
+    console.error("admin_html_cache_read_failed", err);
   }
   return { html: "", source: "miss" };
 }
