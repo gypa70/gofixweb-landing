@@ -69,6 +69,12 @@
     scroll-behavior: smooth;
   }
 
+  /* Sticky header is h-16 (4rem). Extra 2rem keeps the section title clear of the bar. */
+  section[id],
+  [id="analyza"] {
+    scroll-margin-top: 6rem;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Manrope', system-ui, -apple-system, sans-serif;

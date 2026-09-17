@@ -203,7 +203,7 @@ function Hero() {
             </ul>
           </div>
 
-          <div id="analyza" className="rise scroll-mt-24 lg:col-span-5" style={{ animationDelay: '120ms' }}>
+          <div id="analyza" className="rise lg:col-span-5" style={{ animationDelay: '120ms' }}>
             <LeadForm variant="hero" />
           </div>
         </div>
