@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import LeadForm from '@/components/landing/LeadForm';
 import LossCalculator from '@/components/landing/LossCalculator';
 import HowItWorks from '@/components/landing/HowItWorks';
+import VideoSection from '@/components/landing/VideoSection';
 import SocialProof from '@/components/landing/SocialProof';
 import Pricing from '@/components/landing/Pricing';
 import FaqSection from '@/components/landing/FaqSection';
@@ -22,6 +23,7 @@ type NavLink = {
 
 const navLinks: NavLink[] = [
   { label: 'Jak to funguje', href: '#jak-to-funguje' },
+  { label: 'Video', href: '#video' },
   { label: 'Kalkulačka', href: '#kalkulacka' },
   { label: 'Výsledky', href: '#vysledky' },
   { label: 'Ceník', href: '#ceny' },
@@ -317,6 +319,7 @@ export default function Index() {
         <Hero />
         <LossCalculator />
         <HowItWorks />
+        <VideoSection />
         <SocialProof />
         <Pricing />
         <FaqSection />
