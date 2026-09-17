@@ -1,4 +1,4 @@
-const VIDEO_SRC = '/videos/gofixweb-promo.mp4?v=13378970';
+const VIDEO_SRC = '/videos/gofixweb-promo.mp4?v=13389281';
 const VIDEO_POSTER = '/images/video-poster.jpg?v=13378970';
 
 export default function VideoSection() {
