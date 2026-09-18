@@ -5981,7 +5981,7 @@ async function handleAdminScanStatsIngest(request, env) {
   }
   try {
     const stored = await writeScanStatsCache(body, env);
-    const html = await renderAndCacheAdminHtml(env, { allowGithub: false });
+    const html = await warmAdminPageCaches(env);
     return jsonResponse({
       ok: true,
       total: stored.total,
