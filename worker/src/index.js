@@ -1087,6 +1087,7 @@ function subscribersFromSnapshot(snapshot) {
     canceled_30d: Number(raw.canceled_30d || raw.canceled30d || 0),
     active_list: list.map((row) => ({
       email: String((row && (row.email || row.customer_email)) || "").trim(),
+      domain: String((row && (row.domain || row.shop || row.shop_url)) || "").trim(),
       plan: subscriberPlanLabel(row && row.plan),
       started_at: String((row && (row.started_at || row.activated_at || row.created_at)) || "").trim(),
     })),
@@ -1097,23 +1098,25 @@ function renderActiveSubscribersDetail(data) {
   const rows = Array.isArray(data.active_list) ? data.active_list : [];
   if (!rows.length) {
     if (Number(data.active || 0) > 0) {
-      return `<p class="hint">Seznam e-mailů se objeví v příštím DB snapshotu (GHA každých 5 min).</p>`;
+      return `<p class="hint">Seznam e-mailů a domén se objeví v příštím DB snapshotu (GHA každých 5 min).</p>`;
     }
     return "";
   }
   const body = rows.map((row) => `<tr>
       <td>${escapeHtml(row.email || "—")}</td>
+      <td>${escapeHtml(row.domain || "—")}</td>
       <td>${escapeHtml(row.plan || "—")}</td>
       <td>${formatWhen(row.started_at)}</td>
     </tr>`).join("");
   return `<details class="orders-match-details">
     <summary>Aktivní předplatitelé — ${escapeHtml(rows.length)}</summary>
-    <p class="hint">E-mail, tarif a datum vzniku ze snapshotu tabulky subscriptions (stav active). Není to živý Stripe.</p>
+    <p class="hint">E-mail, doména e-shopu, tarif a datum vzniku ze snapshotu tabulky subscriptions (stav active). Interní E2E/QC testy v tomto seznamu nejsou. Není to živý Stripe.</p>
     <div class="orders-match-table">
       <table>
         <thead>
           <tr>
             <th>E-mail</th>
+            <th>Doména</th>
             <th>Tarif</th>
             <th>Vznik předplatného</th>
           </tr>
@@ -1130,10 +1133,10 @@ function renderSubscribersBox(snapshot) {
   return `<div class="orders-box">
     <h2>Předplatitelé</h2>
     <p class="hint">Ze snapshotu DB (GHA každých 5 min), ne živý Stripe při načtení stránky.
-    Aktivní / MRR = jen live-mode řádky v tabulce subscriptions se stavem active, bez interních QC testů
-    (trueforexway@, audit@gofixweb.com a další QC e-maily, trycloudflare).
+    Aktivní / MRR = řádky v tabulce subscriptions se stavem active mimo interní E2E/QC testy
+    (QC e-maily trueforexway@ / audit@gofixweb.com, domény *.trycloudflare.com a money.cz).
     MRR = součet měsíčních cen aktivních tarifů (Basic 1 490 / Pro 3 990 / Premium 6 990 Kč).
-    Zrušené / expirované = stav canceled/expired a Stripe customer.subscription.deleted za posledních 30 dní.</p>
+    Zrušené / expirované = stav canceled/expired a Stripe customer.subscription.deleted za posledních 30 dní (také bez QC testů).</p>
     <div class="cards">
       <div class="card"><div class="k">Aktivní</div><div class="v ok">${escapeHtml(data.active)}</div></div>
       <div class="card"><div class="k">Basic</div><div class="v">${escapeHtml(plans.basic)}</div></div>
@@ -3067,6 +3070,7 @@ const ADMIN_LINKS = {
   openSurvey: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-open-survey.yml",
   exitIntent: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/email-exit-intent.yml",
   legalScan: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/legal-scan.yml",
+  legalWarmup: "https://github.com/gypa70/gofixweb-scanner/actions/workflows/legal-warmup.yml",
   actions: "https://github.com/gypa70/gofixweb-scanner/actions",
 };
 
@@ -3159,6 +3163,7 @@ const ADMIN_LIST_LIMIT = 50;
 function isAdminDashboardHtml(html) {
   const text = String(html || "");
   return text.includes('id="tab-legal"')
+    && text.includes('id="tab-legal-warmup"')
     && text.includes("admin-tabs")
     && !text.includes('id="admin-cache-warming"');
 }
@@ -3218,6 +3223,7 @@ function parseAdminFlash(url) {
     legal: q.get("legal") === "1",
     legalQueued: q.get("legal_queued") === "1",
     legalError: String(q.get("legal_error") || "").trim(),
+    warmupQueued: q.get("warmup_queued") === "1",
   };
 }
 
@@ -3256,6 +3262,9 @@ function renderAdminFlashHtml(flash) {
   }
   if (f.legalError) {
     parts.push(`<p class="banner-err">${escapeHtml(f.legalError)}</p>`);
+  }
+  if (f.warmupQueued) {
+    parts.push(`<p class="banner-ok">Požadavek na odemčení warm-up haltu trygofixlegal.com je ve frontě. Obnovení DB trvá obvykle do minuty — stránka se sama obnoví.</p>`);
   }
   return parts.join("");
 }
@@ -3417,6 +3426,7 @@ async function renderAndCacheAdminHtml(env, { allowGithub = true } = {}) {
 function slimAdminSnapshot(snapshot) {
   const data = snapshot && typeof snapshot === "object" ? snapshot : {};
   const leads = data.landing_leads && typeof data.landing_leads === "object" ? data.landing_leads : {};
+  const legalWarm = data.legal_warmup && typeof data.legal_warmup === "object" ? data.legal_warmup : {};
   return {
     ...data,
     rows: Array.isArray(data.rows) ? data.rows.slice(0, ADMIN_LIST_LIMIT) : [],
@@ -3424,6 +3434,10 @@ function slimAdminSnapshot(snapshot) {
     landing_leads: {
       ...leads,
       rows: Array.isArray(leads.rows) ? leads.rows.slice(0, ADMIN_LIST_LIMIT) : [],
+    },
+    legal_warmup: {
+      ...legalWarm,
+      rows: Array.isArray(legalWarm.rows) ? legalWarm.rows.slice(0, ADMIN_LIST_LIMIT) : [],
     },
   };
 }
@@ -4442,6 +4456,86 @@ function campaignRemainingCount(snapshot, runState) {
   );
 }
 
+function emptyLegalWarmup() {
+  return {
+    campaign: "legal_warmup",
+    sending_domain: "trygofixlegal.com",
+    from_email: "info@trygofixlegal.com",
+    stats: { sent: 0, bounced: 0, pending: 0, uncertain: 0, bounce_rate: 0, accepted: 0, rejected: 0 },
+    halt: { halted: false, halt_reason: "" },
+    rows: [],
+    day_label: "Den 1, limit 8/den",
+    cap: 8,
+    sent_today: 0,
+    remaining_today: 8,
+    phase: 1,
+  };
+}
+
+function renderLegalWarmupBox(snapshot) {
+  const data = snapshot && snapshot.legal_warmup && typeof snapshot.legal_warmup === "object"
+    ? snapshot.legal_warmup
+    : emptyLegalWarmup();
+  const stats = data.stats || {};
+  const halt = data.halt || {};
+  const halted = Boolean(halt.halted || stats.halted);
+  const haltClass = halted ? "halt-on" : "halt-off";
+  const haltLabel = halted ? "ZAPNUTO" : "VYPNUTO";
+  const rows = sortAdminDeliveryRows(Array.isArray(data.rows) ? data.rows : []).slice(0, ADMIN_LIST_LIMIT);
+  const tableRows = rows.length
+    ? rows.map((row) => {
+      const bounceCls = row.bounce_status === "bounced" ? "bad" : (row.bounce_status === "uncertain" ? "warn" : "");
+      return `<tr>
+        <td>${escapeHtml(formatWhen(row.sent_at))}</td>
+        <td>${escapeHtml(row.email || "")}</td>
+        <td>${escapeHtml(row.smtp_status || "")}</td>
+        <td class="${bounceCls}">${escapeHtml(row.bounce_status || "")}</td>
+        <td>${escapeHtml(row.bounce_reason || "")}</td>
+      </tr>`;
+    }).join("")
+    : `<tr><td colspan="5">Zatím žádné odeslání z info@trygofixlegal.com.</td></tr>`;
+  const haltBox = halted
+    ? `<div class="halt-box">
+        <p><strong>Odesílání warm-up trygofixlegal.com je zastavené.</strong>
+        ${halt.halt_reason ? ` Důvod: ${escapeHtml(halt.halt_reason)}` : ""}</p>
+        <form method="post" action="/admin/resume-legal">
+          <button type="submit">Odemknout halt warm-up Legal</button>
+        </form>
+        <p class="hint">Tlačítko spustí GitHub Action, která v DB nastaví halted=0 pro kampaň legal_warmup a persistne ji.
+        Pokud bounce rate pořád &gt; 3 % a je odesláno ≥ 10 mailů, další send halt znovu zapne.</p>
+      </div>`
+    : `<p class="hint">Halt je vypnutý. Warm-up může odesílat v okně Po–Pá 8:00–18:00 Praha (max ${escapeHtml(data.cap ?? 8)}/den). Zákaznické šablony se neposílají.</p>`;
+  return `<div class="legal-warmup-box">
+    <h2>Warm-up — trygofixlegal.com</h2>
+    <p class="hint">From <code>info@trygofixlegal.com</code>. Fáze ${escapeHtml(data.phase ?? 1)}: ${escapeHtml(data.day_label || "")}.
+    Dnes odesláno ${escapeHtml(data.sent_today ?? 0)} / ${escapeHtml(data.cap ?? 8)} (zbývá ${escapeHtml(data.remaining_today ?? 0)}).
+    Po 3–5 pracovních dnech bez haltu ručně zapnout Fázi 2 (25→53) přes <code>LEGAL_WARMUP_PHASE=2</code>.</p>
+    <div class="cards">
+      <div class="card"><div class="k">Plán</div><div class="v" style="font-size:1.05rem">${escapeHtml(data.day_label || "—")}</div></div>
+      <div class="card"><div class="k">Odesláno</div><div class="v">${escapeHtml(stats.sent ?? 0)}</div></div>
+      <div class="card"><div class="k">Bounced</div><div class="v bad">${escapeHtml(stats.bounced ?? 0)}</div></div>
+      <div class="card"><div class="k">Pending</div><div class="v">${escapeHtml(stats.pending ?? 0)}</div></div>
+      <div class="card"><div class="k">Uncertain</div><div class="v warn">${escapeHtml(stats.uncertain ?? 0)}</div></div>
+      <div class="card"><div class="k">Bounce rate</div><div class="v">${escapeHtml(Number(stats.bounce_rate ?? 0).toFixed(2))} %</div></div>
+      <div class="card"><div class="k">Halt</div><div class="v ${haltClass}">${haltLabel}</div></div>
+    </div>
+    ${haltBox}
+    <div class="links">
+      <a href="${ADMIN_LINKS.legalWarmup}" target="_blank" rel="noopener">GHA legal warmup</a>
+      <a href="${ADMIN_LINKS.bounce}" target="_blank" rel="noopener">GHA bounce monitor</a>
+      <a href="${ADMIN_LINKS.resume}" target="_blank" rel="noopener">GHA resume halt</a>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Datum</th><th>Příjemce</th><th>SMTP</th><th>Bounce</th><th>Důvod</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+  </div>`;
+}
+
 function renderAdminHtml(snapshot, {
   error = "",
   queued = false,
@@ -4481,12 +4575,16 @@ function renderAdminHtml(snapshot, {
   const bounceRate = Number(stats.bounce_rate ?? 0);
   const whyPending = Number((snapshot?.why_not_buy || {}).pending ?? 0);
   const orderCount = Number((orders || emptyStripeOrders()).count || 0);
+  const legalWarm = snapshot?.legal_warmup || {};
+  const legalWarmHalt = Boolean((legalWarm.halt || {}).halted || (legalWarm.stats || {}).halted);
+  const legalWarmSent = Number((legalWarm.stats || {}).sent || 0);
   const campaignBadgeCls = halted || bounceRate >= 3 ? "bad" : remainingSend > 0 ? "warn" : "";
   const tabsNav = `<nav class="admin-tabs" role="tablist" aria-label="Sekce adminu">
       ${adminTabButton("campaign", "Stav kampaně", `${adminTabBadge(remainingSend, campaignBadgeCls)}${halted ? adminTabBadge("HALT", "bad") : ""}`)}
       ${adminTabButton("emails", "Odeslané e-maily", adminTabBadge(stats.sent ?? 0))}
       ${adminTabButton("tests", "Testovací sken")}
       ${adminTabButton("legal", "Legal Scanner (demo)")}
+      ${adminTabButton("legal-warmup", "Warm-up — Legal", `${adminTabBadge(legalWarmSent)}${legalWarmHalt ? adminTabBadge("HALT", "bad") : ""}`)}
       ${adminTabButton("leads", "Poptávky", adminTabBadge(leadsInfo.newCount, leadsInfo.newCount > 0 ? "warn" : ""))}
       ${adminTabButton("orders", "Objednávky", adminTabBadge(orderCount))}
       ${adminTabButton("feedback", "Zpětná vazba", adminTabBadge(whyPending, whyPending > 0 ? "warn" : ""))}
@@ -4784,6 +4882,9 @@ function renderAdminHtml(snapshot, {
     .dev-scan-live h2 { color: #fbbf24; }
     .legal-scan-box { border: 1px solid rgba(45,212,191,0.45); background: rgba(13,148,136,0.10); }
     .legal-scan-box h2 { color: #5eead4; }
+    .legal-warmup-box { border: 1px solid rgba(96,165,250,0.45); background: rgba(37,99,235,0.10); padding: 1rem; border-radius: 10px; }
+    .legal-warmup-box h2 { color: #93c5fd; font-size: 1.05rem; margin: 0 0 0.35rem; }
+    .legal-warmup-box .cards { margin-top: 0.75rem; }
     .legal-health { margin: 0.75rem 0 0.2rem; padding: 0.75rem 0.85rem; border-radius: 8px; background: rgba(15,23,42,0.65); border: 1px solid rgba(94,234,212,0.35); }
     .legal-health-thin { border-color: rgba(251,191,36,0.7); background: rgba(251,191,36,0.12); }
     .legal-health-num { font-size: 1.6rem; font-weight: 800; color: #5eead4; }
@@ -4930,6 +5031,9 @@ function renderAdminHtml(snapshot, {
     </section>
     <section class="admin-panel" id="tab-legal" role="tabpanel" aria-labelledby="tabbtn-legal">
       ${renderLegalScanBox(legalScan, { queued: legalQueued, error: legalError })}
+    </section>
+    <section class="admin-panel" id="tab-legal-warmup" role="tabpanel" aria-labelledby="tabbtn-legal-warmup">
+      ${renderLegalWarmupBox(snapshot)}
     </section>
     <section class="admin-panel" id="tab-leads" role="tabpanel" aria-labelledby="tabbtn-leads">
       ${renderLandingLeadsBox(snapshot)}
@@ -5142,7 +5246,7 @@ function renderAdminHtml(snapshot, {
       });
     });
     function showAdminTab(id) {
-      var known = { campaign: 1, emails: 1, tests: 1, legal: 1, leads: 1, orders: 1, feedback: 1 };
+      var known = { campaign: 1, emails: 1, tests: 1, legal: 1, "legal-warmup": 1, leads: 1, orders: 1, feedback: 1 };
       if (!known[id]) id = "campaign";
       document.querySelectorAll(".admin-tab").forEach(function (btn) {
         var on = btn.getAttribute("data-tab") === id;
@@ -5377,7 +5481,9 @@ function renderAdminHtml(snapshot, {
       var q = new URLSearchParams(location.search);
       var fromQuery = (q.get("scan") === "1" || q.get("email_queued") === "1" || q.get("email_kind"))
         ? "tests"
-        : (q.get("legal") === "1" || q.get("legal_queued") === "1" ? "legal" : (q.get("resend") === "1" ? "emails" : ""));
+        : (q.get("legal") === "1" || q.get("legal_queued") === "1" ? "legal"
+          : (q.get("warmup_queued") === "1" || q.get("warmup") === "1" ? "legal-warmup"
+            : (q.get("resend") === "1" ? "emails" : "")));
       showAdminTab(fromHash || fromQuery || (${legalError ? "true" : "false"} ? "legal" : "") || fromStore || "campaign");
       var legalPoll = ${legalBusy ? "true" : "false"} || q.get("legal_queued") === "1";
       if (q.get("legal_queued") === "1" && history.replaceState) {
@@ -5595,6 +5701,29 @@ async function handleAdminResume(request, env) {
     return adminHtmlResponse(deniedPage, 502);
   }
   return Response.redirect(new URL("/admin?queued=1", request.url).toString(), 303);
+}
+
+async function handleAdminResumeLegal(request, env) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const denied = await requireAdminAuth(request, env);
+  if (denied) return denied;
+  try {
+    await dispatchGithubEvent(env, "email-legal-warmup-resume", {
+      source: "admin",
+      campaign: "legal_warmup",
+      at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("admin_resume_legal_dispatch_failed", err);
+    const deniedPage = renderAdminHtml(
+      { stats: {}, halt: { halted: true }, rows: [], legal_warmup: { halt: { halted: true } } },
+      { error: "Resume GHA se nepodařilo spustit. Zkuste workflow ručně." },
+    );
+    return adminHtmlResponse(deniedPage, 502);
+  }
+  return Response.redirect(new URL("/admin?warmup_queued=1", request.url).toString(), 303);
 }
 
 async function handleAdminLaunch(request, env) {
@@ -7800,6 +7929,10 @@ export default {
 
     if (url.pathname === "/admin/resume") {
       return handleAdminResume(request, env);
+    }
+
+    if (url.pathname === "/admin/resume-legal") {
+      return handleAdminResumeLegal(request, env);
     }
 
     if (url.pathname === "/admin/launch") {

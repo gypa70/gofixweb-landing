@@ -65,7 +65,7 @@ def evaluate_store(status: dict[str, Any], page: str, page_code: int, cache_head
     kv = status.get("kv") if isinstance(status.get("kv"), dict) else {}
     cache_api = status.get("cache_api") if isinstance(status.get("cache_api"), dict) else {}
     stub = 'id="admin-cache-warming"' in page
-    dashboard = 'id="tab-legal"' in page and "admin-tabs" in page and not stub
+    dashboard = 'id="tab-legal"' in page and 'id="tab-legal-warmup"' in page and "admin-tabs" in page and not stub
     age = kv.get("age_sec")
     try:
         age_sec = int(age) if age is not None else None

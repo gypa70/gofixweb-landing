@@ -40,7 +40,7 @@ class AdminHtmlCacheTests(unittest.TestCase):
         self.assertIn("kv_miss", decision["reasons"])
 
     def test_evaluate_ok_on_dashboard(self) -> None:
-        page = '<nav class="admin-tabs"></nav><section id="tab-legal"></section><div id="legal-scan">'
+        page = '<nav class="admin-tabs"></nav><section id="tab-legal"></section><section id="tab-legal-warmup"></section><div id="legal-scan">'
         decision = evaluate_store(
             {
                 "kv": {"hit": True, "stale": False, "age_sec": 60, "bytes": 100000, "generated_at": "2026-09-14T12:00:00Z"},
@@ -85,6 +85,14 @@ class AdminHtmlCacheTests(unittest.TestCase):
         self.assertIn("admin-html-cache-alert", text)
         self.assertIn("*/15 * * * *", text)
         self.assertNotIn("POST /admin/warm-html", text)
+
+    def test_legal_warmup_tab_in_worker(self) -> None:
+        text = WORKER.read_text(encoding="utf-8")
+        self.assertIn('id="tab-legal-warmup"', text)
+        self.assertIn("/admin/resume-legal", text)
+        self.assertIn("Warm-up — Legal", text)
+        self.assertIn("handleAdminResumeLegal", text)
+        self.assertNotIn("warmAdminPageCaches", text[text.index("async function handleAdminPage"):text.find("\nasync function ", text.index("async function handleAdminPage") + 1)])
 
 
 if __name__ == "__main__":
