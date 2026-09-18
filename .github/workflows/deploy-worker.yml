@@ -451,6 +451,10 @@ jobs:
             echo "::error::immediate GET after warm missing tab-legal-warmup"
             exit 1
           fi
+          if ! grep -q 'id="tab-scan-stats"' /tmp/admin-now.html; then
+            echo "::error::immediate GET after warm missing tab-scan-stats"
+            exit 1
+          fi
           if ! grep -q 'legalHealthHtml' /tmp/admin-now.html; then
             echo "::error::warmed /admin HTML missing legalHealthHtml (colo cache serving old dashboard?)"
             exit 1
@@ -613,7 +617,7 @@ jobs:
               head -c 400 /tmp/cold-$i.html || true
               exit 1
             fi
-            if ! grep -q 'id="tab-legal"' /tmp/cold-$i.html || ! grep -q 'id="tab-legal-warmup"' /tmp/cold-$i.html || ! grep -q 'id="legal-scan"' /tmp/cold-$i.html || ! grep -q 'admin-tabs' /tmp/cold-$i.html; then
+            if ! grep -q 'id="tab-legal"' /tmp/cold-$i.html || ! grep -q 'id="tab-legal-warmup"' /tmp/cold-$i.html || ! grep -q 'id="tab-scan-stats"' /tmp/cold-$i.html || ! grep -q 'id="legal-scan"' /tmp/cold-$i.html || ! grep -q 'admin-tabs' /tmp/cold-$i.html; then
               echo "::error::cold try $i is not the full dashboard"
               head -c 400 /tmp/cold-$i.html || true
               exit 1

@@ -11,6 +11,7 @@
  *
  *   ADMIN_BASIC_PASSWORD — heslo Basic Auth pro GET /admin
  *   ADMIN_BASIC_USER     — volitelně (default gofixweb)
+ * POST /admin/scan-stats-ingest — Hetzner/VPS pošle souhrn scan_stats_aggregate do KV.
  *   UNSUBSCRIBE_SECRET   — HMAC pro /unsubscribe a /unsub-status
  *   BANK_ACCOUNT         — číslo účtu FinalEdge s.r.o. (48h payfail převod)
  *   BANK_IBAN            — volitelně IBAN
@@ -3164,6 +3165,7 @@ function isAdminDashboardHtml(html) {
   const text = String(html || "");
   return text.includes('id="tab-legal"')
     && text.includes('id="tab-legal-warmup"')
+    && text.includes('id="tab-scan-stats"')
     && text.includes("admin-tabs")
     && !text.includes('id="admin-cache-warming"');
 }
@@ -3305,9 +3307,10 @@ async function buildAdminPageModel(env, { allowGithub = false } = {}) {
   }
   if (!runState || !Array.isArray(runState.recent)) runState = emptyOutreachRunState();
   const legalScan = await readLegalScanCache(env, { allowGithub });
+  const scanStats = await readScanStatsCache(env);
   const orders = await resolveAdminOrders(snapshot);
   const ordersError = String(snapshot?.orders?.error || snapshot?.orders_error || "");
-  return { snapshot, runState, legalScan, orders, ordersError };
+  return { snapshot, runState, legalScan, scanStats, orders, ordersError };
 }
 
 async function putAdminHtmlStore(env, html, generatedAt) {
@@ -3418,6 +3421,7 @@ async function renderAndCacheAdminHtml(env, { allowGithub = true } = {}) {
     orders: model.orders,
     ordersError: model.ordersError,
     legalScan: model.legalScan,
+    scanStats: model.scanStats,
   });
   await putAdminHtmlStore(env, html, new Date().toISOString());
   return html;
@@ -3999,6 +4003,27 @@ function adminTabButton(id, label, badgeHtml = "") {
 const LEGAL_SCAN_CACHE = "https://admin.gofixweb/legal-scan-last";
 const LEGAL_SCAN_KV_KEY = "legal-scan-last";
 const LEGAL_SCAN_TTL = 86400;
+const SCAN_STATS_CACHE = "https://admin.gofixweb/scan-stats-aggregate";
+const SCAN_STATS_KV_KEY = "scan-stats-aggregate";
+const SCAN_STATS_TTL = 86400;
+const SCAN_STATS_STALE_SEC = 15 * 60;
+const SCAN_STATS_CAMPAIGN_DAYS = ["2026-09-17", "2026-09-18"];
+const SCAN_STATS_PLATFORM_ORDER = ["woocommerce", "shoptet", "shopify", "wordpress", "other", "unknown"];
+const SCAN_STATS_BAND_ORDER = ["0-49", "50-69", "70-89", "90-100", "missing"];
+const SCAN_STATS_SOURCE_ORDER = ["gfw", "legal", "access"];
+const SCAN_STATS_PLATFORM_LABEL = {
+  woocommerce: "WooCommerce",
+  shoptet: "Shoptet",
+  shopify: "Shopify",
+  wordpress: "WordPress",
+  other: "other",
+  unknown: "unknown",
+};
+const SCAN_STATS_SOURCE_LABEL = {
+  gfw: "gfw",
+  legal: "legal",
+  access: "access",
+};
 const LEGAL_SCAN_RULES = [
   ["omnibus_30_days", "a", "Nejnižší cena za 30 dní"],
   ["odr_link", "b", "Odkaz na EU ODR"],
@@ -4536,6 +4561,274 @@ function renderLegalWarmupBox(snapshot) {
   </div>`;
 }
 
+function emptyScanStats() {
+  return {
+    generated_at: "",
+    last_recorded_at: "",
+    total: 0,
+    internal: 0,
+    campaign_total: 0,
+    older: 0,
+    by_source: [],
+    by_kind: [],
+    by_platform: [],
+    by_band: [],
+    by_day: [],
+    by_tld: [],
+    fails: [],
+    shard_progress: {},
+    csv_unique: 0,
+    target_remaining: 0,
+  };
+}
+
+function asCountRows(raw) {
+  if (Array.isArray(raw)) {
+    return raw.map((row) => {
+      if (row && typeof row === "object") {
+        const key = row.k ?? row.key ?? row.name ?? row.label ?? "";
+        return { k: String(key || "(null)"), n: Number(row.n ?? row.count ?? 0) || 0 };
+      }
+      return { k: String(row), n: 0 };
+    }).filter((row) => row.k);
+  }
+  if (raw && typeof raw === "object") {
+    return Object.entries(raw).map(([k, n]) => ({ k: String(k), n: Number(n) || 0 }));
+  }
+  return [];
+}
+
+function orderedCountRows(rows, preferred) {
+  const map = new Map(rows.map((row) => [row.k, row.n]));
+  const out = [];
+  const seen = new Set();
+  for (const key of preferred) {
+    if (key === "wordpress" && !map.has("wordpress")) continue;
+    out.push({ k: key, n: map.get(key) || 0 });
+    seen.add(key);
+  }
+  for (const row of rows) {
+    if (seen.has(row.k)) continue;
+    out.push(row);
+  }
+  return out;
+}
+
+function normalizeScanStats(raw) {
+  const data = raw && typeof raw === "object" ? raw : {};
+  const byDay = asCountRows(data.by_day);
+  const campaignDays = Array.isArray(data.campaign_days) && data.campaign_days.length
+    ? data.campaign_days.map(String)
+    : SCAN_STATS_CAMPAIGN_DAYS;
+  const campaignFromDays = byDay
+    .filter((row) => campaignDays.includes(row.k))
+    .reduce((sum, row) => sum + row.n, 0);
+  const total = Number(data.total) || 0;
+  const campaignTotal = Number(data.campaign_total ?? data.campaign_17_18 ?? campaignFromDays) || 0;
+  const fails = (Array.isArray(data.fails) ? data.fails : []).slice(0, 50).map((row) => {
+    const item = row && typeof row === "object" ? row : { error: String(row || "") };
+    return {
+      host: String(item.host || "").slice(0, 200),
+      error: String(item.error || item.raw || "").slice(0, 240),
+      log: String(item.log || "").slice(0, 80),
+    };
+  });
+  const shardRaw = data.shard_progress && typeof data.shard_progress === "object" ? data.shard_progress : {};
+  const shard_progress = {};
+  for (const [key, value] of Object.entries(shardRaw)) {
+    const row = value && typeof value === "object" ? value : {};
+    shard_progress[String(key).slice(0, 40)] = {
+      done: Number(row.done) || 0,
+      of: Number(row.of) || 0,
+      status: String(row.status || "").slice(0, 16),
+    };
+  }
+  return {
+    generated_at: String(data.generated_at || data.ingested_at || ""),
+    last_recorded_at: String(data.last_recorded_at || ""),
+    total,
+    internal: Number(data.internal) || 0,
+    campaign_total: campaignTotal,
+    older: Number(data.older) || Math.max(0, total - campaignTotal),
+    csv_unique: Number(data.csv_unique) || 0,
+    target_remaining: Number(data.target_remaining) || 0,
+    by_source: orderedCountRows(asCountRows(data.by_source), SCAN_STATS_SOURCE_ORDER),
+    by_kind: asCountRows(data.by_kind),
+    by_platform: orderedCountRows(asCountRows(data.by_platform), SCAN_STATS_PLATFORM_ORDER),
+    by_band: orderedCountRows((() => {
+      const merged = new Map();
+      for (const row of asCountRows(data.by_band)) {
+        const key = (row.k === "(null)" || row.k === "null") ? "missing" : row.k;
+        merged.set(key, (merged.get(key) || 0) + row.n);
+      }
+      return [...merged.entries()].map(([k, n]) => ({ k, n }));
+    })(), SCAN_STATS_BAND_ORDER),
+    by_day: byDay,
+    by_tld: asCountRows(data.by_tld),
+    fails,
+    shard_progress,
+  };
+}
+
+async function readScanStatsCache(env) {
+  let colo = null;
+  try {
+    const hit = await caches.default.match(SCAN_STATS_CACHE);
+    if (hit) {
+      const raw = await hit.json();
+      if (raw && typeof raw === "object") colo = raw;
+    }
+  } catch (err) {
+    console.error("scan_stats_cache_read_failed", err);
+  }
+  let kv = null;
+  if (env && env.ADMIN_HTML) {
+    try {
+      const raw = await env.ADMIN_HTML.get(SCAN_STATS_KV_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") kv = parsed;
+      }
+    } catch (err) {
+      console.error("scan_stats_kv_read_failed", err);
+    }
+  }
+  const newer = (() => {
+    if (!kv) return colo;
+    if (!colo) return kv;
+    return String(kv.generated_at || kv.last_recorded_at || "")
+      >= String(colo.generated_at || colo.last_recorded_at || "")
+      ? kv
+      : colo;
+  })();
+  return newer ? normalizeScanStats(newer) : emptyScanStats();
+}
+
+async function writeScanStatsCache(body, env) {
+  const payload = normalizeScanStats(body);
+  payload.generated_at = payload.generated_at || new Date().toISOString();
+  await caches.default.put(
+    SCAN_STATS_CACHE,
+    new Response(JSON.stringify(payload), {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": `public, max-age=${SCAN_STATS_TTL}`,
+      },
+    }),
+  );
+  if (env && env.ADMIN_HTML) {
+    try {
+      await env.ADMIN_HTML.put(SCAN_STATS_KV_KEY, JSON.stringify(payload), {
+        metadata: {
+          generated_at: String(payload.generated_at || ""),
+          last_recorded_at: String(payload.last_recorded_at || ""),
+          total: String(payload.total || 0),
+        },
+      });
+    } catch (err) {
+      console.error("scan_stats_kv_put_failed", err);
+    }
+  }
+  return payload;
+}
+
+function scanStatsAgeSec(stats) {
+  const stamp = Date.parse(stats && stats.last_recorded_at);
+  if (!Number.isFinite(stamp)) return null;
+  return Math.max(0, Math.round((Date.now() - stamp) / 1000));
+}
+
+function renderCountBars(rows, total, labels = {}) {
+  const nAll = Number(total) || rows.reduce((sum, row) => sum + row.n, 0);
+  if (!rows.length) {
+    return `<p class="hint">Žádné hodnoty v tabulce.</p>`;
+  }
+  const body = rows.map((row) => {
+    const pct = nAll > 0 ? Math.round((1000 * row.n) / nAll) / 10 : 0;
+    const label = labels[row.k] || row.k;
+    const width = Math.max(row.n > 0 ? 2 : 0, Math.min(100, pct));
+    return `<tr>
+      <td>${escapeHtml(label)}</td>
+      <td>${escapeHtml(row.n)}</td>
+      <td>${escapeHtml(pct)} %</td>
+      <td><div class="scan-bar-track"><div class="scan-bar-fill" style="width:${width}%"></div></div></td>
+    </tr>`;
+  }).join("");
+  return `<table class="scan-stats-table">
+    <thead><tr><th>Skupina</th><th>Počet</th><th>Podíl</th><th></th></tr></thead>
+    <tbody>${body}</tbody>
+  </table>`;
+}
+
+function renderScanStatsBox(stats) {
+  const data = stats && Number(stats.total) > 0 ? stats : null;
+  if (!data) {
+    return `<div class="scan-stats-box">
+      <h2>Agregátní statistiky</h2>
+      <p class="hint">Zatím žádný snapshot z <code>scan_stats_aggregate</code>. Data přijdou POST <code>/admin/scan-stats-ingest</code> z Hetzner VPS a cron / POST <code>/admin/warm-html</code> je vloží do HTML. GET /admin tabulku z VPS nečte.</p>
+    </div>`;
+  }
+  const ageSec = scanStatsAgeSec(data);
+  const running = ageSec != null && ageSec <= SCAN_STATS_STALE_SEC;
+  const statusCls = running ? "ok" : "warn";
+  const statusLabel = running ? "běží (zápis čerstvý)" : (ageSec == null ? "neznámý stav" : "zastavená / bez nového zápisu");
+  const shards = Object.entries(data.shard_progress || {});
+  const remain = shards.reduce((sum, [, row]) => sum + Math.max(0, (Number(row.of) || 0) - (Number(row.done) || 0)), 0);
+  const shardHtml = shards.length
+    ? `<table class="scan-stats-table">
+        <thead><tr><th>Shard</th><th>Hotovo v tomto běhu</th><th>Zbývá v běhu</th></tr></thead>
+        <tbody>${shards.map(([name, row]) => {
+          const left = Math.max(0, (Number(row.of) || 0) - (Number(row.done) || 0));
+          return `<tr><td>${escapeHtml(name)}</td><td>${escapeHtml(row.done)} / ${escapeHtml(row.of)}</td><td>${escapeHtml(left)}</td></tr>`;
+        }).join("")}</tbody>
+      </table>`
+    : "";
+  const failRows = (data.fails || []).filter((row) => row.host || row.error);
+  const failHtml = failRows.length
+    ? `<table class="scan-stats-table">
+        <thead><tr><th>Doména</th><th>Typ chyby</th><th>Log</th></tr></thead>
+        <tbody>${failRows.map((row) => `<tr>
+          <td>${escapeHtml(row.host || "—")}</td>
+          <td>${escapeHtml(row.error || "—")}</td>
+          <td>${escapeHtml(row.log || "")}</td>
+        </tr>`).join("")}</tbody>
+      </table>`
+    : `<p class="hint">V logu shardů teď není žádný FAIL.</p>`;
+  const laterN = (data.by_day || []).filter((row) => row.k > "2026-09-18").reduce((sum, row) => sum + row.n, 0);
+  const day17 = (data.by_day || []).find((row) => row.k === "2026-09-17");
+  const day18 = (data.by_day || []).find((row) => row.k === "2026-09-18");
+  return `<div class="scan-stats-box">
+    <h2>Agregátní statistiky</h2>
+    <p class="hint">Anonymní tabulka <code>scan_stats_aggregate</code> (bez e-mailu). GET čte jen Cache/KV.
+    WordPress není samostatný bucket ve scanneru — v datech je WooCommerce / Shoptet / Shopify / other / unknown.
+    FAIL seznam je z logů VPS, tabulka ho neukládá (INSERT OR IGNORE jen úspěšný anonymní řádek).</p>
+    <div class="cards">
+      <div class="card"><div class="k">Naskenováno celkem</div><div class="v">${escapeHtml(data.total)}</div></div>
+      <div class="card"><div class="k">Hetzner 17.–18. 9.</div><div class="v">${escapeHtml(data.campaign_total)}</div></div>
+      <div class="card"><div class="k">Starší dny</div><div class="v">${escapeHtml(data.older)}</div></div>
+      <div class="card"><div class="k">Interní hosty</div><div class="v">${escapeHtml(data.internal)}</div></div>
+      <div class="card"><div class="k">Stav kampaně</div><div class="v ${statusCls}" style="font-size:1.05rem">${escapeHtml(statusLabel)}</div></div>
+      <div class="card"><div class="k">Poslední zápis</div><div class="v" style="font-size:1.05rem">${formatWhen(data.last_recorded_at)}</div></div>
+    </div>
+    <p class="hint">17. 9.: ${escapeHtml(day17 ? day17.n : 0)} · 18. 9.: ${escapeHtml(day18 ? day18.n : 0)}${
+      laterN ? ` · po 18. 9.: ${escapeHtml(laterN)}` : ""
+    }${remain ? ` · v aktuálním běhu zbývá ${escapeHtml(remain)} URL (4 shardy)` : ""}
+    · snapshot ${formatWhen(data.generated_at)}${ageSec != null ? ` · stáří zápisu ${escapeHtml(Math.round(ageSec / 60))} min` : ""}.</p>
+    <h3>Source</h3>
+    ${renderCountBars(data.by_source, data.total, SCAN_STATS_SOURCE_LABEL)}
+    <h3>Platforma</h3>
+    ${renderCountBars(data.by_platform, data.total, SCAN_STATS_PLATFORM_LABEL)}
+    <h3>Pásmo PageSpeed (mobil)</h3>
+    ${renderCountBars(data.by_band, data.total, { missing: "chybí / PSI error" })}
+    <h3>Typ scanu</h3>
+    ${renderCountBars(data.by_kind, data.total)}
+    <h3>FAIL / chyby</h3>
+    <p class="hint">${escapeHtml(failRows.length)} unikátních chyb v logu (opakování stejné URL se nesčítají).</p>
+    ${failHtml}
+    ${shardHtml ? `<h3>Průběh shardů (aktuální běh)</h3>${shardHtml}` : ""}
+  </div>`;
+}
+
 function renderAdminHtml(snapshot, {
   error = "",
   queued = false,
@@ -4563,6 +4856,7 @@ function renderAdminHtml(snapshot, {
   legalScan = null,
   legalQueued = false,
   legalError = "",
+  scanStats = null,
 } = {}) {
   const stats = snapshot?.stats || {};
   const halt = snapshot?.halt || {};
@@ -4578,6 +4872,8 @@ function renderAdminHtml(snapshot, {
   const legalWarm = snapshot?.legal_warmup || {};
   const legalWarmHalt = Boolean((legalWarm.halt || {}).halted || (legalWarm.stats || {}).halted);
   const legalWarmSent = Number((legalWarm.stats || {}).sent || 0);
+  const scanStatsData = scanStats && typeof scanStats === "object" ? scanStats : emptyScanStats();
+  const scanStatsTotal = Number(scanStatsData.total) || 0;
   const campaignBadgeCls = halted || bounceRate >= 3 ? "bad" : remainingSend > 0 ? "warn" : "";
   const tabsNav = `<nav class="admin-tabs" role="tablist" aria-label="Sekce adminu">
       ${adminTabButton("campaign", "Stav kampaně", `${adminTabBadge(remainingSend, campaignBadgeCls)}${halted ? adminTabBadge("HALT", "bad") : ""}`)}
@@ -4585,6 +4881,7 @@ function renderAdminHtml(snapshot, {
       ${adminTabButton("tests", "Testovací sken")}
       ${adminTabButton("legal", "Legal Scanner (demo)")}
       ${adminTabButton("legal-warmup", "Warm-up — Legal", `${adminTabBadge(legalWarmSent)}${legalWarmHalt ? adminTabBadge("HALT", "bad") : ""}`)}
+      ${adminTabButton("scan-stats", "Agregátní statistiky", adminTabBadge(scanStatsTotal))}
       ${adminTabButton("leads", "Poptávky", adminTabBadge(leadsInfo.newCount, leadsInfo.newCount > 0 ? "warn" : ""))}
       ${adminTabButton("orders", "Objednávky", adminTabBadge(orderCount))}
       ${adminTabButton("feedback", "Zpětná vazba", adminTabBadge(whyPending, whyPending > 0 ? "warn" : ""))}
@@ -4885,6 +5182,13 @@ function renderAdminHtml(snapshot, {
     .legal-warmup-box { border: 1px solid rgba(96,165,250,0.45); background: rgba(37,99,235,0.10); padding: 1rem; border-radius: 10px; }
     .legal-warmup-box h2 { color: #93c5fd; font-size: 1.05rem; margin: 0 0 0.35rem; }
     .legal-warmup-box .cards { margin-top: 0.75rem; }
+    .scan-stats-box { border: 1px solid rgba(56,189,248,0.45); background: rgba(14,165,233,0.08); padding: 1rem; border-radius: 10px; }
+    .scan-stats-box h2 { color: #7dd3fc; font-size: 1.05rem; margin: 0 0 0.35rem; }
+    .scan-stats-box h3 { font-size: 0.95rem; margin: 1rem 0 0.4rem; color: #e2e8f0; }
+    .scan-stats-box .cards { margin-top: 0.75rem; }
+    .scan-stats-table { width: 100%; }
+    .scan-bar-track { height: 8px; background: #0f172a; border-radius: 99px; overflow: hidden; min-width: 80px; }
+    .scan-bar-fill { height: 100%; background: #38bdf8; border-radius: 99px; }
     .legal-health { margin: 0.75rem 0 0.2rem; padding: 0.75rem 0.85rem; border-radius: 8px; background: rgba(15,23,42,0.65); border: 1px solid rgba(94,234,212,0.35); }
     .legal-health-thin { border-color: rgba(251,191,36,0.7); background: rgba(251,191,36,0.12); }
     .legal-health-num { font-size: 1.6rem; font-weight: 800; color: #5eead4; }
@@ -5034,6 +5338,9 @@ function renderAdminHtml(snapshot, {
     </section>
     <section class="admin-panel" id="tab-legal-warmup" role="tabpanel" aria-labelledby="tabbtn-legal-warmup">
       ${renderLegalWarmupBox(snapshot)}
+    </section>
+    <section class="admin-panel" id="tab-scan-stats" role="tabpanel" aria-labelledby="tabbtn-scan-stats">
+      ${renderScanStatsBox(scanStatsData)}
     </section>
     <section class="admin-panel" id="tab-leads" role="tabpanel" aria-labelledby="tabbtn-leads">
       ${renderLandingLeadsBox(snapshot)}
@@ -5246,7 +5553,7 @@ function renderAdminHtml(snapshot, {
       });
     });
     function showAdminTab(id) {
-      var known = { campaign: 1, emails: 1, tests: 1, legal: 1, "legal-warmup": 1, leads: 1, orders: 1, feedback: 1 };
+      var known = { campaign: 1, emails: 1, tests: 1, legal: 1, "legal-warmup": 1, "scan-stats": 1, leads: 1, orders: 1, feedback: 1 };
       if (!known[id]) id = "campaign";
       document.querySelectorAll(".admin-tab").forEach(function (btn) {
         var on = btn.getAttribute("data-tab") === id;
@@ -5649,6 +5956,40 @@ async function handleAdminWarmHtml(request, env) {
     });
   } catch (err) {
     console.error("admin_html_warm_post_failed", err);
+    return jsonResponse({ ok: false, error: String((err && err.message) || err) }, 500);
+  }
+}
+
+async function handleAdminScanStatsIngest(request, env) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  const denied = await requireAdminAuth(request, env);
+  if (denied) return denied;
+  const raw = await request.text();
+  if (raw.length > 200000) {
+    return jsonResponse({ ok: false, error: "payload_too_large" }, 413);
+  }
+  let body;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return jsonResponse({ ok: false, error: "invalid_json" }, 400);
+  }
+  if (!body || typeof body !== "object") {
+    return jsonResponse({ ok: false, error: "invalid_json" }, 400);
+  }
+  try {
+    const stored = await writeScanStatsCache(body, env);
+    const html = await renderAndCacheAdminHtml(env, { allowGithub: false });
+    return jsonResponse({
+      ok: true,
+      total: stored.total,
+      last_recorded_at: stored.last_recorded_at,
+      html_bytes: html.length,
+    });
+  } catch (err) {
+    console.error("scan_stats_ingest_failed", err);
     return jsonResponse({ ok: false, error: String((err && err.message) || err) }, 500);
   }
 }
@@ -7913,6 +8254,10 @@ export default {
 
     if (url.pathname === "/admin/warm-html") {
       return handleAdminWarmHtml(request, env);
+    }
+
+    if (url.pathname === "/admin/scan-stats-ingest") {
+      return handleAdminScanStatsIngest(request, env);
     }
 
     if (url.pathname === "/admin/cache-status") {
