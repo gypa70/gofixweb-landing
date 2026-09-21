@@ -31,16 +31,6 @@
   ],
   "queue": [
     {
-      "id": "ai-nastroje-vs-omezene-autofix",
-      "title": "AI nástroje slibují opravu webu. GoFixWeb sahá jen tam, kam smí",
-      "angle": "Rozdíl mezi obecným AI pluginem a omezeným zápisem (SEO pole, komprese, doporučené pluginy).",
-      "avoid": "Neopakovat srovnání platforem Auto vs Manuál jako hlavní téma.",
-      "tags": [
-        "AI",
-        "Opravy"
-      ]
-    },
-    {
       "id": "ai-a-pagespeed",
       "title": "AI PageSpeed nezrychlí, dokud prohlížeč stahuje megabajtové fotky",
       "angle": "Modely nepíšou LCP. Komprese, slider, třetí strany. Kde AI může navrhnout postup a kde jen měříme.",
@@ -227,6 +217,14 @@
       "date": "2026-09-14",
       "source": "anthropic",
       "url": "/blog/ai-onpage-seo-male-eshopy/"
+    },
+    {
+      "id": "ai-nastroje-vs-omezene-autofix",
+      "slug": "ai-nastroje-vs-omezene-autofix",
+      "title": "AI nástroje slibují opravu webu. GoFixWeb sahá jen tam, kam smí",
+      "date": "2026-09-21",
+      "source": "anthropic",
+      "url": "/blog/ai-nastroje-vs-omezene-autofix/"
     }
   ]
 }

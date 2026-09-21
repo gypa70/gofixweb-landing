@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI nástroje slibují opravu webu. GoFixWeb sahá jen tam, kam smí — GoFixWeb</title>
+  <meta name="description" content="Obecné AI pluginy nabízejí přepis celého obsahu. GoFixWeb zapisuje jen do SEO polí, komprese a doporučených pluginů – zbytek zůstává nedotčený.">
+  <link rel="canonical" href="https://gofixweb.com/blog/ai-nastroje-vs-omezene-autofix/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="GoFixWeb">
+  <meta property="og:locale" content="cs_CZ">
+  <meta property="og:title" content="AI nástroje slibují opravu webu. GoFixWeb sahá jen tam, kam smí — GoFixWeb">
+  <meta property="og:description" content="Obecné AI pluginy nabízejí přepis celého obsahu. GoFixWeb zapisuje jen do SEO polí, komprese a doporučených pluginů – zbytek zůstává nedotčený.">
+  <meta property="og:url" content="https://gofixweb.com/blog/ai-nastroje-vs-omezene-autofix/">
+  <meta property="og:image" content="https://gofixweb.com/blog/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="AI nástroje slibují opravu webu. GoFixWeb sahá jen tam, kam smí — GoFixWeb">
+  <meta name="twitter:description" content="Obecné AI pluginy nabízejí přepis celého obsahu. GoFixWeb zapisuje jen do SEO polí, komprese a doporučených pluginů – zbytek zůstává nedotčený.">
+  <meta name="twitter:image" content="https://gofixweb.com/blog/og.png">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "AI nástroje slibují opravu webu. GoFixWeb sahá jen tam, kam smí", "description": "Obecné AI pluginy nabízejí přepis celého obsahu. GoFixWeb zapisuje jen do SEO polí, komprese a doporučených pluginů – zbytek zůstává nedotčený.", "datePublished": "2026-09-21", "dateModified": "2026-09-21", "inLanguage": "cs", "url": "https://gofixweb.com/blog/ai-nastroje-vs-omezene-autofix/", "image": "https://gofixweb.com/blog/og.png", "author": {"@type": "Organization", "name": "GoFixWeb", "url": "https://gofixweb.com"}, "publisher": {"@type": "Organization", "name": "FinalEdge s.r.o.", "url": "https://gofixweb.com"}, "mainEntityOfPage": "https://gofixweb.com/blog/ai-nastroje-vs-omezene-autofix/"}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2332;
+      --navy-light: #243044;
+      --navy-card: #2a3548;
+      --white: #ffffff;
+      --text-light: #cbd5e1;
+      --text-muted: #94a3b8;
+      --green: #16a34a;
+      --green-light: #22c55e;
+      --green-bg: rgba(22, 163, 74, 0.12);
+      --border: rgba(255, 255, 255, 0.08);
+      --max: 1080px;
+      --header-h: 4.5rem;
+    }
+    html { scroll-behavior: smooth; scroll-padding-top: var(--header-h); }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--navy);
+      color: var(--white);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    .container { width: min(var(--max), 92vw); margin: 0 auto; }
+    header {
+      padding: 0.7rem 0;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: rgba(26, 35, 50, 0.92);
+      backdrop-filter: blur(8px);
+      z-index: 20;
+    }
+    .header-inner {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem 1.25rem;
+      min-width: 0;
+    }
+    .brand { flex-shrink: 0; }
+    .logo {
+      font-size: 1.55rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+    }
+    .logo span { color: var(--green); }
+    .site-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.1rem;
+      margin-left: auto;
+      min-width: 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+    }
+    .site-nav::-webkit-scrollbar { display: none; }
+    .site-nav a {
+      flex: 0 0 auto;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+    }
+    .site-nav a:hover {
+      color: var(--white);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .site-nav a.is-active {
+      color: var(--green-light);
+      border-bottom-color: var(--green);
+    }
+    main { flex: 1; padding: 3.5rem 0 4.5rem; }
+    footer {
+      padding: 2.25rem 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    footer a { color: var(--green); font-weight: 500; }
+    footer a:hover { text-decoration: underline; }
+    .footer-links {
+      margin-top: 0.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem 1rem;
+    }
+    .blog-kicker {
+      color: var(--green-light);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.82rem;
+      margin-bottom: 0.65rem;
+    }
+    .blog-index h1, .article h1 {
+      font-size: clamp(1.65rem, 3.2vw, 2.15rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+      max-width: 22ch;
+    }
+    .blog-lead {
+      color: var(--text-muted);
+      max-width: 48ch;
+      margin-bottom: 2.25rem;
+    }
+    .blog-list {
+      display: grid;
+      gap: 1rem;
+    }
+    .blog-card {
+      display: block;
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.35rem 1.4rem 1.4rem;
+    }
+    .blog-card:hover { border-color: rgba(34, 197, 94, 0.35); }
+    .blog-card.featured { padding: 1.6rem 1.55rem 1.7rem; }
+    .blog-card time, .article-meta {
+      display: block;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 0.45rem;
+    }
+    .blog-card h2 {
+      font-size: 1.22rem;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.45rem;
+    }
+    .blog-card.featured h2 { font-size: 1.45rem; }
+    .blog-card p { color: var(--text-light); }
+    .article { max-width: 42rem; }
+    .article-meta { margin-bottom: 1.5rem; }
+    .article h2 {
+      font-size: 1.25rem;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      margin: 2rem 0 0.7rem;
+    }
+    .article h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 1.4rem 0 0.5rem;
+    }
+    .article p, .article li { color: var(--text-light); }
+    .article p { margin-bottom: 0.95rem; }
+    .article ul, .article ol { padding-left: 1.25rem; margin: 0 0 1.1rem; }
+    .article li { margin-bottom: 0.4rem; }
+    .article a { color: var(--green); font-weight: 600; }
+    .article a:hover { text-decoration: underline; }
+    .article strong { color: var(--white); }
+    .article code {
+      font-size: 0.9em;
+      background: rgba(255,255,255,0.06);
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+    .article hr {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: 1.75rem 0;
+    }
+    .article-back {
+      display: inline-block;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 1.35rem;
+    }
+    .article-back:hover { color: var(--green-light); }
+    .article-cta {
+      margin-top: 2.25rem;
+      padding: 1.2rem 1.3rem;
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .article-cta p { margin: 0; }
+    @media (max-width: 768px) {
+      :root { --header-h: 4.15rem; }
+      .logo { font-size: 1.28rem; }
+      .site-nav a { font-size: 0.95rem; padding: 0.42rem 0.55rem; }
+      main { padding: 2.5rem 0 3.25rem; }
+      .blog-card, .blog-card.featured { padding: 1.15rem 1.1rem; }
+      .blog-card.featured h2 { font-size: 1.22rem; }
+    }
+</style>
+</head>
+<body>
+<header>
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="GoFixWeb — úvod">
+        <div class="logo">GoFix<span>Web</span></div>
+      </a>
+      <nav class="site-nav" aria-label="Sekce stránky">
+        <a href="/#signup-form">Report zdarma</a>
+        <a href="/#reseni">Jak to funguje</a>
+        <a href="/#tarify">Ceník</a>
+        <a href="/blog/" class="is-active" aria-current="page">Blog</a>
+        <a href="/#faq">FAQ</a>
+        <a href="/#kontakt">Kontakt</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <div class="container">
+      <article class="article">
+        <a class="article-back" href="/blog/">← Všechny články</a>
+        <p class="blog-kicker">Blog</p>
+        <h1>AI nástroje slibují opravu webu. GoFixWeb sahá jen tam, kam smí</h1>
+        <time class="article-meta" datetime="2026-09-21">21. září 2026</time>
+        <p>Na trhu existuje řada AI nástrojů, které slibují „automatickou optimalizaci webu". Některé nabízejí přepis produktových popisů, jiné generují meta tagy nebo mění strukturu stránek. Problém nastává ve chvíli, kdy si majitel e-shopu uvědomí, že nástroj změnil text, který neměl, nebo přepsal pečlivě vyladěný popis kategorie.</p>
+<p>GoFixWeb funguje jinak. Zapisuje pouze do míst, která jsou technicky oddělená od viditelného obsahu – SEO pole (title, meta description), nastavení komprese obrázků a doporučené pluginy. Zbytek webu zůstává nedotčený.</p>
+<h2>Co znamená „omezený zápis"</h2>
+<p>Omezený zápis znamená, že nástroj nemá přístup k textům produktů, popisům kategorií ani HTML šablonám. Zapisuje pouze do databázových polí, která jsou určená pro SEO metadata, nebo do nastavení pluginů, které řídí kompresi a cache.</p>
+<p>Konkrétně:</p>
+<ul>
+<li><strong>SEO pole</strong>: title tag, meta description, Open Graph tagy – pole, která vyplňujete v pluginech jako Yoast nebo Rank Math.</li>
+<li><strong>Komprese obrázků</strong>: nastavení kvality, formátu (WebP), automatické škálování – parametry pluginů jako ShortPixel nebo Imagify.</li>
+<li><strong>Doporučené pluginy</strong>: seznam nástrojů, které GoFixWeb navrhne nainstalovat (cache, lazy loading, minifikace) – vy rozhodnete, zda je aktivujete.</li>
+</ul>
+<p>Žádný z těchto kroků nezmění text na stránce, který vidí zákazník. Pokud máte v popisu produktu větu „Ručně vyráběné v Česku", zůstane tam i po skenu.</p>
+<h2>Proč obecné AI pluginy sahají dál</h2>
+<p>Mnoho AI nástrojů pracuje s celým obsahem webu. Nabízejí přepis produktových popisů, generování blogových článků nebo automatické doplnění chybějících textů. To může být užitečné, pokud máte prázdný e-shop nebo chcete rychle vytvořit stovky variant.</p>
+<p>Problém nastává, když nástroj:</p>
+<ul>
+<li>Přepíše popis, který jste ladili měsíce.</li>
+<li>Změní tón komunikace (z osobního na korporátní).</li>
+<li>Vygeneruje text, který neodpovídá realitě produktu (halucinace).</li>
+<li>Zasáhne do HTML šablony a rozbije layout.</li>
+</ul>
+<p>Tyto nástroje často vyžadují plný přístup k databázi nebo FTP. Majitel e-shopu pak nemá jistotu, co přesně se změnilo, a vrátit změny bývá složité.</p>
+<h2>Jak GoFixWeb omezuje riziko</h2>
+<p>GoFixWeb používá Application Password – autorizační metodu, kterou nabízí WordPress od verze 5.6. Tento přístup umožňuje číst veřejná data (URL, HTML, obrázky) a zapisovat pouze do SEO polí a nastavení pluginů. Nemá přístup k:</p>
+<ul>
+<li>Textům produktů a kategorií (pokud nejsou v SEO poli).</li>
+<li>HTML šablonám a CSS.</li>
+<li>Uživatelským účtům a objednávkám.</li>
+<li>FTP nebo databázi mimo WordPress API.</li>
+</ul>
+<p>Pokud provozujete e-shop na jiné platformě než WooCommerce (Shoptet, Upgates, vlastní řešení), GoFixWeb nabízí režim Manuál – sken z veřejných dat, PDF report s doporučeními, žádný zápis.</p>
+<h2>Co to znamená pro váš e-shop</h2>
+<p>Když GoFixWeb najde chybějící meta description, doplní ji do SEO pole. Když zjistí, že obrázky nejsou komprimované, navrhne nastavení pluginu. Když odhalí duplicitní title tagy, upozorní vás v reportu.</p>
+<p>Nezasáhne do:</p>
+<ul>
+<li>Textu, který jste napsali vy nebo copywriter.</li>
+<li>Struktury kategorií a tagů.</li>
+<li>Designu a layoutu.</li>
+<li>Funkčnosti košíku a platební brány.</li>
+</ul>
+<p>Tento přístup má dvě výhody:</p>
+<ol>
+<li><strong>Nízké riziko</strong>: změny jsou reverzibilní, protože se týkají pouze metadat a nastavení.</li>
+<li><strong>Transparentnost</strong>: víte přesně, co se změnilo – SEO pole, komprese, doporučené pluginy.</li>
+</ol>
+<p>Nevýhoda: pokud potřebujete přepsat stovky produktových popisů, GoFixWeb to neudělá. Na to existují jiné nástroje – nebo copywriter.</p>
+<h2>Kdy omezený zápis stačí a kdy ne</h2>
+<p>Omezený zápis stačí, pokud:</p>
+<ul>
+<li>Máte napsané texty, ale chybí vám SEO metadata.</li>
+<li>Obrázky jsou nahrané, ale nekomprimované.</li>
+<li>Web je pomalý kvůli chybějící cache nebo minifikaci.</li>
+<li>Chcete rychlou kontrolu bez rizika, že se změní obsah.</li>
+</ul>
+<p>Omezený zápis nestačí, pokud:</p>
+<ul>
+<li>Produkty nemají popis vůbec (prázdná pole).</li>
+<li>Potřebujete hromadný přepis textů (např. z angličtiny do češtiny).</li>
+<li>Chcete změnit strukturu webu (přidat kategorie, sloučit tagy).</li>
+<li>Řešíte technické problémy mimo WordPress (server, DNS, CDN).</li>
+</ul>
+<p>V těchto případech potřebujete buď manuální práci, nebo nástroj s širším zápisem – a s tím spojené riziko.</p>
+<h2>Proč GoFixWeb nerozšiřuje zápis</h2>
+<p>Mohli bychom nabídnout přepis produktových popisů, automatické generování blogů nebo úpravu HTML. Neděláme to ze tří důvodů:</p>
+<ol>
+<li><strong>Riziko halucinace</strong>: AI může vygenerovat text, který neodpovídá realitě produktu (špatné parametry, nepravdivé tvrzení).</li>
+<li><strong>Ztráta kontroly</strong>: majitel e-shopu neví, co přesně se změnilo, a vrátit stovky přepsaných textů je náročné.</li>
+<li><strong>Hranice produktu</strong>: GoFixWeb je nástroj na technické SEO a rychlost, ne copywriting.</li>
+</ol>
+<p>Pokud potřebujete přepsat texty, doporučujeme najít copywritera nebo použít AI nástroj s lidskou kontrolou každého výstupu. GoFixWeb vám pak doplní metadata a zkomprimuje obrázky – bez rizika, že změní to, co jste schválili.</p>
+<p>Chcete stejný typ kontroly na svém e-shopu? <a href="/#analyza">Bezplatný report do 10 minut</a> — nebo se podívejte na <a href="/#faq">FAQ</a> a <a href="/#ceny">ceník</a>.</p>
+        <div class="article-cta">
+          <p>Chcete stejný typ kontroly na svém e-shopu? <a href="/#signup-form">Bezplatný report do 10 minut</a> — nebo se podívejte na <a href="/#faq">FAQ</a> a <a href="/#tarify">ceník</a>.</p>
+        </div>
+      </article>
+    </div>
+  </main>
+<footer>
+    <div class="container">
+      <p>© 2026 FinalEdge s.r.o. / GoFixWeb</p>
+      <div class="footer-links">
+        <a href="/">gofixweb.com</a>
+        <span aria-hidden="true">|</span>
+        <a href="mailto:info@gofixweb.com">info@gofixweb.com</a>
+        <span aria-hidden="true">|</span>
+        <a href="/terms.html?v=20260902">Obchodní podmínky</a>
+        <span aria-hidden="true">|</span>
+        <a href="/privacy.html?v=20260815">Ochrana osobních údajů</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
