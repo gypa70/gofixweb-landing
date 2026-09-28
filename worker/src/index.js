@@ -67,6 +67,24 @@ const LEGACY_MANUAL_FIX_AMOUNT = 399000;
 const LEGACY_AUTO_OR_AUDIT_AMOUNT = 499000;
 const COMPLETE_AUDIT_AMOUNT = LEGACY_AUTO_OR_AUDIT_AMOUNT;
 const MANUAL_FIX_AMOUNT = ONE_TIME_FIX_AMOUNT;
+const AI_VISIBILITY_AMOUNT = 49000;
+const CZK_PER_EUR = 25;
+function isAiVisibilityProduct(product) {
+  return product === "ai_visibility_manual" || product === "ai_visibility_auto";
+}
+function needsAutofixConsent(product) {
+  return product === "wp_autofix" || product === "ai_visibility_auto";
+}
+function formatCheckoutPrice(amountKc, lang) {
+  if (lang === "sk") {
+    const eur = (Number(amountKc) / CZK_PER_EUR).toFixed(2);
+    const parts = eur.split(".");
+    const grouped = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    return `${grouped},${parts[1]} €`;
+  }
+  const grouped = String(amountKc).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return `${grouped} Kč`;
+}
 const COMPLETE_AUDIT_CURRENCY = "czk";
 const STRIPE_COMPLETE_AUDIT_PAYMENT_LINK = "plink_1RUHIXFNuCwT88vQ2QjVj3Dz";
 const STRIPE_MANUAL_FIX_PRICE_ID = "price_1UBU78Gx3oG33hb4pxNKgtEP";
@@ -452,6 +470,7 @@ function paidAuditProduct(session) {
   const ref = String(
     session?.client_reference_id || session?.metadata?.product || "",
   ).trim();
+  if (ref === "ai_visibility_manual" || ref === "ai_visibility_auto") return ref;
   if (ref === "manual_fix" || amountTotal === LEGACY_MANUAL_FIX_AMOUNT) return "manual_fix";
   if (ref === "wp_autofix") return "wp_autofix";
   if (amountTotal === LEGACY_AUTO_OR_AUDIT_AMOUNT || ref === "complete_audit") return "complete_audit";
@@ -498,6 +517,9 @@ function classifyCheckoutProduct(session) {
   const ref = String(session?.client_reference_id || meta.product || "").trim();
   const paymentLink = sessionPaymentLinkId(session);
 
+  if (ref === "ai_visibility_manual" || ref === "ai_visibility_auto") {
+    return { product: ref, ambiguous: false, amount: Number.isFinite(amountTotal) ? amountTotal : AI_VISIBILITY_AMOUNT };
+  }
   if (ref === "manual_fix" || amountTotal === LEGACY_MANUAL_FIX_AMOUNT) {
     return { product: "manual_fix", ambiguous: false, amount: Number.isFinite(amountTotal) ? amountTotal : LEGACY_MANUAL_FIX_AMOUNT };
   }
@@ -520,6 +542,8 @@ function emptyStripeOrders() {
     byProduct: {
       manual_fix: { count: 0, amount: 0 },
       wp_autofix: { count: 0, amount: 0 },
+      ai_visibility_manual: { count: 0, amount: 0 },
+      ai_visibility_auto: { count: 0, amount: 0 },
       complete_audit: { count: 0, amount: 0 },
       ambiguous_4990: { count: 0, amount: 0 },
     },
@@ -2105,6 +2129,9 @@ const CHECKOUT_COPY = {
     autoName: AUTO_FIX_NAME,
     manualBlurb: MANUAL_FIX_DESCRIPTION,
     autoBlurb: AUTO_FIX_DESCRIPTION,
+    aiVisibilityName: "Oprava AI viditelnosti",
+    aiVisibilityBlurb: "Přesný návod úpravy robots.txt, aby AI vyhledávání e-shop vidělo. U WooCommerce i automatický zápis se souhlasem a možností vrátit změnu.",
+    aiVisibilityIntro: "Jednorázová platba 490 Kč. Stripe účtuje v korunách.",
     manualIntro: "Jednorázová platba. Po zaplacení dostanete přesný návod k opravě nálezů.",
     autoIntro: "Před platbou je potřeba souhlas s obchodními podmínkami a se zásahem do webu.",
     pay: "Pokračovat k platbě",
@@ -2153,6 +2180,9 @@ const CHECKOUT_COPY = {
       "Presný návod na opravu zistení — zásahy vykonáte sami vo svojej administrácii (jednorazová platba).",
     autoBlurb:
       "Automatický zápis SEO a rýchlostných opráv priamo do vášho WordPress webu (jednorazový zásah)",
+    aiVisibilityName: "Oprava AI viditeľnosti",
+    aiVisibilityBlurb: "Presný návod úpravy robots.txt, aby AI vyhľadávanie e-shop videlo. Pri WooCommerce aj automatický zápis so súhlasom a možnosťou vrátiť zmenu.",
+    aiVisibilityIntro: "Jednorazová platba 19,60 € (490 Kč). Stripe účtuje v korunách.",
     manualIntro: "Jednorazová platba. Po zaplatení dostanete presný návod na opravu zistení.",
     autoIntro: "Pred platbou je potrebný súhlas s obchodnými podmienkami a so zásahom do webu.",
     pay: "Pokračovať k platbe",
@@ -2578,15 +2608,17 @@ function checkoutOfferPage({
   alreadyPaid = false,
 } = {}) {
   const isAuto = product === "wp_autofix";
+  const isAi = isAiVisibilityProduct(product);
+  const needsConsent = needsAutofixConsent(product);
   const copy = checkoutCopy(domain, email);
-  const title = isAuto ? copy.autoName : copy.manualName;
-  const priceLabel = alreadyPaid ? "" : "1 990 Kč";
-  const blurb = alreadyPaid ? copy.alreadyPaid : (isAuto ? copy.autoBlurb : copy.manualBlurb);
-  const intro = alreadyPaid ? "" : (isAuto ? copy.autoIntro : copy.manualIntro);
+  const title = isAi ? copy.aiVisibilityName : (isAuto ? copy.autoName : copy.manualName);
+  const priceLabel = alreadyPaid ? "" : (copy.lang === "sk" || isAi ? formatCheckoutPrice(isAi ? 490 : 1990, copy.lang === "sk" ? "sk" : "cz") : "1 990 Kč");
+  const blurb = alreadyPaid ? copy.alreadyPaid : (isAi ? copy.aiVisibilityBlurb : (isAuto ? copy.autoBlurb : copy.manualBlurb));
+  const intro = alreadyPaid ? "" : (isAi ? copy.aiVisibilityIntro : (isAuto ? copy.autoIntro : copy.manualIntro));
   const err = errorMessage
     ? `<p class="err" id="vop-error">${escapeHtml(errorMessage)}</p>`
     : "";
-  const vopBlock = isAuto
+  const vopBlock = needsConsent
     ? `<label for="vop-consent">
         <input type="checkbox" id="vop-consent" name="vop_consent" value="1" required>
         <span>
@@ -2934,7 +2966,7 @@ async function handleCheckout(request, env) {
     });
   }
 
-  if (product !== "manual_fix" && product !== "wp_autofix") {
+  if (product !== "manual_fix" && product !== "wp_autofix" && !isAiVisibilityProduct(product)) {
     return new Response(copy.unknownProduct, { status: 400 });
   }
 
@@ -2957,7 +2989,8 @@ async function handleCheckout(request, env) {
   }
 
   const withdrawn = isVopConsented(withdrawal);
-  const vopOk = product !== "wp_autofix" || isVopConsented(consent);
+  const consentProduct = needsAutofixConsent(product);
+  const vopOk = !consentProduct || isVopConsented(consent);
   if (request.method !== "POST" || !withdrawn || !vopOk) {
     let errorMessage = "";
     if (request.method === "POST" && !withdrawn) errorMessage = copy.withdrawalError;
@@ -2987,7 +3020,7 @@ async function handleCheckout(request, env) {
       email,
       domain,
       product,
-      vop: product === "wp_autofix",
+      vop: needsAutofixConsent(product),
       consentAt,
       ip,
       slider,
@@ -2996,11 +3029,12 @@ async function handleCheckout(request, env) {
     console.error("vop_consent_dispatch_failed", String(err && err.message ? err.message : err));
   }
 
-  const amount = ONE_TIME_FIX_AMOUNT;
-  const name = product === "manual_fix" ? copy.manualName : copy.autoName;
-  const description = product === "manual_fix" ? copy.manualBlurb : copy.autoBlurb;
+  const aiProduct = isAiVisibilityProduct(product);
+  const amount = aiProduct ? AI_VISIBILITY_AMOUNT : ONE_TIME_FIX_AMOUNT;
+  const name = aiProduct ? copy.aiVisibilityName : (product === "manual_fix" ? copy.manualName : copy.autoName);
+  const description = aiProduct ? copy.aiVisibilityBlurb : (product === "manual_fix" ? copy.manualBlurb : copy.autoBlurb);
   const successUrl =
-    product === "wp_autofix"
+    needsAutofixConsent(product)
       ? autofixOnboardingSuccessUrl({ email, domain, lang: copy.lang })
       : paidThanksSuccessUrl(new URL(request.url).origin, copy.lang);
 
@@ -3015,7 +3049,7 @@ async function handleCheckout(request, env) {
   body.set("metadata[withdrawal_consent_version]", WITHDRAWAL_CONSENT_VERSION);
   body.set("metadata[consent_at]", consentAt);
   if (ip) body.set("metadata[consent_ip]", ip);
-  if (product === "wp_autofix") {
+  if (needsAutofixConsent(product)) {
     body.set("metadata[vop_consent]", "1");
     body.set("metadata[vop_version]", VOP_VERSION);
     if (isVopConsented(slider)) body.set("metadata[consent_slider]", "1");
@@ -4026,7 +4060,7 @@ const SCAN_STATS_SOURCE_LABEL = {
 };
 const LEGAL_SCAN_RULES = [
   ["omnibus_30_days", "a", "Nejnižší cena za 30 dní"],
-  ["odr_link", "b", "Odkaz na EU ODR"],
+  ["odr_link", "b", "Zrušená platforma ODR"],
   ["reviews_verification", "c", "Ověření recenzí"],
   ["dsa_report_form", "d", "Hlášení nezákonného obsahu (DSA)"],
   ["complaint_info", "e", "Reklamační informace"],
@@ -6823,7 +6857,7 @@ async function cacheHasUnsub(email) {
 
 const ENG_CACHE_TTL = 31536000;
 const TRACKING_ID_RE = /^[A-Za-z0-9]{8,64}$/;
-const CLICK_PRODUCTS = new Set(["manual_fix", "wp_autofix"]);
+const CLICK_PRODUCTS = new Set(["manual_fix", "wp_autofix", "ai_visibility_manual", "ai_visibility_auto"]);
 const SURVEY_REASONS = new Set(["price", "trust", "other", "findings", "loss", "later", "payfail", "variant", "fear", "share"]);
 const OPEN_PAGE_REASONS = new Set(["findings", "loss", "price", "later"]);
 const CLICK_PAGE_REASONS = new Set(["payfail", "variant", "fear", "share"]);
