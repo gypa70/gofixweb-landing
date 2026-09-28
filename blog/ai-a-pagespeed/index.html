@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI PageSpeed nezrychlí, dokud prohlížeč stahuje megabajtové fotky — GoFixWeb</title>
+  <meta name="description" content="Model navrhne postup, ale LCP píše server a síť. Kde AI diagnostikuje a kde jen měříte výsledek komprese.">
+  <link rel="canonical" href="https://gofixweb.com/blog/ai-a-pagespeed/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="GoFixWeb">
+  <meta property="og:locale" content="cs_CZ">
+  <meta property="og:title" content="AI PageSpeed nezrychlí, dokud prohlížeč stahuje megabajtové fotky — GoFixWeb">
+  <meta property="og:description" content="Model navrhne postup, ale LCP píše server a síť. Kde AI diagnostikuje a kde jen měříte výsledek komprese.">
+  <meta property="og:url" content="https://gofixweb.com/blog/ai-a-pagespeed/">
+  <meta property="og:image" content="https://gofixweb.com/blog/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="AI PageSpeed nezrychlí, dokud prohlížeč stahuje megabajtové fotky — GoFixWeb">
+  <meta name="twitter:description" content="Model navrhne postup, ale LCP píše server a síť. Kde AI diagnostikuje a kde jen měříte výsledek komprese.">
+  <meta name="twitter:image" content="https://gofixweb.com/blog/og.png">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "AI PageSpeed nezrychlí, dokud prohlížeč stahuje megabajtové fotky", "description": "Model navrhne postup, ale LCP píše server a síť. Kde AI diagnostikuje a kde jen měříte výsledek komprese.", "datePublished": "2026-09-28", "dateModified": "2026-09-28", "inLanguage": "cs", "url": "https://gofixweb.com/blog/ai-a-pagespeed/", "image": "https://gofixweb.com/blog/og.png", "author": {"@type": "Organization", "name": "GoFixWeb", "url": "https://gofixweb.com"}, "publisher": {"@type": "Organization", "name": "FinalEdge s.r.o.", "url": "https://gofixweb.com"}, "mainEntityOfPage": "https://gofixweb.com/blog/ai-a-pagespeed/"}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2332;
+      --navy-light: #243044;
+      --navy-card: #2a3548;
+      --white: #ffffff;
+      --text-light: #cbd5e1;
+      --text-muted: #94a3b8;
+      --green: #16a34a;
+      --green-light: #22c55e;
+      --green-bg: rgba(22, 163, 74, 0.12);
+      --border: rgba(255, 255, 255, 0.08);
+      --max: 1080px;
+      --header-h: 4.5rem;
+    }
+    html { scroll-behavior: smooth; scroll-padding-top: var(--header-h); }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--navy);
+      color: var(--white);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    .container { width: min(var(--max), 92vw); margin: 0 auto; }
+    header {
+      padding: 0.7rem 0;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: rgba(26, 35, 50, 0.92);
+      backdrop-filter: blur(8px);
+      z-index: 20;
+    }
+    .header-inner {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem 1.25rem;
+      min-width: 0;
+    }
+    .brand { flex-shrink: 0; }
+    .logo {
+      font-size: 1.55rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+    }
+    .logo span { color: var(--green); }
+    .site-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.1rem;
+      margin-left: auto;
+      min-width: 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+    }
+    .site-nav::-webkit-scrollbar { display: none; }
+    .site-nav a {
+      flex: 0 0 auto;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+    }
+    .site-nav a:hover {
+      color: var(--white);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .site-nav a.is-active {
+      color: var(--green-light);
+      border-bottom-color: var(--green);
+    }
+    main { flex: 1; padding: 3.5rem 0 4.5rem; }
+    footer {
+      padding: 2.25rem 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    footer a { color: var(--green); font-weight: 500; }
+    footer a:hover { text-decoration: underline; }
+    .footer-links {
+      margin-top: 0.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem 1rem;
+    }
+    .blog-kicker {
+      color: var(--green-light);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.82rem;
+      margin-bottom: 0.65rem;
+    }
+    .blog-index h1, .article h1 {
+      font-size: clamp(1.65rem, 3.2vw, 2.15rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+      max-width: 22ch;
+    }
+    .blog-lead {
+      color: var(--text-muted);
+      max-width: 48ch;
+      margin-bottom: 2.25rem;
+    }
+    .blog-list {
+      display: grid;
+      gap: 1rem;
+    }
+    .blog-card {
+      display: block;
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.35rem 1.4rem 1.4rem;
+    }
+    .blog-card:hover { border-color: rgba(34, 197, 94, 0.35); }
+    .blog-card.featured { padding: 1.6rem 1.55rem 1.7rem; }
+    .blog-card time, .article-meta {
+      display: block;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 0.45rem;
+    }
+    .blog-card h2 {
+      font-size: 1.22rem;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.45rem;
+    }
+    .blog-card.featured h2 { font-size: 1.45rem; }
+    .blog-card p { color: var(--text-light); }
+    .article { max-width: 42rem; }
+    .article-meta { margin-bottom: 1.5rem; }
+    .article h2 {
+      font-size: 1.25rem;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      margin: 2rem 0 0.7rem;
+    }
+    .article h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 1.4rem 0 0.5rem;
+    }
+    .article p, .article li { color: var(--text-light); }
+    .article p { margin-bottom: 0.95rem; }
+    .article ul, .article ol { padding-left: 1.25rem; margin: 0 0 1.1rem; }
+    .article li { margin-bottom: 0.4rem; }
+    .article a { color: var(--green); font-weight: 600; }
+    .article a:hover { text-decoration: underline; }
+    .article strong { color: var(--white); }
+    .article code {
+      font-size: 0.9em;
+      background: rgba(255,255,255,0.06);
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+    .article hr {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: 1.75rem 0;
+    }
+    .article-back {
+      display: inline-block;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 1.35rem;
+    }
+    .article-back:hover { color: var(--green-light); }
+    .article-cta {
+      margin-top: 2.25rem;
+      padding: 1.2rem 1.3rem;
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .article-cta p { margin: 0; }
+    @media (max-width: 768px) {
+      :root { --header-h: 4.15rem; }
+      .logo { font-size: 1.28rem; }
+      .site-nav a { font-size: 0.95rem; padding: 0.42rem 0.55rem; }
+      main { padding: 2.5rem 0 3.25rem; }
+      .blog-card, .blog-card.featured { padding: 1.15rem 1.1rem; }
+      .blog-card.featured h2 { font-size: 1.22rem; }
+    }
+</style>
+</head>
+<body>
+<header>
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="GoFixWeb — úvod">
+        <div class="logo">GoFix<span>Web</span></div>
+      </a>
+      <nav class="site-nav" aria-label="Sekce stránky">
+        <a href="/#signup-form">Report zdarma</a>
+        <a href="/#reseni">Jak to funguje</a>
+        <a href="/#tarify">Ceník</a>
+        <a href="/blog/" class="is-active" aria-current="page">Blog</a>
+        <a href="/#faq">FAQ</a>
+        <a href="/#kontakt">Kontakt</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <div class="container">
+      <article class="article">
+        <a class="article-back" href="/blog/">← Všechny články</a>
+        <p class="blog-kicker">Blog</p>
+        <h1>AI PageSpeed nezrychlí, dokud prohlížeč stahuje megabajtové fotky</h1>
+        <time class="article-meta" datetime="2026-09-28">28. září 2026</time>
+        <p>Jazykovému modelu můžete popsat pomalou stránku, vložit výstup z PageSpeed Insights a dostat seznam kroků. Model ale nepřepíše šablonu, nenastaví WebP a nezmenší slider. Dokud prohlížeč stahuje 2,5 MB obrázků, LCP zůstane vysoké — bez ohledu na to, jak dobře AI popíše problém.</p>
+<p>Tento článek ukazuje, kde AI diagnostika končí a kde začíná práce se soubory, pluginy a třetími stranami.</p>
+<h2>Co AI vidí v PageSpeed reportu</h2>
+<p>PageSpeed Insights vrátí JSON se skóre, metrikami a seznamem příležitostí. Model z něj přečte:</p>
+<ul>
+<li><strong>Largest Contentful Paint</strong> — čas zobrazení největšího prvku (obvykle obrázek).</li>
+<li><strong>Properly size images</strong> — kolik kilobajtů by úspora komprese ušetřila.</li>
+<li><strong>Eliminate render-blocking resources</strong> — CSS a JS, které blokují vykreslení.</li>
+<li><strong>Reduce unused JavaScript</strong> — kód, který stránka nenačte.</li>
+</ul>
+<p>Z těchto dat model sestaví prioritizovaný seznam: „Komprimujte obrázky, odložte nepoužívané skripty, přesuňte CSS do hlavičky." To je užitečné shrnutí, ale nezmění ani jeden bajt na serveru.</p>
+<h2>Kde AI navrhne postup</h2>
+<p>GoFixWeb používá model k tomu, aby z veřejných dat (HTML, PageSpeed, Lighthouse) sestavil diagnostiku:</p>
+<ol>
+<li><strong>Identifikace těžkých obrázků</strong> — parser HTML najde <code>&lt;img&gt;</code>, stáhne hlavičku a zapíše rozměry i velikost souboru.</li>
+<li><strong>Kontrola formátu</strong> — pokud je JPEG větší než 200 kB a chybí WebP varianta, model doporučí kompresi.</li>
+<li><strong>Třetí strany</strong> — pokud HTML obsahuje <code>&lt;script src="https://..."&gt;</code> z jiné domény, model upozorní na externí zdroj, který ovlivňuje LCP.</li>
+<li><strong>Slider a galerie</strong> — pokud HTML načítá deset obrázků najednou, model navrhne lazy loading nebo zmenšení počtu snímků.</li>
+</ol>
+<p>Výstupem je PDF s konkrétními URL, velikostmi a doporučením. Implementaci ale musí provést buď automatický proces (u WooCommerce přes Application Password), nebo vy ručně.</p>
+<h2>Co AI neprovede: komprese, CDN, hosting</h2>
+<p>Model nezmění konfiguraci serveru ani nepřepíše soubory. Tři nejčastější úkoly, které zůstávají na straně e-shopu:</p>
+<h3>Komprese obrázků</h3>
+<p>PageSpeed často hlásí úsporu 1–2 MB. Aby se projevila, musíte:</p>
+<ul>
+<li>Nahrát WebP varianty nebo použít plugin (ShortPixel, Imagify).</li>
+<li>Nastavit <code>&lt;picture&gt;</code> s fallbackem na JPEG.</li>
+<li>Zkontrolovat, že server posílá správný <code>Content-Type</code>.</li>
+</ul>
+<p>GoFixWeb v režimu Auto (WooCommerce) nahraje komprimované soubory přes REST API a aktualizuje přílohy. U jiných CMS dostanete PDF s URL a doporučenou velikostí — kompresi provedete sami nebo přes plugin.</p>
+<h3>Slider a karousel</h3>
+<p>Pokud úvodní slider načítá pět obrázků po 800 kB, LCP se pohybuje kolem 4–5 sekund. Model to v reportu popíše, ale změnu musíte udělat v nastavení pluginu:</p>
+<ul>
+<li>Zmenšit počet snímků na tři.</li>
+<li>Zapnout lazy loading pro druhý a třetí snímek.</li>
+<li>Zvážit statický obrázek místo karuselu.</li>
+</ul>
+<p>Automatická oprava slideru neexistuje — každý plugin má jinou strukturu a API.</p>
+<h3>Třetí strany: analytics, reklama, chat</h3>
+<p>Pokud stránka načítá Google Analytics, Facebook Pixel, Smartsupp a Sklik konverzní kód, každý skript přidává 50–200 ms k LCP. Model v reportu vypíše domény a velikost, ale rozhodnout, co odložit nebo odstranit, musíte vy:</p>
+<ul>
+<li>Analytics lze načíst asynchronně (<code>async</code> nebo <code>defer</code>).</li>
+<li>Chat můžete zobrazit až po interakci uživatele.</li>
+<li>Reklamu a tracking zvažte podle ROI — ne každý skript má stejnou hodnotu.</li>
+</ul>
+<p>GoFixWeb třetí strany neodstraňuje, protože by to mohlo přerušit měření nebo ztratit konverze.</p>
+<h2>Kde jen měříte: field data a reálné připojení</h2>
+<p>PageSpeed Insights ukazuje dvě sady dat:</p>
+<ul>
+<li><strong>Lab data</strong> — simulace na rychlém připojení, prázdná cache.</li>
+<li><strong>Field data</strong> — reálné metriky z Chrome User Experience Report (CrUX), pokud má stránka dostatek návštěv.</li>
+</ul>
+<p>Model přečte obě čísla, ale field data odrážejí skutečné uživatele: pomalé mobilní sítě, starší telefony, cache prohlížeče. Pokud lab skóre je 85 a field LCP 3,2 s, problém není v diagnostice — je v tom, že reální uživatelé stahují nekomprimované obrázky nebo čekají na pomalý server.</p>
+<p>AI vám řekne, že field data jsou horší. Zlepšení ale přijde až po kompresi, CDN nebo upgradu hostingu — a projeví se v CrUX datech za 28 dní.</p>
+<h2>Jak GoFixWeb kombinuje AI diagnostiku a automatickou opravu</h2>
+<ol>
+<li><strong>Sken</strong> — parser stáhne HTML, obrázky (hlavičky), PageSpeed JSON.</li>
+<li><strong>Model</strong> — GPT-4 vyhodnotí priority: komprese, SEO pole, lazy loading, třetí strany.</li>
+<li><strong>Auto (WooCommerce)</strong> — přes Application Password nahraje WebP, doplní alt, title, meta description.</li>
+<li><strong>Manuál (ostatní CMS)</strong> — PDF s URL, velikostmi, doporučením; implementace na vás.</li>
+</ol>
+<p>Model neprovádí změny sám — buď je provede automatický proces (u WooCommerce), nebo dostanete návod. Tím se vyhnete halucinacím („Změnil jsem konfiguraci serveru") a zároveň máte jasný seznam úkolů.</p>
+<h2>Co z toho plyne pro váš e-shop</h2>
+<ul>
+<li><strong>AI diagnostika je rychlá a přesná</strong> — model přečte PageSpeed report a HTML za sekundy.</li>
+<li><strong>Implementace zůstává na serveru</strong> — komprese, slider, třetí strany musí někdo změnit.</li>
+<li><strong>Auto režim funguje jen u WooCommerce</strong> — ostatní CMS dostanou PDF s postupem.</li>
+<li><strong>Field data se změní až po nasazení</strong> — lab skóre je okamžité, CrUX data trvají týdny.</li>
+</ul>
+<p>Pokud PageSpeed hlásí 2 MB obrázků a LCP 4 sekundy, model vám řekne, které soubory komprimovat. Zrychlení ale přijde až po nahrání WebP a kontrole v prohlížeči.</p>
+<p>Chcete stejný typ kontroly na svém e-shopu? <a href="/#analyza">Bezplatný report do 10 minut</a> — nebo se podívejte na <a href="/#faq">FAQ</a> a <a href="/#ceny">ceník</a>.</p>
+        <div class="article-cta">
+          <p>Chcete stejný typ kontroly na svém e-shopu? <a href="/#signup-form">Bezplatný report do 10 minut</a> — nebo se podívejte na <a href="/#faq">FAQ</a> a <a href="/#tarify">ceník</a>.</p>
+        </div>
+      </article>
+    </div>
+  </main>
+<footer>
+    <div class="container">
+      <p>© 2026 FinalEdge s.r.o. / GoFixWeb</p>
+      <div class="footer-links">
+        <a href="/">gofixweb.com</a>
+        <span aria-hidden="true">|</span>
+        <a href="mailto:info@gofixweb.com">info@gofixweb.com</a>
+        <span aria-hidden="true">|</span>
+        <a href="/terms.html?v=20260902">Obchodní podmínky</a>
+        <span aria-hidden="true">|</span>
+        <a href="/privacy.html?v=20260815">Ochrana osobních údajů</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

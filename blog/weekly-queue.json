@@ -31,16 +31,6 @@
   ],
   "queue": [
     {
-      "id": "ai-a-pagespeed",
-      "title": "AI PageSpeed nezrychlí, dokud prohlížeč stahuje megabajtové fotky",
-      "angle": "Modely nepíšou LCP. Komprese, slider, třetí strany. Kde AI může navrhnout postup a kde jen měříme.",
-      "avoid": "Neopakovat článek o tržbách a rychlosti ani case study čísla jako slib.",
-      "tags": [
-        "AI",
-        "PageSpeed"
-      ]
-    },
-    {
       "id": "budoucnost-automatizovanych-oprav",
       "title": "Budoucnost automatizovaných oprav e-shopů: víc měření, míň magie",
       "angle": "Co půjde dál automatizovat bezpečně a co zůstane na člověku (checkout, doprava, právní texty).",
@@ -225,6 +215,14 @@
       "date": "2026-09-21",
       "source": "anthropic",
       "url": "/blog/ai-nastroje-vs-omezene-autofix/"
+    },
+    {
+      "id": "ai-a-pagespeed",
+      "slug": "ai-a-pagespeed",
+      "title": "AI PageSpeed nezrychlí, dokud prohlížeč stahuje megabajtové fotky",
+      "date": "2026-09-28",
+      "source": "anthropic",
+      "url": "/blog/ai-a-pagespeed/"
     }
   ]
 }
