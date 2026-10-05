@@ -31,16 +31,6 @@
   ],
   "queue": [
     {
-      "id": "budoucnost-automatizovanych-oprav",
-      "title": "Budoucnost automatizovaných oprav e-shopů: víc měření, míň magie",
-      "angle": "Co půjde dál automatizovat bezpečně a co zůstane na člověku (checkout, doprava, právní texty).",
-      "avoid": "Žádné sci-fi sliby o plně autonomním e-shopu.",
-      "tags": [
-        "AI",
-        "Automatizace"
-      ]
-    },
-    {
       "id": "ai-generovane-title-meta",
       "title": "AI umí napsat title. Nestojí to za nic, když je na stu URL stejný",
       "angle": "Hromadné šablony z chatu vs. pole po stránkách. Jak poznat, že AI jen přepsala slogan firmy.",
@@ -223,6 +213,14 @@
       "date": "2026-09-28",
       "source": "anthropic",
       "url": "/blog/ai-a-pagespeed/"
+    },
+    {
+      "id": "budoucnost-automatizovanych-oprav",
+      "slug": "budoucnost-automatizovanych-oprav",
+      "title": "Budoucnost automatizovaných oprav e-shopů: víc měření, míň magie",
+      "date": "2026-10-05",
+      "source": "anthropic",
+      "url": "/blog/budoucnost-automatizovanych-oprav/"
     }
   ]
 }
