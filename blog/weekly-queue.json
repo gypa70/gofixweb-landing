@@ -31,16 +31,6 @@
   ],
   "queue": [
     {
-      "id": "ai-generovane-title-meta",
-      "title": "AI umí napsat title. Nestojí to za nic, když je na stu URL stejný",
-      "angle": "Hromadné šablony z chatu vs. pole po stránkách. Jak poznat, že AI jen přepsala slogan firmy.",
-      "avoid": "Neopakovat pětiminutovou kontrolu krok za krokem.",
-      "tags": [
-        "AI",
-        "SEO"
-      ]
-    },
-    {
       "id": "chatbot-vs-technicky-sken",
       "title": "Chatbot vám poradí plugin. Sken vám řekne, co je na URL rozbité",
       "angle": "Konverzace s modelem vs. veřejné HTML + PageSpeed. Proč rada bez měření špatně sedí.",
@@ -221,6 +211,14 @@
       "date": "2026-10-05",
       "source": "anthropic",
       "url": "/blog/budoucnost-automatizovanych-oprav/"
+    },
+    {
+      "id": "ai-generovane-title-meta",
+      "slug": "ai-generovane-title-meta",
+      "title": "AI umí napsat title. Nestojí to za nic, když je na stu URL stejný",
+      "date": "2026-10-12",
+      "source": "anthropic",
+      "url": "/blog/ai-generovane-title-meta/"
     }
   ]
 }
