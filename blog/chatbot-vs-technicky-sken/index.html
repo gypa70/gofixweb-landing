@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chatbot vám poradí plugin. Sken vám řekne, co je na URL rozbité — GoFixWeb</title>
+  <meta name="description" content="Konverzace s modelem dává obecnou radu. Sken HTML a PageSpeed ukazuje konkrétní čísla. Proč rada bez měření špatně sedí.">
+  <link rel="canonical" href="https://gofixweb.com/blog/chatbot-vs-technicky-sken/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="GoFixWeb">
+  <meta property="og:locale" content="cs_CZ">
+  <meta property="og:title" content="Chatbot vám poradí plugin. Sken vám řekne, co je na URL rozbité — GoFixWeb">
+  <meta property="og:description" content="Konverzace s modelem dává obecnou radu. Sken HTML a PageSpeed ukazuje konkrétní čísla. Proč rada bez měření špatně sedí.">
+  <meta property="og:url" content="https://gofixweb.com/blog/chatbot-vs-technicky-sken/">
+  <meta property="og:image" content="https://gofixweb.com/blog/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Chatbot vám poradí plugin. Sken vám řekne, co je na URL rozbité — GoFixWeb">
+  <meta name="twitter:description" content="Konverzace s modelem dává obecnou radu. Sken HTML a PageSpeed ukazuje konkrétní čísla. Proč rada bez měření špatně sedí.">
+  <meta name="twitter:image" content="https://gofixweb.com/blog/og.png">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Chatbot vám poradí plugin. Sken vám řekne, co je na URL rozbité", "description": "Konverzace s modelem dává obecnou radu. Sken HTML a PageSpeed ukazuje konkrétní čísla. Proč rada bez měření špatně sedí.", "datePublished": "2026-10-19", "dateModified": "2026-10-19", "inLanguage": "cs", "url": "https://gofixweb.com/blog/chatbot-vs-technicky-sken/", "image": "https://gofixweb.com/blog/og.png", "author": {"@type": "Organization", "name": "GoFixWeb", "url": "https://gofixweb.com"}, "publisher": {"@type": "Organization", "name": "FinalEdge s.r.o.", "url": "https://gofixweb.com"}, "mainEntityOfPage": "https://gofixweb.com/blog/chatbot-vs-technicky-sken/"}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2332;
+      --navy-light: #243044;
+      --navy-card: #2a3548;
+      --white: #ffffff;
+      --text-light: #cbd5e1;
+      --text-muted: #94a3b8;
+      --green: #16a34a;
+      --green-light: #22c55e;
+      --green-bg: rgba(22, 163, 74, 0.12);
+      --border: rgba(255, 255, 255, 0.08);
+      --max: 1080px;
+      --header-h: 4.5rem;
+    }
+    html { scroll-behavior: smooth; scroll-padding-top: var(--header-h); }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--navy);
+      color: var(--white);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    .container { width: min(var(--max), 92vw); margin: 0 auto; }
+    header {
+      padding: 0.7rem 0;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: rgba(26, 35, 50, 0.92);
+      backdrop-filter: blur(8px);
+      z-index: 20;
+    }
+    .header-inner {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem 1.25rem;
+      min-width: 0;
+    }
+    .brand { flex-shrink: 0; }
+    .logo {
+      font-size: 1.55rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+    }
+    .logo span { color: var(--green); }
+    .site-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.1rem;
+      margin-left: auto;
+      min-width: 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+    }
+    .site-nav::-webkit-scrollbar { display: none; }
+    .site-nav a {
+      flex: 0 0 auto;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+    }
+    .site-nav a:hover {
+      color: var(--white);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .site-nav a.is-active {
+      color: var(--green-light);
+      border-bottom-color: var(--green);
+    }
+    main { flex: 1; padding: 3.5rem 0 4.5rem; }
+    footer {
+      padding: 2.25rem 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    footer a { color: var(--green); font-weight: 500; }
+    footer a:hover { text-decoration: underline; }
+    .footer-links {
+      margin-top: 0.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem 1rem;
+    }
+    .blog-kicker {
+      color: var(--green-light);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.82rem;
+      margin-bottom: 0.65rem;
+    }
+    .blog-index h1, .article h1 {
+      font-size: clamp(1.65rem, 3.2vw, 2.15rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+      max-width: 22ch;
+    }
+    .blog-lead {
+      color: var(--text-muted);
+      max-width: 48ch;
+      margin-bottom: 2.25rem;
+    }
+    .blog-list {
+      display: grid;
+      gap: 1rem;
+    }
+    .blog-card {
+      display: block;
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.35rem 1.4rem 1.4rem;
+    }
+    .blog-card:hover { border-color: rgba(34, 197, 94, 0.35); }
+    .blog-card.featured { padding: 1.6rem 1.55rem 1.7rem; }
+    .blog-card time, .article-meta {
+      display: block;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 0.45rem;
+    }
+    .blog-card h2 {
+      font-size: 1.22rem;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.45rem;
+    }
+    .blog-card.featured h2 { font-size: 1.45rem; }
+    .blog-card p { color: var(--text-light); }
+    .article { max-width: 42rem; }
+    .article-meta { margin-bottom: 1.5rem; }
+    .article h2 {
+      font-size: 1.25rem;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      margin: 2rem 0 0.7rem;
+    }
+    .article h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 1.4rem 0 0.5rem;
+    }
+    .article p, .article li { color: var(--text-light); }
+    .article p { margin-bottom: 0.95rem; }
+    .article ul, .article ol { padding-left: 1.25rem; margin: 0 0 1.1rem; }
+    .article li { margin-bottom: 0.4rem; }
+    .article a { color: var(--green); font-weight: 600; }
+    .article a:hover { text-decoration: underline; }
+    .article strong { color: var(--white); }
+    .article code {
+      font-size: 0.9em;
+      background: rgba(255,255,255,0.06);
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+    .article hr {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: 1.75rem 0;
+    }
+    .article-back {
+      display: inline-block;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 1.35rem;
+    }
+    .article-back:hover { color: var(--green-light); }
+    .article-cta {
+      margin-top: 2.25rem;
+      padding: 1.2rem 1.3rem;
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .article-cta p { margin: 0; }
+    @media (max-width: 768px) {
+      :root { --header-h: 4.15rem; }
+      .logo { font-size: 1.28rem; }
+      .site-nav a { font-size: 0.95rem; padding: 0.42rem 0.55rem; }
+      main { padding: 2.5rem 0 3.25rem; }
+      .blog-card, .blog-card.featured { padding: 1.15rem 1.1rem; }
+      .blog-card.featured h2 { font-size: 1.22rem; }
+    }
+</style>
+</head>
+<body>
+<header>
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="GoFixWeb — úvod">
+        <div class="logo">GoFix<span>Web</span></div>
+      </a>
+      <nav class="site-nav" aria-label="Sekce stránky">
+        <a href="/#signup-form">Report zdarma</a>
+        <a href="/#reseni">Jak to funguje</a>
+        <a href="/#tarify">Ceník</a>
+        <a href="/blog/" class="is-active" aria-current="page">Blog</a>
+        <a href="/#faq">FAQ</a>
+        <a href="/#kontakt">Kontakt</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <div class="container">
+      <article class="article">
+        <a class="article-back" href="/blog/">← Všechny články</a>
+        <p class="blog-kicker">Blog</p>
+        <h1>Chatbot vám poradí plugin. Sken vám řekne, co je na URL rozbité</h1>
+        <time class="article-meta" datetime="2026-10-19">19. října 2026</time>
+        <p>Zeptáte se chatbota, jak zrychlit e-shop, a dostanete seznam pluginů. Zeptáte se, jak opravit SEO, a model vám popíše best practice. Odpověď vypadá užitečně, ale chybí jí jedno: data z vašeho webu.</p>
+<p>Konverzační model nemá přístup k vašemu HTML, nevidí váhu obrázků, nezná skutečný LCP ani počet indexovaných URL. Radí na základě obecných vzorců, ne konkrétního stavu. Sken naopak stáhne veřejné HTML, změří PageSpeed, spočítá duplicity a ukáže přesně, kde je problém.</p>
+<h2>Chatbot radí podle vzorců, ne podle vašich dat</h2>
+<p>Když se zeptáte „Jak zrychlit WooCommerce e-shop?", model vám nabídne:</p>
+<ul>
+<li>plugin na lazy loading obrázků</li>
+<li>caching plugin</li>
+<li>CDN</li>
+<li>minifikaci CSS a JS</li>
+</ul>
+<p>Všechny rady jsou správné — obecně. Model ale neví, jestli máte obrázky 2,5 MB nebo 150 kB, jestli už máte cache zapnutou, ani jestli je váš LCP 1,2 s nebo 4,8 s.</p>
+<p>Sken stáhne HTML, změří skutečnou váhu obrázků, spustí PageSpeed Insights a ukáže konkrétní čísla. Teprve pak víte, jestli je problém v obrázcích, nebo jinde.</p>
+<h2>Sken vidí veřejné HTML a PageSpeed — nic víc, nic míň</h2>
+<p>GoFixWeb sken pracuje s tím, co je veřejně dostupné:</p>
+<ul>
+<li>HTML každé URL (title, H1, meta description, struktura)</li>
+<li>PageSpeed Insights (LCP, CLS, TBT, lab i field data)</li>
+<li>váha obrázků a jejich formát</li>
+<li>duplicity title a H1 napříč URL</li>
+<li>indexace v Google (site: vyhledávání)</li>
+</ul>
+<p>Nevidí administraci, neví, jaké pluginy máte nainstalované, nemá přístup k databázi. Měří to, co vidí návštěvník a robot Googlu.</p>
+<p>Chatbot naopak nevidí nic z toho. Radí podle toho, co se osvědčilo obecně, ne podle toho, co konkrétně brzdí váš web.</p>
+<h2>Proč rada bez měření špatně sedí</h2>
+<p>Představte si, že máte e-shop s 300 produkty. Chatbot vám poradí:</p>
+<p>„Optimalizujte meta description pro každou stránku."</p>
+<p>Sken vám ukáže:</p>
+<ul>
+<li>87 URL má stejný title „E-shop – Název webu"</li>
+<li>142 URL nemá meta description vůbec</li>
+<li>23 produktových URL má H1 shodný s title</li>
+<li>průměrná váha obrázků na produktové stránce je 1,8 MB</li>
+</ul>
+<p>Teď víte přesně, kde začít. Neřešíte meta description, dokud neopravíte duplicitní title. Neřešíte lazy loading, dokud nesníží váhu obrázků.</p>
+<p>Rada bez měření je jako recept bez ingrediencí. Může být správný, ale nevíte, jestli sedí na váš případ.</p>
+<h2>Co dělat, když chatbot poradí plugin</h2>
+<p>Pokud vám model doporučí konkrétní plugin, ověřte si:</p>
+<ol>
+<li><strong>Změřte stav před instalací.</strong> PageSpeed Insights, váha HTML, počet HTTP požadavků.</li>
+<li><strong>Nainstalujte plugin a změřte znovu.</strong> Pokud se LCP nezměnil, plugin problém neřeší.</li>
+<li><strong>Zkontrolujte konflikt.</strong> Dva caching pluginy nebo dva lazy-loading pluginy často brzdí víc, než pomáhají.</li>
+</ol>
+<p>GoFixWeb Auto režim pluginy neinstaluje. Doporučí je v PDF reportu, pokud sken ukáže, že by pomohly (například chybějící komprese nebo lazy loading). Instalaci a nastavení necháváme na vás nebo na manuálním režimu.</p>
+<p>Důvod je prostý: plugin může změnit chování webu, ovlivnit checkout nebo kolidovat s jiným rozšířením. Auto režim sahá jen tam, kam smí — SEO pole, komprese obrázků, doporučené pluginy v reportu.</p>
+<h2>Kdy je konverzace užitečná a kdy ne</h2>
+<p>Chatbot má své místo:</p>
+<ul>
+<li><strong>Vysvětlení pojmu.</strong> Co je LCP, jak funguje lazy loading, co dělá Application Password.</li>
+<li><strong>Obecná strategie.</strong> Jak strukturovat kategorie, jak psát produktové popisy, jak nastavit breadcrumbs.</li>
+<li><strong>Brainstorming.</strong> Nápady na dlouhé title, varianty H1, návrhy alt textů.</li>
+</ul>
+<p>Chatbot nemá místo tam, kde potřebujete konkrétní čísla:</p>
+<ul>
+<li>Kolik URL má duplicitní title?</li>
+<li>Jaká je průměrná váha obrázků na produktových stránkách?</li>
+<li>Kolik URL je indexovaných, ale nemá meta description?</li>
+<li>Jaký je skutečný LCP na mobilech?</li>
+</ul>
+<p>Na tyto otázky odpovídá sken, ne konverzace.</p>
+<h2>Sken jako základ, rada jako doplněk</h2>
+<p>GoFixWeb kombinuje obojí:</p>
+<ol>
+<li><strong>Sken změří</strong> veřejné HTML, PageSpeed, duplicity, váhu obrázků.</li>
+<li><strong>AI vyhodnotí</strong> naměřená data a navrhne konkrétní opravy.</li>
+<li><strong>Auto režim opraví</strong> to, co smí (WooCommerce SEO pole, komprese obrázků přes Application Password).</li>
+<li><strong>PDF report doporučí</strong> zbytek (pluginy, strukturální změny, manuální úpravy).</li>
+</ol>
+<p>Rada bez měření je hádání. Měření bez rady je tabulka čísel. Dohromady dostanete konkrétní plán, co opravit jako první.</p>
+<p>Pokud vám chatbot poradí plugin, nejdřív změřte, jestli problém, který má řešit, vůbec máte. Pokud ano, nainstalujte ho a změřte znovu. Pokud ne, ušetříte čas i riziko konfliktu.</p>
+<p>Chcete stejný typ kontroly na svém e-shopu? <a href="/#analyza">Bezplatný report do 10 minut</a> — nebo se podívejte na <a href="/#faq">FAQ</a> a <a href="/#ceny">ceník</a>.</p>
+        <div class="article-cta">
+          <p>Chcete stejný typ kontroly na svém e-shopu? <a href="/#signup-form">Bezplatný report do 10 minut</a> — nebo se podívejte na <a href="/#faq">FAQ</a> a <a href="/#tarify">ceník</a>.</p>
+        </div>
+      </article>
+    </div>
+  </main>
+<footer>
+    <div class="container">
+      <p>© 2026 FinalEdge s.r.o. / GoFixWeb</p>
+      <div class="footer-links">
+        <a href="/">gofixweb.com</a>
+        <span aria-hidden="true">|</span>
+        <a href="mailto:info@gofixweb.com">info@gofixweb.com</a>
+        <span aria-hidden="true">|</span>
+        <a href="/terms.html?v=20260902">Obchodní podmínky</a>
+        <span aria-hidden="true">|</span>
+        <a href="/privacy.html?v=20260815">Ochrana osobních údajů</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

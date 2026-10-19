@@ -31,16 +31,6 @@
   ],
   "queue": [
     {
-      "id": "chatbot-vs-technicky-sken",
-      "title": "Chatbot vám poradí plugin. Sken vám řekne, co je na URL rozbité",
-      "angle": "Konverzace s modelem vs. veřejné HTML + PageSpeed. Proč rada bez měření špatně sedí.",
-      "avoid": "Nehanit AI obecně; držet se diagnostiky e-shopu.",
-      "tags": [
-        "AI",
-        "Sken"
-      ]
-    },
-    {
       "id": "kde-ai-neopravi-eshop",
       "title": "Kam AI ani automatická oprava sahat nesmí: platby, košík, doprava",
       "angle": "Hranice bezpečného zápisu. Proč GoFixWeb neřeší checkout skriptem.",
@@ -219,6 +209,14 @@
       "date": "2026-10-12",
       "source": "anthropic",
       "url": "/blog/ai-generovane-title-meta/"
+    },
+    {
+      "id": "chatbot-vs-technicky-sken",
+      "slug": "chatbot-vs-technicky-sken",
+      "title": "Chatbot vám poradí plugin. Sken vám řekne, co je na URL rozbité",
+      "date": "2026-10-19",
+      "source": "anthropic",
+      "url": "/blog/chatbot-vs-technicky-sken/"
     }
   ]
 }
