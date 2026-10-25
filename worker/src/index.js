@@ -4065,7 +4065,7 @@ const LEGAL_SCAN_RULES = [
   ["dsa_report_form", "d", "Hlášení nezákonného obsahu (DSA)"],
   ["complaint_info", "e", "Reklamační informace"],
   ["withdrawal", "f", "Odstoupení od smlouvy"],
-  ["checkout_button", "g", "Potvrzovací tlačítko"],
+  // (g) Potvrzovací tlačítko — ve V1 vyřazeno (gofix-legal-scanner 363aceb), nezobrazuje se ani nepočítá.
   ["epr_packaging", "h", "EPR / obalové právo"],
   ["greenwashing_claims", "i", "Tvrzení o udržitelnosti"],
   ["eaa_accessibility", "j", "Přístupnost (EAA)"],
@@ -4118,7 +4118,7 @@ function legalHealthFromPayload(p, rules = LEGAL_SCAN_RULES) {
 
 function renderLegalHealth(p) {
   const h = legalHealthFromPayload(p);
-  const total = h.rules_total || 10;
+  const total = h.rules_total || LEGAL_SCAN_RULES.length;
   const thin = legalIsThinSample(h);
   const boxClass = thin ? "legal-health legal-health-thin" : "legal-health";
   let main;
@@ -5670,7 +5670,7 @@ function renderAdminHtml(snapshot, {
           rules_total: total,
         };
       }
-      var total = h.rules_total || 10;
+      var total = h.rules_total || LEGAL_RULES.length;
       var thin = legalIsThinSample(h);
       var main;
       var extra = "";
