@@ -65,7 +65,7 @@ def evaluate_store(status: dict[str, Any], page: str, page_code: int, cache_head
     kv = status.get("kv") if isinstance(status.get("kv"), dict) else {}
     cache_api = status.get("cache_api") if isinstance(status.get("cache_api"), dict) else {}
     stub = 'id="admin-cache-warming"' in page
-    dashboard = 'id="tab-legal"' in page and 'id="tab-legal-warmup"' in page and 'id="tab-scan-stats"' in page and "admin-tabs" in page and not stub
+    dashboard = 'id="tab-scan-stats"' in page and "admin-tabs" in page and not stub
     age = kv.get("age_sec")
     try:
         age_sec = int(age) if age is not None else None
@@ -223,7 +223,7 @@ def apply_alert(decision: dict[str, Any], *, token: str, repo: str, dry_run: boo
 
 def run_check(*, password: str, token: str = "", repo: str = "", dry_run: bool = False, run_url: str = "") -> dict[str, Any]:
     status_code, status = fetch_json(f"{BASE_URL}/admin/cache-status", password)
-    page_code, page, headers = fetch_text(f"{BASE_URL}/admin?legal=1", password)
+    page_code, page, headers = fetch_text(f"{BASE_URL}/admin", password)
     decision = evaluate_store(status, page, page_code, headers.get("x-admin-cache") or "")
     decision["status_http"] = status_code
     decision["status"] = status

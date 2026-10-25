@@ -400,7 +400,7 @@ jobs:
           print(raw[:12000])
           PY
 
-      - name: Probe /admin cache-status then warm then legal=1
+      - name: Probe /admin cache-status then warm then load
         if: steps.cf.outputs.present == 'true'
         env:
           ADMIN_BASIC_PASSWORD: ${{ secrets.ADMIN_BASIC_PASSWORD }}
@@ -409,7 +409,7 @@ jobs:
         run: |
           set -euo pipefail
           BASE="https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev"
-          URL="$BASE/admin?legal=1"
+          URL="$BASE/admin"
           AUTH="gofixweb:${ADMIN_BASIC_PASSWORD}"
           ACCOUNT="${CLOUDFLARE_ACCOUNT_ID:-47c841c4775065340b62547db3608ea4}"
           echo "===== GET /admin/cache-status (no warm) ====="
@@ -433,7 +433,7 @@ jobs:
             echo "::error::POST /admin/warm-html returned $warm_code"
             exit 1
           fi
-          echo "===== GET /admin?legal=1 within 5s of warm ====="
+          echo "===== GET /admin within 5s of warm ====="
           code=$(curl -sS -D /tmp/admin-now.hdr -o /tmp/admin-now.html -w "%{http_code}" --max-time 30 -u "$AUTH" "$URL")
           bytes=$(wc -c < /tmp/admin-now.html | tr -d ' ')
           cache=$(awk -F': ' 'tolower($1)=="x-admin-cache"{print $2}' /tmp/admin-now.hdr | tr -d '\r')
@@ -443,124 +443,15 @@ jobs:
             head -c 400 /tmp/admin-now.html || true
             exit 1
           fi
-          if ! grep -q 'id="tab-legal"' /tmp/admin-now.html; then
-            echo "::error::immediate GET after warm missing tab-legal"
-            exit 1
-          fi
-          if ! grep -q 'id="tab-legal-warmup"' /tmp/admin-now.html; then
-            echo "::error::immediate GET after warm missing tab-legal-warmup"
+          if grep -q 'id="tab-legal"' /tmp/admin-now.html; then
+            echo "::error::warmed /admin HTML still has GoFix Legal tab (colo cache serving old dashboard?)"
             exit 1
           fi
           if ! grep -q 'id="tab-scan-stats"' /tmp/admin-now.html; then
             echo "::error::immediate GET after warm missing tab-scan-stats"
             exit 1
           fi
-          if ! grep -q 'legalHealthHtml' /tmp/admin-now.html; then
-            echo "::error::warmed /admin HTML missing legalHealthHtml (colo cache serving old dashboard?)"
-            exit 1
-          fi
-          if ! grep -q 'legal-health-warn' /tmp/admin-now.html; then
-            echo "::error::warmed /admin HTML missing legal-health-warn"
-            exit 1
-          fi
           echo "immediate dashboard ok"
-
-  legal_e2e:
-    needs: deploy
-    if: needs.deploy.outputs.worker_ready == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    steps:
-      - name: Scan www.ptacek.cz via POST /admin/legal-scan
-        env:
-          ADMIN_BASIC_PASSWORD: ${{ secrets.ADMIN_BASIC_PASSWORD }}
-        run: |
-          set -euo pipefail
-          BASE="https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev"
-          AUTH="gofixweb:${ADMIN_BASIC_PASSWORD}"
-          echo "===== POST /admin/legal-scan www.ptacek.cz send_email=1 ====="
-          code=$(curl -sS -o /tmp/legal-post.html -w "%{http_code}" --max-time 30 \
-            -u "$AUTH" -X POST -F "shop_url=www.ptacek.cz" -F "send_email=1" \
-            --max-redirs 0 "$BASE/admin/legal-scan" || true)
-          echo "post HTTP $code"
-          if [ "$code" != "303" ]; then
-            echo "::error::legal-scan POST expected 303, got $code"
-            head -c 600 /tmp/legal-post.html || true
-            exit 1
-          fi
-          json_code=""
-          for i in 1 2 3 4 5 6; do
-            json_code=$(curl -sS -o /tmp/legal-post.json -w "%{http_code}" --max-time 30 \
-              -u "$AUTH" -A "gofixweb-gha-legal-e2e" \
-              "$BASE/admin/legal-status" || true)
-            echo "status-after-post try $i HTTP $json_code $(head -c 240 /tmp/legal-post.json || true)"
-            if [ "$json_code" = "200" ] && grep -q '"send_email":true' /tmp/legal-post.json; then
-              break
-            fi
-            sleep 2
-          done
-          if [ "$json_code" != "200" ] || ! grep -q '"send_email":true' /tmp/legal-post.json; then
-            echo "::error::legal-status after send_email POST must have send_email true"
-            cat /tmp/legal-post.json || true
-            exit 1
-          fi
-          python3 - <<'PY'
-          import json, subprocess, time, os
-          from datetime import datetime, timezone
-          base = "https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev"
-          password = os.environ["ADMIN_BASIC_PASSWORD"]
-          started = time.time()
-          last = {}
-          saw_pending = False
-          for i in range(24):
-              raw = subprocess.check_output(
-                  [
-                      "curl", "-sS", "--max-time", "30",
-                      "-u", f"gofixweb:{password}",
-                      "-A", "gofixweb-gha-legal-e2e",
-                      f"{base}/admin/legal-status",
-                  ],
-                  text=True,
-              )
-              last = json.loads(raw)
-              print(f"poll {i+1} status={last.get('status')} shop={last.get('shop_url')} send_email={last.get('send_email')} mailed={last.get('email_sent_to')} err={last.get('email_error')}")
-              if last.get("status") == "pending":
-                  saw_pending = True
-              if last.get("status") == "error" and saw_pending:
-                  raise SystemExit(f"scan error: {last.get('error')}")
-              if last.get("status") == "done" and (last.get("payload") or {}).get("url"):
-                  at = str(last.get("at") or "")
-                  try:
-                      stamp = datetime.fromisoformat(at.replace("Z", "+00:00")).timestamp()
-                  except ValueError:
-                      stamp = 0
-                  if stamp < started - 5:
-                      print("stale done, waiting for this POST")
-                      time.sleep(5)
-                      continue
-                  payload = last["payload"]
-                  print("RESULT_SHOP", payload.get("url"))
-                  print("RESULT_TERMS", (payload.get("terms") or {}).get("url"), (payload.get("terms") or {}).get("source"))
-                  for key in (
-                      "omnibus_30_days", "odr_link", "reviews_verification", "dsa_report_form",
-                      "complaint_info", "withdrawal", "checkout_button", "epr_packaging",
-                      "greenwashing_claims", "eaa_accessibility",
-                  ):
-                      block = payload.get(key) or {}
-                      print(f"RULE {key} {block.get('result')}")
-                  shop = str(payload.get("url") or last.get("shop_url") or "")
-                  if "ptacek.cz" not in shop:
-                      raise SystemExit(f"expected ptacek.cz, got {shop}")
-                  mailed = str(last.get("email_sent_to") or "")
-                  mail_err = str(last.get("email_error") or "")
-                  print("RESULT_EMAIL", mailed or mail_err or "missing")
-                  if "trueforexway@gmail.com" not in mailed:
-                      raise SystemExit(f"email not sent: {mail_err or mailed or json.dumps(last)[:400]}")
-                  raise SystemExit(0)
-              time.sleep(5)
-          raise SystemExit(f"scan did not finish: {json.dumps(last)[:800]}")
-          PY
-
 
   cold_admin:
     needs: deploy
@@ -568,13 +459,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Wait 6 minutes then cold-load /admin?legal=1 without warm
+      - name: Wait 6 minutes then cold-load /admin without warm
         env:
           ADMIN_BASIC_PASSWORD: ${{ secrets.ADMIN_BASIC_PASSWORD }}
         run: |
           set -euo pipefail
           BASE="https://gofixweb-report-trigger.gofixweb-report-trigger.workers.dev"
-          URL="$BASE/admin?legal=1"
+          URL="$BASE/admin"
           AUTH="gofixweb:${ADMIN_BASIC_PASSWORD}"
           echo "sleeping 360s (no warm-html) to match a later user load"
           sleep 360
@@ -604,7 +495,7 @@ jobs:
             cache=$(awk -F': ' 'tolower($1)=="x-admin-cache"{print $2}' /tmp/cold-$i.hdr | tr -d '\r')
             echo "cold $i HTTP $code bytes=$bytes x-admin-cache=${cache:-none}"
             if [ "$code" != "200" ]; then
-              echo "::error::cold admin?legal=1 try $i returned $code"
+              echo "::error::cold /admin try $i returned $code"
               head -c 800 /tmp/cold-$i.html || true
               exit 1
             fi
@@ -617,10 +508,10 @@ jobs:
               head -c 400 /tmp/cold-$i.html || true
               exit 1
             fi
-            if ! grep -q 'id="tab-legal"' /tmp/cold-$i.html || ! grep -q 'id="tab-legal-warmup"' /tmp/cold-$i.html || ! grep -q 'id="tab-scan-stats"' /tmp/cold-$i.html || ! grep -q 'id="legal-scan"' /tmp/cold-$i.html || ! grep -q 'admin-tabs' /tmp/cold-$i.html; then
+            if ! grep -q 'id="tab-scan-stats"' /tmp/cold-$i.html || ! grep -q 'admin-tabs' /tmp/cold-$i.html; then
               echo "::error::cold try $i is not the full dashboard"
               head -c 400 /tmp/cold-$i.html || true
               exit 1
             fi
           done
-          echo "cold legal=1 loads ok after 6min wait and colo-cache purge"
+          echo "cold /admin loads ok after 6min wait and colo-cache purge"
