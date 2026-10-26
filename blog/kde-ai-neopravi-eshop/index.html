@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kam AI ani automatická oprava sahat nesmí: platby, košík, doprava — GoFixWeb</title>
+  <meta name="description" content="Proč GoFixWeb neřeší checkout skriptem a kde končí hranice bezpečného zápisu do e-shopu.">
+  <link rel="canonical" href="https://gofixweb.com/blog/kde-ai-neopravi-eshop/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="GoFixWeb">
+  <meta property="og:locale" content="cs_CZ">
+  <meta property="og:title" content="Kam AI ani automatická oprava sahat nesmí: platby, košík, doprava — GoFixWeb">
+  <meta property="og:description" content="Proč GoFixWeb neřeší checkout skriptem a kde končí hranice bezpečného zápisu do e-shopu.">
+  <meta property="og:url" content="https://gofixweb.com/blog/kde-ai-neopravi-eshop/">
+  <meta property="og:image" content="https://gofixweb.com/blog/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Kam AI ani automatická oprava sahat nesmí: platby, košík, doprava — GoFixWeb">
+  <meta name="twitter:description" content="Proč GoFixWeb neřeší checkout skriptem a kde končí hranice bezpečného zápisu do e-shopu.">
+  <meta name="twitter:image" content="https://gofixweb.com/blog/og.png">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Kam AI ani automatická oprava sahat nesmí: platby, košík, doprava", "description": "Proč GoFixWeb neřeší checkout skriptem a kde končí hranice bezpečného zápisu do e-shopu.", "datePublished": "2026-10-26", "dateModified": "2026-10-26", "inLanguage": "cs", "url": "https://gofixweb.com/blog/kde-ai-neopravi-eshop/", "image": "https://gofixweb.com/blog/og.png", "author": {"@type": "Organization", "name": "GoFixWeb", "url": "https://gofixweb.com"}, "publisher": {"@type": "Organization", "name": "FinalEdge s.r.o.", "url": "https://gofixweb.com"}, "mainEntityOfPage": "https://gofixweb.com/blog/kde-ai-neopravi-eshop/"}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2332;
+      --navy-light: #243044;
+      --navy-card: #2a3548;
+      --white: #ffffff;
+      --text-light: #cbd5e1;
+      --text-muted: #94a3b8;
+      --green: #16a34a;
+      --green-light: #22c55e;
+      --green-bg: rgba(22, 163, 74, 0.12);
+      --border: rgba(255, 255, 255, 0.08);
+      --max: 1080px;
+      --header-h: 4.5rem;
+    }
+    html { scroll-behavior: smooth; scroll-padding-top: var(--header-h); }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--navy);
+      color: var(--white);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    .container { width: min(var(--max), 92vw); margin: 0 auto; }
+    header {
+      padding: 0.7rem 0;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: rgba(26, 35, 50, 0.92);
+      backdrop-filter: blur(8px);
+      z-index: 20;
+    }
+    .header-inner {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem 1.25rem;
+      min-width: 0;
+    }
+    .brand { flex-shrink: 0; }
+    .logo {
+      font-size: 1.55rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+    }
+    .logo span { color: var(--green); }
+    .site-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.1rem;
+      margin-left: auto;
+      min-width: 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+    }
+    .site-nav::-webkit-scrollbar { display: none; }
+    .site-nav a {
+      flex: 0 0 auto;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+    }
+    .site-nav a:hover {
+      color: var(--white);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .site-nav a.is-active {
+      color: var(--green-light);
+      border-bottom-color: var(--green);
+    }
+    main { flex: 1; padding: 3.5rem 0 4.5rem; }
+    footer {
+      padding: 2.25rem 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    footer a { color: var(--green); font-weight: 500; }
+    footer a:hover { text-decoration: underline; }
+    .footer-links {
+      margin-top: 0.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem 1rem;
+    }
+    .blog-kicker {
+      color: var(--green-light);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.82rem;
+      margin-bottom: 0.65rem;
+    }
+    .blog-index h1, .article h1 {
+      font-size: clamp(1.65rem, 3.2vw, 2.15rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+      max-width: 22ch;
+    }
+    .blog-lead {
+      color: var(--text-muted);
+      max-width: 48ch;
+      margin-bottom: 2.25rem;
+    }
+    .blog-list {
+      display: grid;
+      gap: 1rem;
+    }
+    .blog-card {
+      display: block;
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.35rem 1.4rem 1.4rem;
+    }
+    .blog-card:hover { border-color: rgba(34, 197, 94, 0.35); }
+    .blog-card.featured { padding: 1.6rem 1.55rem 1.7rem; }
+    .blog-card time, .article-meta {
+      display: block;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 0.45rem;
+    }
+    .blog-card h2 {
+      font-size: 1.22rem;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.45rem;
+    }
+    .blog-card.featured h2 { font-size: 1.45rem; }
+    .blog-card p { color: var(--text-light); }
+    .article { max-width: 42rem; }
+    .article-meta { margin-bottom: 1.5rem; }
+    .article h2 {
+      font-size: 1.25rem;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      margin: 2rem 0 0.7rem;
+    }
+    .article h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 1.4rem 0 0.5rem;
+    }
+    .article p, .article li { color: var(--text-light); }
+    .article p { margin-bottom: 0.95rem; }
+    .article ul, .article ol { padding-left: 1.25rem; margin: 0 0 1.1rem; }
+    .article li { margin-bottom: 0.4rem; }
+    .article a { color: var(--green); font-weight: 600; }
+    .article a:hover { text-decoration: underline; }
+    .article strong { color: var(--white); }
+    .article code {
+      font-size: 0.9em;
+      background: rgba(255,255,255,0.06);
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+    .article hr {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: 1.75rem 0;
+    }
+    .article-back {
+      display: inline-block;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 1.35rem;
+    }
+    .article-back:hover { color: var(--green-light); }
+    .article-cta {
+      margin-top: 2.25rem;
+      padding: 1.2rem 1.3rem;
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .article-cta p { margin: 0; }
+    @media (max-width: 768px) {
+      :root { --header-h: 4.15rem; }
+      .logo { font-size: 1.28rem; }
+      .site-nav a { font-size: 0.95rem; padding: 0.42rem 0.55rem; }
+      main { padding: 2.5rem 0 3.25rem; }
+      .blog-card, .blog-card.featured { padding: 1.15rem 1.1rem; }
+      .blog-card.featured h2 { font-size: 1.22rem; }
+    }
+</style>
+</head>
+<body>
+<header>
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="GoFixWeb — úvod">
+        <div class="logo">GoFix<span>Web</span></div>
+      </a>
+      <nav class="site-nav" aria-label="Sekce stránky">
+        <a href="/#signup-form">Report zdarma</a>
+        <a href="/#reseni">Jak to funguje</a>
+        <a href="/#tarify">Ceník</a>
+        <a href="/blog/" class="is-active" aria-current="page">Blog</a>
+        <a href="/#faq">FAQ</a>
+        <a href="/#kontakt">Kontakt</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <div class="container">
+      <article class="article">
+        <a class="article-back" href="/blog/">← Všechny články</a>
+        <p class="blog-kicker">Blog</p>
+        <h1>Kam AI ani automatická oprava sahat nesmí: platby, košík, doprava</h1>
+        <time class="article-meta" datetime="2026-10-26">26. října 2026</time>
+        <p>Automatická oprava e-shopu zní lákavě. Skript se přihlásí, opraví title, zkomprimuje obrázky, změní nastavení pluginu. Ušetříte čas, vyhnete se chybám. Ale existuje hranice, za kterou žádný skript sahat nesmí — a to je cesta od košíku k platbě.</p>
+<p>GoFixWeb neřeší checkout automaticky. Nezasahuje do nastavení dopravy, platebních bran, daňových pravidel ani podmínek objednávky. Není to nedostatek funkce. Je to záměr.</p>
+<h2>Proč je checkout jiný než SEO pole</h2>
+<p>Když skript přepíše title nebo H1, nejhorší scénář je špatný text. Zákazník si všimne, opravíte to, žádné peníze se neztratí.</p>
+<p>Když skript změní nastavení platební brány, může se stát, že:</p>
+<ul>
+<li>objednávka projde, ale peníze nepřijdou</li>
+<li>zákazník zaplatí dvakrát</li>
+<li>daň se vypočítá špatně</li>
+<li>doprava se nezobrazí pro konkrétní zemi</li>
+<li>objednávka skončí ve stavu „čeká na platbu" natrvalo</li>
+</ul>
+<p>To nejsou hypotézy. Každá platební brána má desítky nastavení. Callback URL, webhook tajemství, testovací vs. produkční režim, měna, zaokrouhlení, povolené metody podle země. Stačí jeden překlep a objednávka selže — nebo projde, ale vy o ní nevíte.</p>
+<h2>Co se může pokazit při automatickém zápisu do checkoutu</h2>
+<p><strong>Platební brána:</strong> Každá brána (GoPay, Stripe, PayPal, Comgate) má vlastní API, vlastní pole, vlastní logiku. Skript nemůže vědět, jestli máte testovací klíč nebo produkční. Nemůže ověřit, jestli webhook funguje. Nemůže zkontrolovat, jestli callback URL sedí s vaší doménou.</p>
+<p><strong>Doprava:</strong> Pokud máte Zásilkovnu, PPL, DPD a vlastní rozvoz, každá metoda má jiné podmínky. Hmotnost, rozměry, země, cena podle zóny. Automatický zápis může přepsat pravidlo, které jste ručně ladili měsíc.</p>
+<p><strong>Daně a účetnictví:</strong> WooCommerce umí DPH, osvobození, reverse charge, digitální služby. Pokud skript změní sazbu nebo zapne/vypne daň pro konkrétní kategorii, účetní vám to najde až při uzávěrce.</p>
+<p><strong>Stavy objednávek:</strong> „Čeká na platbu", „Zpracovává se", „Dokončeno", „Zrušeno". Každý stav spouští e-mail, mění sklad, zapisuje do účetnictví. Automatický přepis může rozbít celý workflow.</p>
+<h2>Kde končí hranice bezpečného zápisu</h2>
+<p>GoFixWeb zapisuje do polí, která nemění obchodní logiku:</p>
+<ul>
+<li>SEO pole (title, description, H1) — špatný text je vidět, opravíte ho</li>
+<li>komprese obrázků — soubor se zmenší, kvalita zůstane, nic se nerozbije</li>
+<li>doporučené pluginy (Yoast, WebP, cache) — instalace, ne konfigurace</li>
+<li>základní nastavení WooCommerce (indexace, permalink) — jen to, co nemění checkout</li>
+</ul>
+<p>Nezapisuje do:</p>
+<ul>
+<li>platebních bran (API klíče, callback, webhook)</li>
+<li>dopravních metod (cena, podmínky, zóny)</li>
+<li>daňových pravidel (sazby, země, kategorie)</li>
+<li>stavů objednávek (workflow, e-maily, sklad)</li>
+<li>košíku (cross-sell, upsell, kupóny)</li>
+</ul>
+<p>Proč? Protože každý e-shop má jinou kombinaci bran, dopravců, daňových režimů. Neexistuje univerzální „správné" nastavení. A riziko chyby je příliš vysoké.</p>
+<h2>Co dělat, když checkout potřebuje opravu</h2>
+<p>Pokud PageSpeed hlásí pomalý skript na stránce košíku, nebo platební brána vrací chybu, řešení není automatické.</p>
+<p><strong>Manuální kontrola:</strong> Otevřete prohlížeč, jděte do Nástroje pro vývojáře (F12), záložka Network. Projděte košík až po potvrzení objednávky. Hledejte červené řádky (chyby), pomalé požadavky (nad 1 s), duplicitní volání.</p>
+<p><strong>Testovací objednávka:</strong> Vytvořte testovací produkt za 1 Kč, projděte celý checkout. Zkontrolujte, jestli přišel e-mail, jestli se objednávka zobrazila v administraci, jestli se stav změnil po zaplacení.</p>
+<p><strong>Dokumentace brány:</strong> Každá platební brána má manuál. Najdete tam, jak nastavit webhook, jak ověřit callback, jak testovat v sandboxu. Pokud brána vrací chybu, je tam kód (např. „invalid signature") — hledejte ho v dokumentaci.</p>
+<p><strong>Plugin vs. vlastní kód:</strong> Pokud používáte oficiální plugin brány (např. WooCommerce Payments, GoPay), aktualizujte ho. Pokud máte vlastní integraci, najměte vývojáře. Automatický skript to nevyřeší.</p>
+<h2>Proč to říkáme nahlas</h2>
+<p>Existují nástroje, které slibují „kompletní optimalizaci e-shopu jedním kliknutím". Zní to dobře. Ale pokud vám nikdo neřekne, co skript <em>neudělá</em>, riskujete víc, než získáte.</p>
+<p>GoFixWeb má jasnou hranici: opravuje to, co lze opravit bez rizika ztráty objednávky. SEO, obrázky, doporučené pluginy. Checkout ne.</p>
+<p>Není to omezení technologie. Je to rozhodnutí. Protože automatický zápis do platební brány může ušetřit deset minut — a stát vás tisíce korun v propadlých objednávkách.</p>
+<p>Chcete stejný typ kontroly na svém e-shopu? <a href="/#analyza">Bezplatný report do 10 minut</a> — nebo se podívejte na <a href="/#faq">FAQ</a> a <a href="/#ceny">ceník</a>.</p>
+        <div class="article-cta">
+          <p>Chcete stejný typ kontroly na svém e-shopu? <a href="/#signup-form">Bezplatný report do 10 minut</a> — nebo se podívejte na <a href="/#faq">FAQ</a> a <a href="/#tarify">ceník</a>.</p>
+        </div>
+      </article>
+    </div>
+  </main>
+<footer>
+    <div class="container">
+      <p>© 2026 FinalEdge s.r.o. / GoFixWeb</p>
+      <div class="footer-links">
+        <a href="/">gofixweb.com</a>
+        <span aria-hidden="true">|</span>
+        <a href="mailto:info@gofixweb.com">info@gofixweb.com</a>
+        <span aria-hidden="true">|</span>
+        <a href="/terms.html?v=20260902">Obchodní podmínky</a>
+        <span aria-hidden="true">|</span>
+        <a href="/privacy.html?v=20260815">Ochrana osobních údajů</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

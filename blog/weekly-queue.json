@@ -31,16 +31,6 @@
   ],
   "queue": [
     {
-      "id": "kde-ai-neopravi-eshop",
-      "title": "Kam AI ani automatická oprava sahat nesmí: platby, košík, doprava",
-      "angle": "Hranice bezpečného zápisu. Proč GoFixWeb neřeší checkout skriptem.",
-      "avoid": "Neopakovat seznam Auto funkcí jako recenzi WordPressu.",
-      "tags": [
-        "AI",
-        "Bezpečnost"
-      ]
-    },
-    {
       "id": "ai-obrazky-vs-komprese",
       "title": "AI umí vygenerovat fotku. LCP spíš spraví komprese té, kterou už máte",
       "angle": "Generativní obrázky vs. bajty na homepage. Kdy nová grafika škodí víc než stará těžká.",
@@ -217,6 +207,14 @@
       "date": "2026-10-19",
       "source": "anthropic",
       "url": "/blog/chatbot-vs-technicky-sken/"
+    },
+    {
+      "id": "kde-ai-neopravi-eshop",
+      "slug": "kde-ai-neopravi-eshop",
+      "title": "Kam AI ani automatická oprava sahat nesmí: platby, košík, doprava",
+      "date": "2026-10-26",
+      "source": "anthropic",
+      "url": "/blog/kde-ai-neopravi-eshop/"
     }
   ]
 }
