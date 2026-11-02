@@ -31,16 +31,6 @@
   ],
   "queue": [
     {
-      "id": "ai-obrazky-vs-komprese",
-      "title": "AI umí vygenerovat fotku. LCP spíš spraví komprese té, kterou už máte",
-      "angle": "Generativní obrázky vs. bajty na homepage. Kdy nová grafika škodí víc než stará těžká.",
-      "avoid": "Neopakovat case study 2,45 MB→0,59 MB jako univerzální výsledek.",
-      "tags": [
-        "AI",
-        "Obrázky"
-      ]
-    },
-    {
       "id": "ai-copy-kategorii",
       "title": "AI text do kategorie nevyřeší desítky prázdných archivů",
       "angle": "Tenké kategorie a duplicitní copy. Generovaný odstavec nestačí, když je URL zbytečná.",
@@ -215,6 +205,14 @@
       "date": "2026-10-26",
       "source": "anthropic",
       "url": "/blog/kde-ai-neopravi-eshop/"
+    },
+    {
+      "id": "ai-obrazky-vs-komprese",
+      "slug": "ai-obrazky-vs-komprese",
+      "title": "AI umí vygenerovat fotku. LCP spíš spraví komprese té, kterou už máte",
+      "date": "2026-11-02",
+      "source": "anthropic",
+      "url": "/blog/ai-obrazky-vs-komprese/"
     }
   ]
 }

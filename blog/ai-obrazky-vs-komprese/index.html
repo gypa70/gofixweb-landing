@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI umí vygenerovat fotku. LCP spíš spraví komprese té, kterou už máte — GoFixWeb</title>
+  <meta name="description" content="Generativní obrázky vypadají dobře, ale LCP řeší bajty. Kdy nová grafika škodí víc než stará těžká fotka.">
+  <link rel="canonical" href="https://gofixweb.com/blog/ai-obrazky-vs-komprese/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="GoFixWeb">
+  <meta property="og:locale" content="cs_CZ">
+  <meta property="og:title" content="AI umí vygenerovat fotku. LCP spíš spraví komprese té, kterou už máte — GoFixWeb">
+  <meta property="og:description" content="Generativní obrázky vypadají dobře, ale LCP řeší bajty. Kdy nová grafika škodí víc než stará těžká fotka.">
+  <meta property="og:url" content="https://gofixweb.com/blog/ai-obrazky-vs-komprese/">
+  <meta property="og:image" content="https://gofixweb.com/blog/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="AI umí vygenerovat fotku. LCP spíš spraví komprese té, kterou už máte — GoFixWeb">
+  <meta name="twitter:description" content="Generativní obrázky vypadají dobře, ale LCP řeší bajty. Kdy nová grafika škodí víc než stará těžká fotka.">
+  <meta name="twitter:image" content="https://gofixweb.com/blog/og.png">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "AI umí vygenerovat fotku. LCP spíš spraví komprese té, kterou už máte", "description": "Generativní obrázky vypadají dobře, ale LCP řeší bajty. Kdy nová grafika škodí víc než stará těžká fotka.", "datePublished": "2026-11-02", "dateModified": "2026-11-02", "inLanguage": "cs", "url": "https://gofixweb.com/blog/ai-obrazky-vs-komprese/", "image": "https://gofixweb.com/blog/og.png", "author": {"@type": "Organization", "name": "GoFixWeb", "url": "https://gofixweb.com"}, "publisher": {"@type": "Organization", "name": "FinalEdge s.r.o.", "url": "https://gofixweb.com"}, "mainEntityOfPage": "https://gofixweb.com/blog/ai-obrazky-vs-komprese/"}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2332;
+      --navy-light: #243044;
+      --navy-card: #2a3548;
+      --white: #ffffff;
+      --text-light: #cbd5e1;
+      --text-muted: #94a3b8;
+      --green: #16a34a;
+      --green-light: #22c55e;
+      --green-bg: rgba(22, 163, 74, 0.12);
+      --border: rgba(255, 255, 255, 0.08);
+      --max: 1080px;
+      --header-h: 4.5rem;
+    }
+    html { scroll-behavior: smooth; scroll-padding-top: var(--header-h); }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--navy);
+      color: var(--white);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    .container { width: min(var(--max), 92vw); margin: 0 auto; }
+    header {
+      padding: 0.7rem 0;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: rgba(26, 35, 50, 0.92);
+      backdrop-filter: blur(8px);
+      z-index: 20;
+    }
+    .header-inner {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem 1.25rem;
+      min-width: 0;
+    }
+    .brand { flex-shrink: 0; }
+    .logo {
+      font-size: 1.55rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+    }
+    .logo span { color: var(--green); }
+    .site-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.1rem;
+      margin-left: auto;
+      min-width: 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+    }
+    .site-nav::-webkit-scrollbar { display: none; }
+    .site-nav a {
+      flex: 0 0 auto;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+    }
+    .site-nav a:hover {
+      color: var(--white);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .site-nav a.is-active {
+      color: var(--green-light);
+      border-bottom-color: var(--green);
+    }
+    main { flex: 1; padding: 3.5rem 0 4.5rem; }
+    footer {
+      padding: 2.25rem 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    footer a { color: var(--green); font-weight: 500; }
+    footer a:hover { text-decoration: underline; }
+    .footer-links {
+      margin-top: 0.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem 1rem;
+    }
+    .blog-kicker {
+      color: var(--green-light);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.82rem;
+      margin-bottom: 0.65rem;
+    }
+    .blog-index h1, .article h1 {
+      font-size: clamp(1.65rem, 3.2vw, 2.15rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+      max-width: 22ch;
+    }
+    .blog-lead {
+      color: var(--text-muted);
+      max-width: 48ch;
+      margin-bottom: 2.25rem;
+    }
+    .blog-list {
+      display: grid;
+      gap: 1rem;
+    }
+    .blog-card {
+      display: block;
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.35rem 1.4rem 1.4rem;
+    }
+    .blog-card:hover { border-color: rgba(34, 197, 94, 0.35); }
+    .blog-card.featured { padding: 1.6rem 1.55rem 1.7rem; }
+    .blog-card time, .article-meta {
+      display: block;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 0.45rem;
+    }
+    .blog-card h2 {
+      font-size: 1.22rem;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.45rem;
+    }
+    .blog-card.featured h2 { font-size: 1.45rem; }
+    .blog-card p { color: var(--text-light); }
+    .article { max-width: 42rem; }
+    .article-meta { margin-bottom: 1.5rem; }
+    .article h2 {
+      font-size: 1.25rem;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      margin: 2rem 0 0.7rem;
+    }
+    .article h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 1.4rem 0 0.5rem;
+    }
+    .article p, .article li { color: var(--text-light); }
+    .article p { margin-bottom: 0.95rem; }
+    .article ul, .article ol { padding-left: 1.25rem; margin: 0 0 1.1rem; }
+    .article li { margin-bottom: 0.4rem; }
+    .article a { color: var(--green); font-weight: 600; }
+    .article a:hover { text-decoration: underline; }
+    .article strong { color: var(--white); }
+    .article code {
+      font-size: 0.9em;
+      background: rgba(255,255,255,0.06);
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+    .article hr {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: 1.75rem 0;
+    }
+    .article-back {
+      display: inline-block;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 1.35rem;
+    }
+    .article-back:hover { color: var(--green-light); }
+    .article-cta {
+      margin-top: 2.25rem;
+      padding: 1.2rem 1.3rem;
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .article-cta p { margin: 0; }
+    @media (max-width: 768px) {
+      :root { --header-h: 4.15rem; }
+      .logo { font-size: 1.28rem; }
+      .site-nav a { font-size: 0.95rem; padding: 0.42rem 0.55rem; }
+      main { padding: 2.5rem 0 3.25rem; }
+      .blog-card, .blog-card.featured { padding: 1.15rem 1.1rem; }
+      .blog-card.featured h2 { font-size: 1.22rem; }
+    }
+</style>
+</head>
+<body>
+<header>
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="GoFixWeb — úvod">
+        <div class="logo">GoFix<span>Web</span></div>
+      </a>
+      <nav class="site-nav" aria-label="Sekce stránky">
+        <a href="/#signup-form">Report zdarma</a>
+        <a href="/#reseni">Jak to funguje</a>
+        <a href="/#tarify">Ceník</a>
+        <a href="/blog/" class="is-active" aria-current="page">Blog</a>
+        <a href="/#faq">FAQ</a>
+        <a href="/#kontakt">Kontakt</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <div class="container">
+      <article class="article">
+        <a class="article-back" href="/blog/">← Všechny články</a>
+        <p class="blog-kicker">Blog</p>
+        <h1>AI umí vygenerovat fotku. LCP spíš spraví komprese té, kterou už máte</h1>
+        <time class="article-meta" datetime="2026-11-02">2. listopadu 2026</time>
+        <p>Generativní AI dnes umí vytvořit obrázek na míru. Zadáte prompt, dostanete vizuál, který sedí na barvu, kompozici, atmosféru. Problém je, že prohlížeč stahuje bajty, ne estetiku. A když nová AI fotka váží víc než původní, Largest Contentful Paint se zhorší, ne zlepší.</p>
+<p>Článek se drží jednoho úhlu: kdy výměna obrázku za generovaný škodí rychlosti víc, než kdybyste původní jen zkomprimovali.</p>
+<h2>Proč generativní obrázky často váží víc</h2>
+<p>AI nástroje (Midjourney, DALL·E, Stable Diffusion) generují obrázky ve vysokém rozlišení – typicky 1024×1024 px nebo víc, často ve formátu PNG. Výsledný soubor může mít 2–4 MB, protože model neřeší optimalizaci pro web.</p>
+<p>Původní fotka z telefonu nebo banky obrázků může mít stejné rozlišení, ale formát JPEG s rozumnou kompresí ji stlačí na 300–600 kB. Když ji nahradíte AI obrázkem bez komprese, prohlížeč stáhne víc dat. LCP se prodlouží, PageSpeed skóre klesne.</p>
+<p>Kontrola v prohlížeči: otevřete DevTools → Network → Img, obnovte stránku, podívejte se na sloupec Size u hlavního obrázku. Pokud vidíte číslo nad 1 MB, máte prostor pro kompresi – ať už jde o AI grafiku, nebo původní fotku.</p>
+<h2>Kdy má smysl obrázek vyměnit</h2>
+<p>Výměna dává smysl, když původní vizuál je nečitelný, pixelovaný, nebo nesedí na obsah. Například: generický stock obrázek „muž u počítače" na stránce o autoopravně. Tam AI může vytvořit fotku dílny, která lépe odpovídá textu.</p>
+<p>Ale i v tom případě platí: nový obrázek musíte zkomprimovat. Ideálně převést do WebP nebo AVIF, nastavit responsive varianty přes <code>srcset</code>, aby mobil nestahoval desktop rozlišení.</p>
+<p>Pokud původní obrázek sedí na obsah a jen váží moc, komprese je rychlejší a levnější než generování nového. Nástroje jako TinyPNG, Squoosh nebo WP plugin Imagify stlačí JPEG nebo PNG bezztrátově nebo s minimální ztrátou kvality. Výsledek: stejný vizuál, menší soubor, lepší LCP.</p>
+<h2>Co měří PageSpeed Insights a proč to záleží</h2>
+<p>PageSpeed Insights v sekci „Opportunities" často hlásí „Properly size images" nebo „Serve images in next-gen formats". To znamená, že prohlížeč stáhl obrázek větší, než bylo nutné pro viewport, nebo ve formátu, který není optimální.</p>
+<p>LCP (Largest Contentful Paint) měří, kdy se vykreslí největší viditelný prvek – často hero obrázek na homepage. Pokud ten prvek váží 3 MB, prohlížeč ho stahuje déle, LCP roste, skóre klesá. Výměna za AI obrázek o váze 4 MB problém zhorší, ne vyřeší.</p>
+<p>Field data v PageSpeed (CrUX) ukazují reálné načítání u návštěvníků za posledních 28 dní. Pokud tam vidíte LCP nad 2,5 s, komprese obrázků je první krok. Generování nových má smysl až po té kompresi, ne místo ní.</p>
+<h2>Kdy GoFixWeb komprimuje a kdy ne</h2>
+<p>GoFixWeb v režimu Auto (jen WooCommerce) komprimuje obrázky produktů a kategorií přes WP media knihovnu. Nenahrazuje je AI grafikou, protože produktová fotka musí odpovídat reálnému zboží. Komprese je bezztrátová nebo s minimální ztrátou, formát zůstává JPEG nebo PNG, případně WebP, pokud to server podporuje.</p>
+<p>Režim Auto nesahá na hero obrázky v page builderu ani na grafiku vloženou přes HTML/CSS. Tam sken v reportu ukáže váhu a doporučí kompresi, ale výměnu nebo nahrání nového souboru musíte udělat ručně.</p>
+<p>Pokud chcete použít AI obrázek na homepage, postup je: vygenerovat, zkomprimovat mimo WordPress (Squoosh, TinyPNG), nahrát do media knihovny, vložit přes page builder, zkontrolovat DevTools → Network, jestli prohlížeč stahuje správnou variantu.</p>
+<h2>Praktický postup: komprese před výměnou</h2>
+<ol>
+<li>Otevřete homepage v prohlížeči, DevTools → Network → Img, obnovte stránku.</li>
+<li>Najděte největší obrázek (sloupec Size), poznamenejte si název a váhu.</li>
+<li>Pokud váží víc než 500 kB, stáhněte ho, zkomprimujte (TinyPNG, Squoosh), nahrajte zpět.</li>
+<li>Obnovte stránku, zkontrolujte novou váhu. Pokud LCP klesl pod 2,5 s, máte hotovo.</li>
+<li>Teprve když komprese nestačí (obrázek je pixelovaný nebo nesedí na obsah), zvažte výměnu za AI grafiku – ale tu opět zkomprimujte před nahráním.</li>
+</ol>
+<p>Tento postup funguje i na kategoriích, produktech, blog článcích. Komprese je vždy první krok, generování nového vizuálu až druhý.</p>
+<p>Chcete stejný typ kontroly na svém e-shopu? <a href="/#analyza">Bezplatný report do 10 minut</a> — nebo se podívejte na <a href="/#faq">FAQ</a> a <a href="/#ceny">ceník</a>.</p>
+        <div class="article-cta">
+          <p>Chcete stejný typ kontroly na svém e-shopu? <a href="/#signup-form">Bezplatný report do 10 minut</a> — nebo se podívejte na <a href="/#faq">FAQ</a> a <a href="/#tarify">ceník</a>.</p>
+        </div>
+      </article>
+    </div>
+  </main>
+<footer>
+    <div class="container">
+      <p>© 2026 FinalEdge s.r.o. / GoFixWeb</p>
+      <div class="footer-links">
+        <a href="/">gofixweb.com</a>
+        <span aria-hidden="true">|</span>
+        <a href="mailto:info@gofixweb.com">info@gofixweb.com</a>
+        <span aria-hidden="true">|</span>
+        <a href="/terms.html?v=20260902">Obchodní podmínky</a>
+        <span aria-hidden="true">|</span>
+        <a href="/privacy.html?v=20260815">Ochrana osobních údajů</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
