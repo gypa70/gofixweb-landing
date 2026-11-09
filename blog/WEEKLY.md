@@ -2,24 +2,24 @@
 
 Pondělí 07:00 UTC, workflow **Weekly AI blog post**. Klíč: GitHub secret `ANTHROPIC_API_KEY`.
 
-Zbývá témat ve frontě: **11**. Publikováno z pipeline: **9**.
+Zbývá témat ve frontě: **10**. Publikováno z pipeline: **10**.
 
 ## Fronta (další běhy)
 
-1. `ai-copy-kategorii` — AI text do kategorie nevyřeší desítky prázdných archivů
-2. `mereni-pred-po-ai-zasahu` — Než pustíte AI do šablony, změřte homepage. Potom znovu
-3. `ai-a-core-web-vitals` — Core Web Vitals se nepromptují. Počítá je prohlížeč zákazníka
-4. `duveryhodnost-ai-pdf` — AI PDF o čtyřiceti stranách pořád není vyčíslená ztráta v korunách
-5. `application-password-vs-ai-plugin` — Application Password jde smazat. AI plugin v administraci zůstane, dokud ho někdo neodebere
-6. `ai-halucinace-v-navodech` — AI návod často kliká na obrazovku, která v šabloně není
-7. `automatizace-skenu-ne-obsahu` — Automatizovat sken dává smysl. Automatizovat celý katalog obvykle ne
-8. `ai-sitemap-a-filtry` — AI plugin umí vyrobit sitemapu. Neumí rozhodnout, které filtry mají být v indexu
-9. `lidsky-dohled-nad-ai-opravou` — Automatická oprava bez záznamu původního stavu je špatný trade
-10. `ai-v-agenturach-vs-majitel` — Agentura s AI reportem pořád může poslat 40 stran bez jediné koruny
-11. `kdy-nestaci-ai-ani-sken` — Kdy nestačí AI ani sken a potřebujete vývojáře
+1. `mereni-pred-po-ai-zasahu` — Než pustíte AI do šablony, změřte homepage. Potom znovu
+2. `ai-a-core-web-vitals` — Core Web Vitals se nepromptují. Počítá je prohlížeč zákazníka
+3. `duveryhodnost-ai-pdf` — AI PDF o čtyřiceti stranách pořád není vyčíslená ztráta v korunách
+4. `application-password-vs-ai-plugin` — Application Password jde smazat. AI plugin v administraci zůstane, dokud ho někdo neodebere
+5. `ai-halucinace-v-navodech` — AI návod často kliká na obrazovku, která v šabloně není
+6. `automatizace-skenu-ne-obsahu` — Automatizovat sken dává smysl. Automatizovat celý katalog obvykle ne
+7. `ai-sitemap-a-filtry` — AI plugin umí vyrobit sitemapu. Neumí rozhodnout, které filtry mají být v indexu
+8. `lidsky-dohled-nad-ai-opravou` — Automatická oprava bez záznamu původního stavu je špatný trade
+9. `ai-v-agenturach-vs-majitel` — Agentura s AI reportem pořád může poslat 40 stran bez jediné koruny
+10. `kdy-nestaci-ai-ani-sken` — Kdy nestačí AI ani sken a potřebujete vývojáře
 
 ## Publikováno
 
+- 2026-11-09 — [AI text do kategorie nevyřeší desítky prázdných archivů](/blog/ai-copy-kategorii/) (`ai-copy-kategorii`, zdroj: anthropic)
 - 2026-11-02 — [AI umí vygenerovat fotku. LCP spíš spraví komprese té, kterou už máte](/blog/ai-obrazky-vs-komprese/) (`ai-obrazky-vs-komprese`, zdroj: anthropic)
 - 2026-10-26 — [Kam AI ani automatická oprava sahat nesmí: platby, košík, doprava](/blog/kde-ai-neopravi-eshop/) (`kde-ai-neopravi-eshop`, zdroj: anthropic)
 - 2026-10-19 — [Chatbot vám poradí plugin. Sken vám řekne, co je na URL rozbité](/blog/chatbot-vs-technicky-sken/) (`chatbot-vs-technicky-sken`, zdroj: anthropic)

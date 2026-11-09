@@ -31,16 +31,6 @@
   ],
   "queue": [
     {
-      "id": "ai-copy-kategorii",
-      "title": "AI text do kategorie nevyřeší desítky prázdných archivů",
-      "angle": "Tenké kategorie a duplicitní copy. Generovaný odstavec nestačí, když je URL zbytečná.",
-      "avoid": "Neopisovat bod o tenkých kategoriích z WooCommerce checklistu 1:1.",
-      "tags": [
-        "AI",
-        "Katalog"
-      ]
-    },
-    {
       "id": "mereni-pred-po-ai-zasahu",
       "title": "Než pustíte AI do šablony, změřte homepage. Potom znovu",
       "angle": "Před/po stejnou metodikou. Bez druhého měření je „optimalizace“ jen pocit.",
@@ -213,6 +203,14 @@
       "date": "2026-11-02",
       "source": "anthropic",
       "url": "/blog/ai-obrazky-vs-komprese/"
+    },
+    {
+      "id": "ai-copy-kategorii",
+      "slug": "ai-copy-kategorii",
+      "title": "AI text do kategorie nevyřeší desítky prázdných archivů",
+      "date": "2026-11-09",
+      "source": "anthropic",
+      "url": "/blog/ai-copy-kategorii/"
     }
   ]
 }
