@@ -31,16 +31,6 @@
   ],
   "queue": [
     {
-      "id": "mereni-pred-po-ai-zasahu",
-      "title": "Než pustíte AI do šablony, změřte homepage. Potom znovu",
-      "angle": "Před/po stejnou metodikou. Bez druhého měření je „optimalizace“ jen pocit.",
-      "avoid": "Neopakovat case study jako důkaz, že každé AI zlepší skóre.",
-      "tags": [
-        "AI",
-        "Měření"
-      ]
-    },
-    {
       "id": "ai-a-core-web-vitals",
       "title": "Core Web Vitals se nepromptují. Počítá je prohlížeč zákazníka",
       "angle": "LCP, INP, CLS vs. text, který AI vygeneruje do článku. Field data zůstanou rozhodující.",
@@ -211,6 +201,14 @@
       "date": "2026-11-09",
       "source": "anthropic",
       "url": "/blog/ai-copy-kategorii/"
+    },
+    {
+      "id": "mereni-pred-po-ai-zasahu",
+      "slug": "mereni-pred-po-ai-zasahu",
+      "title": "Než pustíte AI do šablony, změřte homepage. Potom znovu",
+      "date": "2026-11-16",
+      "source": "anthropic",
+      "url": "/blog/mereni-pred-po-ai-zasahu/"
     }
   ]
 }
